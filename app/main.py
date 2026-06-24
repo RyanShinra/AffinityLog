@@ -1,28 +1,11 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import engine
-from app.graphql.schema import get_graphql_router
-from app.routers import experiments, health
+from app.routers import health
 
-app = FastAPI(
-    title=settings.app_title,
-    version=settings.app_version,
-    description=(
-        "AffinityLog: backend API for ingesting Amazon Bio Discovery antibody design exports. "
-        "REST endpoint for CSV upload; GraphQL for querying and comparing candidates."
-    ),
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Minimal application skeleton retained through the schema-first redesign.
+# Only the /health probe is wired up; the REST routers and the GraphQL mount come
+# back as the data model and API are rebuilt from the design discussion.
+# Baseline (Sonnet scaffold) preserved at git tag v0-scaffold.
+app = FastAPI(title=settings.app_title, version=settings.app_version)
 app.include_router(health.router)
-app.include_router(experiments.router)
-app.include_router(get_graphql_router(engine), prefix="/graphql")
