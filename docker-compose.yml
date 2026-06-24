@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: affinitylog
+      POSTGRES_PASSWORD: affinitylog
+      POSTGRES_DB: affinitylog
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U affinitylog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://affinitylog:affinitylog@db:5432/affinitylog
+      DEBUG: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Run migrations then start the server
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  pg_data:
