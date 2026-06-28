@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
@@ -8,11 +9,11 @@ from app.config import settings
 # One async engine per process. SQLAlchemy keeps an asyncpg connection pool underneath it;
 # total DB connections ≈ (worker processes) × (pool size). `pool_pre_ping` quietly re-checks a
 # connection before handing it out, so a Postgres restart doesn't surface as a random error.
-engine = create_async_engine(settings.database_url, echo=settings.debug, pool_pre_ping=True)
+engine: AsyncEngine = create_async_engine(settings.database_url, echo=settings.debug, pool_pre_ping=True)
 
 # expire_on_commit=False keeps attributes readable after commit() — we hand ORM objects back to
 # the GraphQL/REST layer past the flush, and don't want a surprise lazy-load there.
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(engine, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
