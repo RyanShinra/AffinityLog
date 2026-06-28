@@ -20,7 +20,6 @@ from sqlalchemy import (
     ARRAY,
     Column,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     String,
@@ -28,6 +27,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -221,11 +223,13 @@ class Experiment(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255))
+    
     # Container FKs are nullable + ON DELETE SET NULL: deleting a project/recipe/target orphans, not deletes,
     # the experiment (it keeps its data). SQL: project_id UUID REFERENCES projects(id) ON DELETE SET NULL
     project_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"))
     recipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("recipes.id", ondelete="SET NULL"))
     target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("targets.id", ondelete="SET NULL"))
+    
     # Recipe-variable run config (model_type, num_designs, hotspots, design_loops…). SQL: params JSONB NOT NULL DEFAULT '{}'
     params: Mapped[dict] = mapped_column(JSONB, default=dict)
     source_filename: Mapped[str | None] = mapped_column(String(500))
