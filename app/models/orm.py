@@ -67,13 +67,19 @@ class MetricValueType(enum.Enum):
     INT = "int"
     BOOL = "bool"
     CATEGORICAL = "categorical"
-    ARTIFACT = "artifact"  # structure/sequence file, not a scalar
 
 
 class Direction(enum.Enum):
     HIGHER_IS_BETTER = "higher_is_better"
     LOWER_IS_BETTER = "lower_is_better"
     NEUTRAL = "neutral"
+
+
+class VariantKind(enum.Enum):
+    PARAMETER = "parameter"
+    MODE = "mode"
+    SOURCE_MODEL = "source_model"
+    COMPONENT = "component"
 
 
 # ---------------------------------------------------------------------------
@@ -140,13 +146,16 @@ class Metric(Base):
 
     __tablename__ = "metrics"
     __table_args__ = (
-        # C-lite metric identity = (module, column_key, discriminator).
+        # Metric identity is the natural key (module_id, column_key, variant_kind, variant) — NOT
+        # column_key alone, because the same column name recurs across modules/runs meaning different
+        # things, and the variant is what tells those apart.
         # NULLS NOT DISTINCT (Postgres 15+) is the subtle bit: by default Postgres treats NULL != NULL,
-        # so two rows with the same (module, column) and a NULL discriminator would NOT collide. We want
-        # them to, so the common (discriminator IS NULL) case stays unique-per-(module,column).
-        #   UNIQUE NULLS NOT DISTINCT (module_id, column_key, discriminator)
+        # so two rows with a NULL variant would NOT collide. We want them to — so a column with no
+        # variant stays unique per (module, column_key). That common (variant IS NULL) case is exactly
+        # what this guards.
+        #   UNIQUE NULLS NOT DISTINCT (module_id, column_key, variant_kind, variant)
         UniqueConstraint(
-            "module_id", "column_key", "discriminator",
+            "module_id", "column_key", "variant_kind", "variant",
             name="uq_metric_identity", postgresql_nulls_not_distinct=True,
         ),
     )
@@ -159,9 +168,21 @@ class Metric(Base):
     unit: Mapped[str | None] = mapped_column(String(32))    # "kcal/mol", "°C"; NULL = dimensionless
     direction: Mapped[Direction] = mapped_column(SAEnum(Direction), default=Direction.NEUTRAL)
     property_categories: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
-    # The thing that disambiguates this column within its module: a param ("model_type=esm"), a run-mode,
-    # the producing model (scRMSD's ABB2/ABB3), or the physical axis (binding vs stability ddG). NULL = common.
-    discriminator: Mapped[str | None] = mapped_column(String(128))
+    
+    # What disambiguates this column WITHIN its module. Some modules emit the same column_key more
+    # than once, meaning a different thing each time; `variant_kind` says along WHICH axis it varies,
+    # `variant` is the value on that axis. The pair is also the handle a GUI groups/compares by.
+    #   PARAMETER     a config knob changed the run    PLM perplexity, model_type=esm  → variant="esm"
+    #   SOURCE_MODEL  scored against another model      igdesign scRMSD via ABB3        → variant="ABB3"
+    #   COMPONENT     one readout of a multi-part metric  thermostability Tm1/Tm2/Tm3   → variant="Tm1"
+    #   MODE          a distinct run-mode of the same module
+    # Both NULL = the common case: this column appears once, nothing to disambiguate.
+    variant_kind: Mapped[VariantKind | None] = mapped_column(SAEnum(VariantKind))
+    variant: Mapped[str | None] = mapped_column(String(128))
+    
+    concept_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="SET NULL"))
+    concept: Mapped["Concept | None"] = relationship(back_populates="metrics")
+     
     # Benchmark normalization, e.g. {"type": "mahalanobis_gaussian", "params": {"mu": 3.59, "sigma": 7.47}}
     transform: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -169,6 +190,16 @@ class Metric(Base):
     module: Mapped["Module"] = relationship(back_populates="metrics")
 
 
+class Concept(Base):
+    __tablename__ = "concepts"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    label: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text)
+    
+    metrics: Mapped[list["Metric"]] = relationship(back_populates="concept")
+    
 # ===========================================================================
 # EXPERIMENT SIDE (ingested data)
 # ===========================================================================
