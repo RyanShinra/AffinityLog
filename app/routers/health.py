@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
 from app.config import settings
-from app.schemas.pydantic import HealthResponse
 
 router = APIRouter()
 
 
-@router.get("/health", response_model=HealthResponse, tags=["ops"])
-async def health() -> HealthResponse:
-    return HealthResponse(status="ok", version=settings.app_version)
+# Kept through the redesign: the ECS/Docker health probe. Deliberately self-contained
+# (returns a plain dict, no domain schema) so it survives clearing the application layer.
+@router.get("/health", tags=["ops"])
+async def health() -> dict[str, str]:
+    return {"status": "ok", "version": settings.app_version}

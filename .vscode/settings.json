@@ -1,0 +1,23 @@
+{
+    "cSpell.words": [
+        "developability",
+        "fasta",
+        "immunogenicity",
+        "ondelete",
+        "polyreactivity",
+        "sessionmaker",
+        "thermostability"
+    ],
+    "continue.enableNextEdit": false,
+    "editor.inlineSuggest.enabled": true,
+    "editor.inlineSuggest.minShowDelay": 200,
+    "editor.inlineSuggest.suppressSuggestions": true,
+    "editor.quickSuggestions": {
+        "other": "offWhenInlineCompletions",
+        "comments": "off",
+        "strings": "off",
+
+    },
+    "editor.quickSuggestionsDelay": 500,
+    "editor.inlineSuggest.suppressInSnippetMode": false,
+}
