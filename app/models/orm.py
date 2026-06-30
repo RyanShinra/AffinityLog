@@ -298,37 +298,23 @@ class Candidate(Base):
     """A designed sequence + its scores."""
 
     __tablename__ = "candidates"
-    __table_args__ = (UniqueConstraint("experiment_id", "sequence_id", name="uq_candidate_seq"), 
-                      Index("ix_candidates_scores_gin", "scores", postgres_using="gin"))
+    __table_args__ = (
+        UniqueConstraint("experiment_id", "sequence_id", name="uq_candidate_seq"),
+        Index("ix_candidates_scores_gin", "scores", postgresql_using="gin"),
+    )
 
     # --- provided (so the file imports & relationships resolve) ---
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     experiment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE"))
 
-    sequence_id: Mapped[str] = mapped_column(String(255))
-    fasta_sequence: Mapped[str] = mapped_column(Text)
+    sequence_id: Mapped[str] = mapped_column(String(255))   # Bio Discovery's per-candidate id
+    fasta_sequence: Mapped[str] = mapped_column(Text)        # the amino-acid sequence
+    # The raw {column_key: value} bag — every export column lands here untyped (default=dict → '{}').
+    # GIN-indexed above so we can query INSIDE it, e.g. WHERE (scores->>'pseudo_perplexity')::float < 10
     scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
     annotation: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    
-    # --- TODO (you): add these columns, copying the patterns from `Module` above ---
-    #   sequence_id     : str         NOT NULL   → String(255)   (Bio Discovery's per-candidate id)
-    #   fasta_sequence  : str         NOT NULL   → Text          (the amino-acid sequence)
-    #   scores          : dict                   → JSONB, default=dict
-    #                       raw SQL:  scores JSONB NOT NULL DEFAULT '{}'   (the {column_key: value} bag)
-    #   annotation      : str | None  NULLABLE   → Text
-    #   created_at      : datetime               → DateTime(timezone=True), server_default=func.now()
-    #
-    # --- TODO (you): add __table_args__ = ( ... ) with BOTH of these ---
-    #   1) UniqueConstraint("experiment_id", "sequence_id", name="uq_candidate_seq")
-    #        raw SQL:  UNIQUE (experiment_id, sequence_id)     ← one sequence_id per experiment
-    #   2) Index("ix_candidates_scores_gin", "scores", postgresql_using="gin")
-    #        raw SQL:  CREATE INDEX ix_candidates_scores_gin ON candidates USING gin (scores);
-    #        (lets us query INSIDE the JSONB, e.g.  WHERE (scores->>'pseudo_perplexity')::float < 10)
-    #
-    # (UniqueConstraint, Index, JSONB, Text, String, DateTime, func, mapped_column, Mapped
-    #  are all already imported at the top — you don't need to touch the imports.)
 
-    # --- relationships (provided) ---
+    # --- relationships ---
     experiment: Mapped["Experiment"] = relationship(back_populates="candidates")
     artifacts: Mapped[list["Artifact"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
