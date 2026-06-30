@@ -5,6 +5,7 @@
         "immunogenicity",
         "ondelete",
         "polyreactivity",
-        "sessionmaker"
+        "sessionmaker",
+        "thermostability"
     ],
 }
