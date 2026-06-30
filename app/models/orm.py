@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -298,7 +299,7 @@ class Experiment(ModelBase):
     )
 
     # Recipe-variable run config (model_type, num_designs, hotspots, design_loops…). SQL: params JSONB NOT NULL DEFAULT '{}'
-    params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default=text("'{}'"))
     source_filename: Mapped[str | None] = mapped_column(String(500))
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -353,7 +354,7 @@ class Candidate(ModelBase):
     fasta_sequence: Mapped[str] = mapped_column(Text)  # the amino-acid sequence
     # The raw {column_key: value} bag — every export column lands here untyped (default=dict → '{}').
     # GIN-indexed above so we can query INSIDE it, e.g. WHERE (scores->>'pseudo_perplexity')::float < 10
-    scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+    scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict, server_default=text("'{}'"))
     annotation: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

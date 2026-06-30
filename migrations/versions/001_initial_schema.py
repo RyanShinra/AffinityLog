@@ -120,7 +120,12 @@ def upgrade() -> None:
         sa.Column("project_id", sa.UUID(), nullable=True),
         sa.Column("recipe_id", sa.UUID(), nullable=True),
         sa.Column("target_id", sa.UUID(), nullable=True),
-        sa.Column("params", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "params",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'"),
+        ),
         sa.Column("source_filename", sa.String(length=500), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
@@ -192,7 +197,12 @@ def upgrade() -> None:
         sa.Column("experiment_id", sa.UUID(), nullable=False),
         sa.Column("sequence_id", sa.String(length=255), nullable=False),
         sa.Column("fasta_sequence", sa.Text(), nullable=False),
-        sa.Column("scores", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "scores",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'"),
+        ),
         sa.Column("annotation", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
