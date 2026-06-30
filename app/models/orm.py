@@ -298,11 +298,19 @@ class Candidate(Base):
     """A designed sequence + its scores."""
 
     __tablename__ = "candidates"
+    __table_args__ = (UniqueConstraint("experiment_id", "sequence_id", name="uq_candidate_seq"), 
+                      Index("ix_candidates_scores_gin", "scores", postgres_using="gin"))
 
     # --- provided (so the file imports & relationships resolve) ---
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     experiment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE"))
 
+    sequence_id: Mapped[str] = mapped_column(String(255))
+    fasta_sequence: Mapped[str] = mapped_column(Text)
+    scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+    annotation: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
     # --- TODO (you): add these columns, copying the patterns from `Module` above ---
     #   sequence_id     : str         NOT NULL   → String(255)   (Bio Discovery's per-candidate id)
     #   fasta_sequence  : str         NOT NULL   → Text          (the amino-acid sequence)
