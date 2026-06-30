@@ -5,13 +5,13 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
-from app.database import Base
+from app.database import ModelBase
 from app.models import orm  # noqa: F401 — ensure models are registered
 
 config = context.config
 fileConfig(config.config_file_name)  # type: ignore[arg-type]
 
-target_metadata = Base.metadata
+target_metadata = ModelBase.metadata
 
 
 def run_migrations_offline() -> None:

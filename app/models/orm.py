@@ -15,6 +15,7 @@ SQLAlchemy 2.0 ↔ what you already know:
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     ARRAY,
@@ -34,7 +35,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import ModelBase
 
 # ---------------------------------------------------------------------------
 # Enums (controlled vocabularies). Each becomes a native Postgres ENUM type.
@@ -93,9 +94,19 @@ class VariantKind(enum.Enum):
 
 recipe_modules = Table(
     "recipe_modules",
-    Base.metadata,
-    Column("recipe_id", UUID(as_uuid=True), ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True),
-    Column("module_id", UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), primary_key=True),
+    ModelBase.metadata,
+    Column(
+        "recipe_id",
+        UUID(as_uuid=True),
+        ForeignKey("recipes.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "module_id",
+        UUID(as_uuid=True),
+        ForeignKey("modules.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 
@@ -104,7 +115,7 @@ recipe_modules = Table(
 # ===========================================================================
 
 
-class Module(Base):
+class Module(ModelBase):
     """
     An algorithmic unit in Bio Discovery (e.g. "Boltz2", "PLM Pseudo-Perplexity").
 
@@ -125,7 +136,9 @@ class Module(Base):
 
     # Postgres native ARRAY of enum. Later we query it with array operators, e.g.
     #   SELECT * FROM modules WHERE functions && ARRAY['stability']::modulefunction[];
-    functions: Mapped[list[ModuleFunction]] = mapped_column(ARRAY(SAEnum(ModuleFunction)), default=list)
+    functions: Mapped[list[ModuleFunction]] = mapped_column(
+        ARRAY(SAEnum(ModuleFunction)), default=list
+    )
 
     # The `| None` is what makes it NULLABLE (like C#'s `string?`).
     repo_url: Mapped[str | None] = mapped_column(String(500))
@@ -136,12 +149,16 @@ class Module(Base):
 
     # Relationships — Python-side nav properties, NOT columns.
     # One Module → many Metric. back_populates wires both sides; cascade deletes its metrics with it.
-    metrics: Mapped[list["Metric"]] = relationship(back_populates="module", cascade="all, delete-orphan")
+    metrics: Mapped[list["Metric"]] = relationship(
+        back_populates="module", cascade="all, delete-orphan"
+    )
     # Other side of the M2M; `secondary` points at the association table above.
-    recipes: Mapped[list["Recipe"]] = relationship(secondary=recipe_modules, back_populates="modules")
+    recipes: Mapped[list["Recipe"]] = relationship(
+        secondary=recipe_modules, back_populates="modules"
+    )
 
 
-class Metric(Base):
+class Metric(ModelBase):
     """One named output a Module can emit (a column). The catalog's core — all our refinements live here."""
 
     __tablename__ = "metrics"
@@ -155,20 +172,28 @@ class Metric(Base):
         # what this guards.
         #   UNIQUE NULLS NOT DISTINCT (module_id, column_key, variant_kind, variant)
         UniqueConstraint(
-            "module_id", "column_key", "variant_kind", "variant",
-            name="uq_metric_identity", postgresql_nulls_not_distinct=True,
+            "module_id",
+            "column_key",
+            "variant_kind",
+            "variant",
+            name="uq_metric_identity",
+            postgresql_nulls_not_distinct=True,
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    module_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"))
-    column_key: Mapped[str] = mapped_column(String(128))   # raw export header, e.g. "pseudo_perplexity"
+    module_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE")
+    )
+    column_key: Mapped[str] = mapped_column(
+        String(128)
+    )  # raw export header, e.g. "pseudo_perplexity"
     display_name: Mapped[str] = mapped_column(String(255))  # "ESM2 Perplexity"
     value_type: Mapped[MetricValueType] = mapped_column(SAEnum(MetricValueType))
-    unit: Mapped[str | None] = mapped_column(String(32))    # "kcal/mol", "°C"; NULL = dimensionless
+    unit: Mapped[str | None] = mapped_column(String(32))  # "kcal/mol", "°C"; NULL = dimensionless
     direction: Mapped[Direction] = mapped_column(SAEnum(Direction), default=Direction.NEUTRAL)
     property_categories: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
-    
+
     # What disambiguates this column WITHIN its module. Some modules emit the same column_key more
     # than once, meaning a different thing each time; `variant_kind` says along WHICH axis it varies,
     # `variant` is the value on that axis. The pair is also the handle a GUI groups/compares by.
@@ -179,33 +204,36 @@ class Metric(Base):
     # Both NULL = the common case: this column appears once, nothing to disambiguate.
     variant_kind: Mapped[VariantKind | None] = mapped_column(SAEnum(VariantKind))
     variant: Mapped[str | None] = mapped_column(String(128))
-    
-    concept_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="SET NULL"))
+
+    concept_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="SET NULL")
+    )
     concept: Mapped["Concept | None"] = relationship(back_populates="metrics")
-     
+
     # Benchmark normalization, e.g. {"type": "mahalanobis_gaussian", "params": {"mu": 3.59, "sigma": 7.47}}
-    transform: Mapped[dict | None] = mapped_column(JSONB)
+    transform: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     module: Mapped["Module"] = relationship(back_populates="metrics")
 
 
-class Concept(Base):
+class Concept(ModelBase):
     __tablename__ = "concepts"
-    
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(64), unique=True)
     label: Mapped[str] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(Text)
-    
+
     metrics: Mapped[list["Metric"]] = relationship(back_populates="concept")
-    
+
+
 # ===========================================================================
 # EXPERIMENT SIDE (ingested data)
 # ===========================================================================
 
 
-class Project(Base):
+class Project(ModelBase):
     """Thin container grouping related experiments."""
 
     __tablename__ = "projects"
@@ -218,7 +246,7 @@ class Project(Base):
     experiments: Mapped[list["Experiment"]] = relationship(back_populates="project")
 
 
-class Target(Base):
+class Target(ModelBase):
     """The antigen designed against (e.g. HER2 / 1S78). Reusable across experiments."""
 
     __tablename__ = "targets"
@@ -231,7 +259,7 @@ class Target(Base):
     experiments: Mapped[list["Experiment"]] = relationship(back_populates="target")
 
 
-class Recipe(Base):
+class Recipe(ModelBase):
     """A Bio Discovery workflow = a composition of modules."""
 
     __tablename__ = "recipes"
@@ -243,26 +271,34 @@ class Recipe(Base):
     version: Mapped[str | None] = mapped_column(String(32))  # for the capture-as-run concern
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    modules: Mapped[list["Module"]] = relationship(secondary=recipe_modules, back_populates="recipes")
+    modules: Mapped[list["Module"]] = relationship(
+        secondary=recipe_modules, back_populates="recipes"
+    )
     experiments: Mapped[list["Experiment"]] = relationship(back_populates="recipe")
 
 
-class Experiment(Base):
+class Experiment(ModelBase):
     """One run: a recipe against a target, with config (params), producing candidates."""
 
     __tablename__ = "experiments"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255))
-    
+
     # Container FKs are nullable + ON DELETE SET NULL: deleting a project/recipe/target orphans, not deletes,
     # the experiment (it keeps its data). SQL: project_id UUID REFERENCES projects(id) ON DELETE SET NULL
-    project_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"))
-    recipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("recipes.id", ondelete="SET NULL"))
-    target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("targets.id", ondelete="SET NULL"))
-    
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
+    )
+    recipe_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recipes.id", ondelete="SET NULL")
+    )
+    target_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("targets.id", ondelete="SET NULL")
+    )
+
     # Recipe-variable run config (model_type, num_designs, hotspots, design_loops…). SQL: params JSONB NOT NULL DEFAULT '{}'
-    params: Mapped[dict] = mapped_column(JSONB, default=dict)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     source_filename: Mapped[str | None] = mapped_column(String(500))
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -270,18 +306,22 @@ class Experiment(Base):
     project: Mapped["Project | None"] = relationship(back_populates="experiments")
     recipe: Mapped["Recipe | None"] = relationship(back_populates="experiments")
     target: Mapped["Target | None"] = relationship(back_populates="experiments")
-    candidates: Mapped[list["Candidate"]] = relationship(back_populates="experiment", cascade="all, delete-orphan")
+    candidates: Mapped[list["Candidate"]] = relationship(
+        back_populates="experiment", cascade="all, delete-orphan"
+    )
 
 
-class Artifact(Base):
+class Artifact(ModelBase):
     """A non-scalar output (structure/sequence file) referenced by URI. The placeholder hook for now."""
 
     __tablename__ = "artifacts"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    candidate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"))
-    kind: Mapped[str] = mapped_column(String(32))     # "structure" / "sequence"
-    uri: Mapped[str] = mapped_column(String(1000))    # "s3://bucket/…" or "https://…"
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(32))  # "structure" / "sequence"
+    uri: Mapped[str] = mapped_column(String(1000))  # "s3://bucket/…" or "https://…"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     candidate: Mapped["Candidate"] = relationship(back_populates="artifacts")
@@ -294,7 +334,7 @@ class Artifact(Base):
 # ===========================================================================
 
 
-class Candidate(Base):
+class Candidate(ModelBase):
     """A designed sequence + its scores."""
 
     __tablename__ = "candidates"
@@ -305,10 +345,12 @@ class Candidate(Base):
 
     # --- provided (so the file imports & relationships resolve) ---
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    experiment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE"))
+    experiment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE")
+    )
 
-    sequence_id: Mapped[str] = mapped_column(String(255))   # Bio Discovery's per-candidate id
-    fasta_sequence: Mapped[str] = mapped_column(Text)        # the amino-acid sequence
+    sequence_id: Mapped[str] = mapped_column(String(255))  # Bio Discovery's per-candidate id
+    fasta_sequence: Mapped[str] = mapped_column(Text)  # the amino-acid sequence
     # The raw {column_key: value} bag — every export column lands here untyped (default=dict → '{}').
     # GIN-indexed above so we can query INSIDE it, e.g. WHERE (scores->>'pseudo_perplexity')::float < 10
     scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
@@ -317,4 +359,6 @@ class Candidate(Base):
 
     # --- relationships ---
     experiment: Mapped["Experiment"] = relationship(back_populates="candidates")
-    artifacts: Mapped[list["Artifact"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
+    artifacts: Mapped[list["Artifact"]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan"
+    )
