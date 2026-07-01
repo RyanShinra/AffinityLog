@@ -104,6 +104,23 @@ Docker only. Do not add a deploy step to CI until the next sprint.
 
 ---
 
+## Dev environment (multi-machine)
+
+- **PC:** WSL Ubuntu is the default shell — VS Code opens the repo via the `/mnt/f/...` mount
+  (same working tree, not a separate clone). Assume WSL bash unless the user says otherwise;
+  avoid defaulting to PowerShell or Git Bash for Python/Alembic/Docker work.
+- **Mac:** native terminal.
+- **`.venv` is OS-specific and gitignored** — build it fresh per machine/shell
+  (`python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"` on WSL/Mac;
+  `python -m venv .venv && .venv\Scripts\pip install -e ".[dev]"` if ever run natively on Windows).
+  Since PC WSL and PC-native share one `.venv` folder path on disk, rebuilding from WSL
+  overwrites a Windows-built one (and vice versa) — expected, not a bug.
+- **Docker Desktop's WSL2 backend is shared** — containers started from PowerShell are visible
+  and usable from WSL bash (`docker compose ps`) without restarting, as long as WSL integration
+  is enabled for the Ubuntu distro (Docker Desktop → Settings → Resources → WSL Integration).
+
+---
+
 ## Quick start
 
 ```bash
