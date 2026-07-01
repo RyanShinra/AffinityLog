@@ -1,0 +1,5962 @@
+[
+ {
+  "module": "PLM Pseudo-Perplexity",
+  "param": "model_type=esm",
+  "column": "pseudo_perplexity",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Titer",
+    "spearman": -0.541,
+    "stars": "***",
+    "auroc": 0.867,
+    "auprc": 0.753,
+    "precisionTop5": 0.902,
+    "precisionTop5NullDist": [
+     0.273,
+     0.363
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": -0.631
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": -0.543
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": -0.785
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": -0.711
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.289,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.131
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": 0.174
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.272
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.472
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.254,
+    "stars": "***",
+    "auroc": 0.379,
+    "auprc": 0.692,
+    "precisionTop5": 0.583,
+    "precisionTop5NullDist": [
+     0.694,
+     0.834
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.185
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.219
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.483
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": 0.212
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.245,
+    "stars": "***",
+    "auroc": 0.664,
+    "auprc": 0.649,
+    "precisionTop5": 0.9,
+    "precisionTop5NullDist": [
+     0.195,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.197
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.527
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": -0.443
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.5
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.151,
+    "stars": "***",
+    "auroc": 0.588,
+    "auprc": 0.684,
+    "precisionTop5": 0.772,
+    "precisionTop5NullDist": [
+     0.532,
+     0.696
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.046
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": -0.139
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.556
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.02
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.148,
+    "stars": "***",
+    "auroc": 0.557,
+    "auprc": 0.64,
+    "precisionTop5": 0.759,
+    "precisionTop5NullDist": [
+     0.481,
+     0.672
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.064
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": -0.148
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.493
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.024
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.11,
+    "stars": "***",
+    "auroc": 0.453,
+    "auprc": 0.578,
+    "precisionTop5": 0.605,
+    "precisionTop5NullDist": [
+     0.518,
+     0.691
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": -0.102
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": 0.101
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": -0.454
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": -0.089
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.104,
+    "stars": "***",
+    "auroc": 0.555,
+    "auprc": 0.672,
+    "precisionTop5": 0.667,
+    "precisionTop5NullDist": [
+     0.533,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.225
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.136
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": -0.497
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.06
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.012,
+    "stars": "",
+    "auroc": 0.491,
+    "auprc": 0.66,
+    "precisionTop5": 0.397,
+    "precisionTop5NullDist": [
+     0.616,
+     0.781
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.38
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.082
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.366
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.081
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "PLM Pseudo-Perplexity",
+  "param": "model_type=amplify",
+  "column": "pseudo_perplexity",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Titer",
+    "spearman": -0.448,
+    "stars": "***",
+    "auroc": 0.806,
+    "auprc": 0.649,
+    "precisionTop5": 0.85,
+    "precisionTop5NullDist": [
+     0.26,
+     0.35
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": -0.663
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": -0.501
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": -0.724
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": -0.72
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.177,
+    "stars": "***",
+    "auroc": 0.424,
+    "auprc": 0.706,
+    "precisionTop5": 0.583,
+    "precisionTop5NullDist": [
+     0.68,
+     0.848
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.168
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.085
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.364
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": 0.081
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.153,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.107
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.031
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.231
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.067
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.142,
+    "stars": "***",
+    "auroc": 0.445,
+    "auprc": 0.562,
+    "precisionTop5": 0.494,
+    "precisionTop5NullDist": [
+     0.494,
+     0.679
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": -0.173
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": 0.056
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": -0.341
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": -0.091
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.102,
+    "stars": "",
+    "auroc": 0.626,
+    "auprc": 0.566,
+    "precisionTop5": 0.7,
+    "precisionTop5NullDist": [
+     0.2,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.24
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.087
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": -0.257
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 1
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.091,
+    "stars": "***",
+    "auroc": 0.548,
+    "auprc": 0.661,
+    "precisionTop5": 0.709,
+    "precisionTop5NullDist": [
+     0.518,
+     0.696
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.046
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.14
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.363
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.126
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.074,
+    "stars": "**",
+    "auroc": 0.518,
+    "auprc": 0.616,
+    "precisionTop5": 0.684,
+    "precisionTop5NullDist": [
+     0.506,
+     0.671
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.089
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.166
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.285
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.168
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.062,
+    "stars": "*",
+    "auroc": 0.542,
+    "auprc": 0.669,
+    "precisionTop5": 0.65,
+    "precisionTop5NullDist": [
+     0.533,
+     0.75
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.12
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": 0.066
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": -0.271
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.031
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.05,
+    "stars": "",
+    "auroc": 0.515,
+    "auprc": 0.672,
+    "precisionTop5": 0.452,
+    "precisionTop5NullDist": [
+     0.603,
+     0.781
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.333
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.148
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.221
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.038
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "ESM2 Property Predictor",
+  "param": "selected_plm=hydrophobicity",
+  "column": "predicted_property",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.408,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.144
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": 0.435
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.178
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.419
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "AbLang2-Perplexity",
+  "param": null,
+  "column": "perplexity",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Titer",
+    "spearman": -0.382,
+    "stars": "***",
+    "auroc": 0.759,
+    "auprc": 0.58,
+    "precisionTop5": 0.795,
+    "precisionTop5NullDist": [
+     0.26,
+     0.351
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": -0.609
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": -0.45
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": -0.733
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": -0.699
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.159,
+    "stars": "***",
+    "auroc": 0.579,
+    "auprc": 0.674,
+    "precisionTop5": 0.734,
+    "precisionTop5NullDist": [
+     0.518,
+     0.697
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.02
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.186
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.376
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.063
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.14,
+    "stars": "***",
+    "auroc": 0.553,
+    "auprc": 0.627,
+    "precisionTop5": 0.684,
+    "precisionTop5NullDist": [
+     0.506,
+     0.684
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.023
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.219
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.301
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.05
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.127,
+    "stars": "***",
+    "auroc": 0.449,
+    "auprc": 0.719,
+    "precisionTop5": 0.625,
+    "precisionTop5NullDist": [
+     0.667,
+     0.833
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.07
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.05
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.379
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": 0.012
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.06,
+    "stars": "*",
+    "auroc": 0.461,
+    "auprc": 0.642,
+    "precisionTop5": 0.452,
+    "precisionTop5NullDist": [
+     0.616,
+     0.781
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.336
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.106
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.224
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.108
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.057,
+    "stars": "",
+    "auroc": 0.553,
+    "auprc": 0.48,
+    "precisionTop5": 0.6,
+    "precisionTop5NullDist": [
+     0.2,
+     0.705
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.236
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": 0.221
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": -0.239
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 1
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.053,
+    "stars": "",
+    "auroc": 0.552,
+    "auprc": 0.677,
+    "precisionTop5": 0.683,
+    "precisionTop5NullDist": [
+     0.533,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.162
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": 0.105
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": -0.27
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.015
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.022,
+    "stars": "",
+    "auroc": 0.518,
+    "auprc": 0.598,
+    "precisionTop5": 0.481,
+    "precisionTop5NullDist": [
+     0.493,
+     0.691
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": -0.111
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": 0.063
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": -0.319
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": -0.043
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.001,
+    "stars": "",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.086
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.086
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.257
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.126
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "AbLang2-Perplexity",
+  "param": null,
+  "column": "log_likelihood",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Titer",
+    "spearman": 0.382,
+    "stars": "***",
+    "auroc": 0.759,
+    "auprc": 0.58,
+    "precisionTop5": 0.795,
+    "precisionTop5NullDist": [
+     0.26,
+     0.351
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": 0.609
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": 0.45
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": 0.733
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": 0.699
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.159,
+    "stars": "***",
+    "auroc": 0.579,
+    "auprc": 0.674,
+    "precisionTop5": 0.734,
+    "precisionTop5NullDist": [
+     0.518,
+     0.697
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.02
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": -0.186
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.376
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.063
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.14,
+    "stars": "***",
+    "auroc": 0.553,
+    "auprc": 0.627,
+    "precisionTop5": 0.684,
+    "precisionTop5NullDist": [
+     0.506,
+     0.684
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.023
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": -0.219
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.301
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.05
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.127,
+    "stars": "***",
+    "auroc": 0.449,
+    "auprc": 0.719,
+    "precisionTop5": 0.625,
+    "precisionTop5NullDist": [
+     0.667,
+     0.833
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": -0.07
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": -0.05
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": -0.379
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.012
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.06,
+    "stars": "*",
+    "auroc": 0.461,
+    "auprc": 0.642,
+    "precisionTop5": 0.452,
+    "precisionTop5NullDist": [
+     0.616,
+     0.781
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": -0.336
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": 0.106
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.224
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.108
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.057,
+    "stars": "",
+    "auroc": 0.553,
+    "auprc": 0.48,
+    "precisionTop5": 0.6,
+    "precisionTop5NullDist": [
+     0.2,
+     0.705
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": -0.236
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.221
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.239
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": -1
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.053,
+    "stars": "",
+    "auroc": 0.552,
+    "auprc": 0.677,
+    "precisionTop5": 0.683,
+    "precisionTop5NullDist": [
+     0.533,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": -0.162
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.105
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.27
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.015
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.022,
+    "stars": "",
+    "auroc": 0.518,
+    "auprc": 0.598,
+    "precisionTop5": 0.481,
+    "precisionTop5NullDist": [
+     0.493,
+     0.691
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": 0.111
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": -0.063
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": 0.319
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": 0.043
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.001,
+    "stars": "",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": -0.086
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": 0.086
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.257
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.126
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TNP",
+  "param": "\"hscale\": 0=Kyte and Doolittle",
+  "column": "PSH",
+  "transform": "Not transformed because of bimodal distribution.",
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.329,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.271
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.253
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.185
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.245
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "FastDPE",
+  "param": null,
+  "column": "cdrHydro",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.3,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": -0.218
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.351
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.071
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.059
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.189,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.214
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.257
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.081
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.053
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TemStaPro",
+  "param": null,
+  "column": "t60_raw",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.299,
+    "stars": "***",
+    "auroc": 0.757,
+    "auprc": 0.603,
+    "precisionTop5": 0.3,
+    "precisionTop5NullDist": [
+     0.2,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.456
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.034
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.515
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.5
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.284,
+    "stars": "***",
+    "auroc": 0.652,
+    "auprc": 0.717,
+    "precisionTop5": 0.785,
+    "precisionTop5NullDist": [
+     0.519,
+     0.696
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.486
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.047
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.266
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.018
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.267,
+    "stars": "***",
+    "auroc": 0.647,
+    "auprc": 0.684,
+    "precisionTop5": 0.772,
+    "precisionTop5NullDist": [
+     0.494,
+     0.658
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.534
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.006
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.264
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.037
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.181,
+    "stars": "***",
+    "auroc": 0.588,
+    "auprc": 0.669,
+    "precisionTop5": 0.65,
+    "precisionTop5NullDist": [
+     0.533,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.42
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.031
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.361
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.078
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TemStaPro",
+  "param": null,
+  "column": "t50_raw",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.294,
+    "stars": "***",
+    "auroc": 0.76,
+    "auprc": 0.684,
+    "precisionTop5": 0.9,
+    "precisionTop5NullDist": [
+     0.2,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.326
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": 0
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.444
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.5
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.215,
+    "stars": "***",
+    "auroc": 0.62,
+    "auprc": 0.682,
+    "precisionTop5": 0.81,
+    "precisionTop5NullDist": [
+     0.481,
+     0.684
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.42
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.092
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.251
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.072
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.21,
+    "stars": "***",
+    "auroc": 0.626,
+    "auprc": 0.711,
+    "precisionTop5": 0.848,
+    "precisionTop5NullDist": [
+     0.544,
+     0.684
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.388
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.095
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.222
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.04
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.198,
+    "stars": "***",
+    "auroc": 0.598,
+    "auprc": 0.682,
+    "precisionTop5": 0.65,
+    "precisionTop5NullDist": [
+     0.5,
+     0.701
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.332
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": 0.055
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.33
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.034
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "FastDPE",
+  "param": null,
+  "column": "SFvCSP",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.283,
+    "stars": "***",
+    "auroc": 0.65,
+    "auprc": 0.815,
+    "precisionTop5": 0.898,
+    "precisionTop5NullDist": [
+     0.612,
+     0.816
+    ],
+    "n": 971,
+    "strata": {
+     "IgG": {
+      "n": 825,
+      "spearman": 0.238
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.533
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.283,
+    "stars": "***",
+    "auroc": 0.35,
+    "auprc": 0.639,
+    "precisionTop5": 0.531,
+    "precisionTop5NullDist": [
+     0.632,
+     0.817
+    ],
+    "n": 971,
+    "strata": {
+     "IgG": {
+      "n": 825,
+      "spearman": 0.238
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.533
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.199,
+    "stars": "***",
+    "auroc": 0.647,
+    "auprc": 0.357,
+    "precisionTop5": 0.241,
+    "precisionTop5NullDist": [
+     0.219,
+     0.31
+    ],
+    "n": 3723,
+    "strata": {
+     "IgG": {
+      "n": 3259,
+      "spearman": 0.159
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": 0.496
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.199,
+    "stars": "***",
+    "auroc": 0.353,
+    "auprc": 0.207,
+    "precisionTop5": 0.112,
+    "precisionTop5NullDist": [
+     0.219,
+     0.31
+    ],
+    "n": 3723,
+    "strata": {
+     "IgG": {
+      "n": 3259,
+      "spearman": 0.159
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": 0.496
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.168,
+    "stars": "***",
+    "auroc": 0.602,
+    "auprc": 0.736,
+    "precisionTop5": 0.818,
+    "precisionTop5NullDist": [
+     0.564,
+     0.782
+    ],
+    "n": 1100,
+    "strata": {
+     "IgG": {
+      "n": 943,
+      "spearman": 0.163
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.082
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.168,
+    "stars": "***",
+    "auroc": 0.398,
+    "auprc": 0.603,
+    "precisionTop5": 0.436,
+    "precisionTop5NullDist": [
+     0.581,
+     0.764
+    ],
+    "n": 1100,
+    "strata": {
+     "IgG": {
+      "n": 943,
+      "spearman": 0.163
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.082
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.16,
+    "stars": "***",
+    "auroc": 0.603,
+    "auprc": 0.765,
+    "precisionTop5": 0.818,
+    "precisionTop5NullDist": [
+     0.582,
+     0.8
+    ],
+    "n": 1097,
+    "strata": {
+     "IgG": {
+      "n": 940,
+      "spearman": 0.165
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.02
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.16,
+    "stars": "***",
+    "auroc": 0.397,
+    "auprc": 0.643,
+    "precisionTop5": 0.473,
+    "precisionTop5NullDist": [
+     0.6,
+     0.818
+    ],
+    "n": 1097,
+    "strata": {
+     "IgG": {
+      "n": 940,
+      "spearman": 0.165
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.02
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.079,
+    "stars": "*",
+    "auroc": 0.514,
+    "auprc": 0.686,
+    "precisionTop5": 0.744,
+    "precisionTop5NullDist": [
+     0.564,
+     0.795
+    ],
+    "n": 763,
+    "strata": {
+     "IgG": {
+      "n": 636,
+      "spearman": 0.071
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.013
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.079,
+    "stars": "*",
+    "auroc": 0.486,
+    "auprc": 0.677,
+    "precisionTop5": 0.692,
+    "precisionTop5NullDist": [
+     0.564,
+     0.795
+    ],
+    "n": 763,
+    "strata": {
+     "IgG": {
+      "n": 636,
+      "spearman": 0.071
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.013
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.045,
+    "stars": "",
+    "auroc": 0.492,
+    "auprc": 0.642,
+    "precisionTop5": 0.714,
+    "precisionTop5NullDist": [
+     0.518,
+     0.75
+    ],
+    "n": 1102,
+    "strata": {
+     "IgG": {
+      "n": 938,
+      "spearman": 0.033
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": -0.406
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.045,
+    "stars": "",
+    "auroc": 0.508,
+    "auprc": 0.66,
+    "precisionTop5": 0.75,
+    "precisionTop5NullDist": [
+     0.535,
+     0.75
+    ],
+    "n": 1102,
+    "strata": {
+     "IgG": {
+      "n": 938,
+      "spearman": 0.033
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": -0.406
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.016,
+    "stars": "",
+    "auroc": 0.515,
+    "auprc": 0.769,
+    "precisionTop5": 0.816,
+    "precisionTop5NullDist": [
+     0.673,
+     0.857
+    ],
+    "n": 967,
+    "strata": {
+     "IgG": {
+      "n": 822,
+      "spearman": 0.014
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.034
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.016,
+    "stars": "",
+    "auroc": 0.485,
+    "auprc": 0.742,
+    "precisionTop5": 0.653,
+    "precisionTop5NullDist": [
+     0.653,
+     0.858
+    ],
+    "n": 967,
+    "strata": {
+     "IgG": {
+      "n": 822,
+      "spearman": 0.014
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.034
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.01,
+    "stars": "",
+    "auroc": 0.489,
+    "auprc": 0.58,
+    "precisionTop5": 0.667,
+    "precisionTop5NullDist": [
+     0,
+     1
+    ],
+    "n": 45,
+    "strata": {
+     "IgG": {
+      "n": 42,
+      "spearman": -0.027
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.866
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.01,
+    "stars": "",
+    "auroc": 0.511,
+    "auprc": 0.598,
+    "precisionTop5": 1,
+    "precisionTop5NullDist": [
+     0,
+     1
+    ],
+    "n": 45,
+    "strata": {
+     "IgG": {
+      "n": 42,
+      "spearman": -0.027
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.866
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "FastDPE",
+  "param": null,
+  "column": "cdrLen",
+  "transform": "transformed (benchmark-derived)",
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.277,
+    "stars": "***",
+    "auroc": 0.607,
+    "auprc": 0.652,
+    "precisionTop5": 0.671,
+    "precisionTop5NullDist": [
+     0.481,
+     0.659
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.299
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": -0.204
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.077
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.099
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.276,
+    "stars": "***",
+    "auroc": 0.636,
+    "auprc": 0.701,
+    "precisionTop5": 0.722,
+    "precisionTop5NullDist": [
+     0.519,
+     0.734
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.334
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": -0.187
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.147
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.035
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.251,
+    "stars": "***",
+    "auroc": 0.696,
+    "auprc": 0.587,
+    "precisionTop5": 0.6,
+    "precisionTop5NullDist": [
+     0.2,
+     0.705
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": -0.419
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.237
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": -0.109
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.172,
+    "stars": "***",
+    "auroc": 0.447,
+    "auprc": 0.585,
+    "precisionTop5": 0.741,
+    "precisionTop5NullDist": [
+     0.531,
+     0.68
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": 0.187
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": -0.062
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": 0.169
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": 0.322
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.153,
+    "stars": "*",
+    "auroc": 0.623,
+    "auprc": 0.49,
+    "precisionTop5": 0.5,
+    "precisionTop5NullDist": [
+     0.2,
+     0.605
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.419
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": 0.086
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": -0.06
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.153,
+    "stars": "***",
+    "auroc": 0.5,
+    "auprc": 0.763,
+    "precisionTop5": 0.778,
+    "precisionTop5NullDist": [
+     0.694,
+     0.847
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.332
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.025
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": -0.133
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": 0.08
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.133,
+    "stars": "***",
+    "auroc": 0.502,
+    "auprc": 0.765,
+    "precisionTop5": 0.764,
+    "precisionTop5NullDist": [
+     0.708,
+     0.847
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": -0.332
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.047
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": -0.165
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.014
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": -0.131,
+    "stars": "***",
+    "auroc": 0.452,
+    "auprc": 0.293,
+    "precisionTop5": 0.235,
+    "precisionTop5NullDist": [
+     0.273,
+     0.372
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": 0.298
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": -0.075
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": 0.481
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": -0.034
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.115,
+    "stars": "***",
+    "auroc": 0.556,
+    "auprc": 0.668,
+    "precisionTop5": 0.533,
+    "precisionTop5NullDist": [
+     0.517,
+     0.701
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": -0.286
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.055
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.014
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.07
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.104,
+    "stars": "***",
+    "auroc": 0.487,
+    "auprc": 0.599,
+    "precisionTop5": 0.654,
+    "precisionTop5NullDist": [
+     0.493,
+     0.679
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": -0.187
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": -0.056
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": 0.098
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": 0.144
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.092,
+    "stars": "***",
+    "auroc": 0.452,
+    "auprc": 0.297,
+    "precisionTop5": 0.278,
+    "precisionTop5NullDist": [
+     0.252,
+     0.397
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": -0.298
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": -0.077
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": 0.433
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": -0.029
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.059,
+    "stars": "*",
+    "auroc": 0.515,
+    "auprc": 0.598,
+    "precisionTop5": 0.468,
+    "precisionTop5NullDist": [
+     0.519,
+     0.697
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.334
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": -0.165
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.184
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.047
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.049,
+    "stars": "",
+    "auroc": 0.526,
+    "auprc": 0.721,
+    "precisionTop5": 0.808,
+    "precisionTop5NullDist": [
+     0.588,
+     0.767
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.29
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": 0.136
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.125
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.32
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.046,
+    "stars": "",
+    "auroc": 0.516,
+    "auprc": 0.63,
+    "precisionTop5": 0.617,
+    "precisionTop5NullDist": [
+     0.549,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.286
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.111
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.03
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.105
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.029,
+    "stars": "",
+    "auroc": 0.535,
+    "auprc": 0.722,
+    "precisionTop5": 0.781,
+    "precisionTop5NullDist": [
+     0.589,
+     0.767
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": -0.29
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.098
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.07
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.147
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.022,
+    "stars": "",
+    "auroc": 0.485,
+    "auprc": 0.552,
+    "precisionTop5": 0.456,
+    "precisionTop5NullDist": [
+     0.494,
+     0.684
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.299
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": -0.22
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.099
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.07
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TNP",
+  "param": "\"hscale\": 0=Kyte and Doolittle",
+  "column": "PNC",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.264,
+    "stars": "***",
+    "auroc": 0.688,
+    "auprc": 0.632,
+    "precisionTop5": 0.889,
+    "precisionTop5NullDist": [
+     0.222,
+     0.667
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": 0.525
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": -0.113
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": 0.337
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": -1
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.123,
+    "stars": "***",
+    "auroc": 0.578,
+    "auprc": 0.413,
+    "precisionTop5": 0.588,
+    "precisionTop5NullDist": [
+     0.26,
+     0.377
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.293
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": 0.049
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": 0.397
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": -0.061
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.096,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.208
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.064
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": 0.173
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.163
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.066,
+    "stars": "*",
+    "auroc": 0.485,
+    "auprc": 0.568,
+    "precisionTop5": 0.465,
+    "precisionTop5NullDist": [
+     0.507,
+     0.649
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.475
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": -0.05
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.147
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.114
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.05,
+    "stars": "",
+    "auroc": 0.482,
+    "auprc": 0.589,
+    "precisionTop5": 0.437,
+    "precisionTop5NullDist": [
+     0.52,
+     0.677
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.431
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": -0.023
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.086
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.053
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.048,
+    "stars": "",
+    "auroc": 0.542,
+    "auprc": 0.709,
+    "precisionTop5": 0.877,
+    "precisionTop5NullDist": [
+     0.631,
+     0.862
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.129
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.001
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.126
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.359
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.026,
+    "stars": "",
+    "auroc": 0.466,
+    "auprc": 0.574,
+    "precisionTop5": 0.356,
+    "precisionTop5NullDist": [
+     0.507,
+     0.685
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.177
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": -0.102
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": 0.091
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": 0.124
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.012,
+    "stars": "",
+    "auroc": 0.48,
+    "auprc": 0.632,
+    "precisionTop5": 0.636,
+    "precisionTop5NullDist": [
+     0.564,
+     0.745
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": 0.287
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": -0.111
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": 0.133
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": 0.01
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.001,
+    "stars": "",
+    "auroc": 0.505,
+    "auprc": 0.77,
+    "precisionTop5": 0.738,
+    "precisionTop5NullDist": [
+     0.692,
+     0.831
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.219
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": 0.036
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": 0.068
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": 0.017
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "ESM2 Property Predictor",
+  "param": "selected_plm=degradation_stability",
+  "column": "predicted_property",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.248,
+    "stars": "***",
+    "auroc": 0.638,
+    "auprc": 0.514,
+    "precisionTop5": 0.3,
+    "precisionTop5NullDist": [
+     0.2,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.394
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": 0.316
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.159
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 1
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.18,
+    "stars": "***",
+    "auroc": 0.595,
+    "auprc": 0.661,
+    "precisionTop5": 0.582,
+    "precisionTop5NullDist": [
+     0.532,
+     0.697
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.319
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.101
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.1
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.063
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.178,
+    "stars": "***",
+    "auroc": 0.591,
+    "auprc": 0.63,
+    "precisionTop5": 0.595,
+    "precisionTop5NullDist": [
+     0.494,
+     0.671
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.326
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.081
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.014
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.107
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.139,
+    "stars": "***",
+    "auroc": 0.559,
+    "auprc": 0.655,
+    "precisionTop5": 0.517,
+    "precisionTop5NullDist": [
+     0.517,
+     0.733
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.255
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": 0.083
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.017
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.005
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.075,
+    "stars": "**",
+    "auroc": 0.497,
+    "auprc": 0.771,
+    "precisionTop5": 0.819,
+    "precisionTop5NullDist": [
+     0.681,
+     0.833
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": -0.344
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": -0.001
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.228
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": 0.027
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TemStaPro",
+  "param": null,
+  "column": "t80_raw",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.247,
+    "stars": "***",
+    "auroc": 0.631,
+    "auprc": 0.718,
+    "precisionTop5": 0.835,
+    "precisionTop5NullDist": [
+     0.519,
+     0.709
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.374
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": -0.023
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.062
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.07
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.239,
+    "stars": "***",
+    "auroc": 0.642,
+    "auprc": 0.694,
+    "precisionTop5": 0.797,
+    "precisionTop5NullDist": [
+     0.506,
+     0.659
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.449
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": -0.058
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.006
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.064
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.191,
+    "stars": "**",
+    "auroc": 0.666,
+    "auprc": 0.539,
+    "precisionTop5": 0.3,
+    "precisionTop5NullDist": [
+     0.2,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.547
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.249
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.391
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": -0.5
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.117,
+    "stars": "***",
+    "auroc": 0.559,
+    "auprc": 0.672,
+    "precisionTop5": 0.717,
+    "precisionTop5NullDist": [
+     0.533,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.399
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.111
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.039
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.015
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "FastDPE",
+  "param": null,
+  "column": "cdrNegCh",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.222,
+    "stars": "**",
+    "auroc": 0.659,
+    "auprc": 0.595,
+    "precisionTop5": 0.8,
+    "precisionTop5NullDist": [
+     0.195,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.468
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.124
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.289
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": -1
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.122,
+    "stars": "***",
+    "auroc": 0.589,
+    "auprc": 0.403,
+    "precisionTop5": 0.526,
+    "precisionTop5NullDist": [
+     0.273,
+     0.363
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": 0.308
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": 0.096
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": -0.001
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": 0.045
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.111,
+    "stars": "***",
+    "auroc": 0.461,
+    "auprc": 0.546,
+    "precisionTop5": 0.38,
+    "precisionTop5NullDist": [
+     0.494,
+     0.672
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.475
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": -0.167
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.026
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.053
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.086,
+    "stars": "***",
+    "auroc": 0.454,
+    "auprc": 0.566,
+    "precisionTop5": 0.367,
+    "precisionTop5NullDist": [
+     0.531,
+     0.696
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.413
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": -0.115
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.041
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.013
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.068,
+    "stars": "**",
+    "auroc": 0.469,
+    "auprc": 0.743,
+    "precisionTop5": 0.764,
+    "precisionTop5NullDist": [
+     0.639,
+     0.819
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": -0.186
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": -0.044
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.112
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.087
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.06,
+    "stars": "*",
+    "auroc": 0.481,
+    "auprc": 0.678,
+    "precisionTop5": 0.836,
+    "precisionTop5NullDist": [
+     0.602,
+     0.836
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.089
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": -0.143
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.063
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.435
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.013,
+    "stars": "",
+    "auroc": 0.476,
+    "auprc": 0.573,
+    "precisionTop5": 0.37,
+    "precisionTop5NullDist": [
+     0.494,
+     0.679
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": 0.189
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": -0.066
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": -0.05
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": 0.221
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.006,
+    "stars": "",
+    "auroc": 0.475,
+    "auprc": 0.621,
+    "precisionTop5": 0.65,
+    "precisionTop5NullDist": [
+     0.55,
+     0.75
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.28
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.143
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.09
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.025
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TemStaPro",
+  "param": null,
+  "column": "t40_raw",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.214,
+    "stars": "***",
+    "auroc": 0.622,
+    "auprc": 0.636,
+    "precisionTop5": 0.57,
+    "precisionTop5NullDist": [
+     0.468,
+     0.697
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.455
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.009
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.175
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.011
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.205,
+    "stars": "***",
+    "auroc": 0.62,
+    "auprc": 0.662,
+    "precisionTop5": 0.582,
+    "precisionTop5NullDist": [
+     0.519,
+     0.696
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.436
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.005
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.132
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.057
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.126,
+    "stars": "***",
+    "auroc": 0.58,
+    "auprc": 0.677,
+    "precisionTop5": 0.75,
+    "precisionTop5NullDist": [
+     0.517,
+     0.733
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.391
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.053
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.246
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.047
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.103,
+    "stars": "",
+    "auroc": 0.619,
+    "auprc": 0.57,
+    "precisionTop5": 0.7,
+    "precisionTop5NullDist": [
+     0.2,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.372
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.159
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.331
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.5
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TNP",
+  "param": "\"hscale\": 0=Kyte and Doolittle",
+  "column": "CDR3_length",
+  "transform": "transformed (benchmark-derived)",
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.195,
+    "stars": "***",
+    "auroc": 0.42,
+    "auprc": 0.556,
+    "precisionTop5": 0.521,
+    "precisionTop5NullDist": [
+     0.507,
+     0.685
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.118
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": 0.109
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": 0.004
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": -0.226
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.18,
+    "stars": "***",
+    "auroc": 0.407,
+    "auprc": 0.624,
+    "precisionTop5": 0.4,
+    "precisionTop5NullDist": [
+     0.6,
+     0.769
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.238
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.052
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.02
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.184
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.177,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.131
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.056
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.183
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.097
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.169,
+    "stars": "*",
+    "auroc": 0.449,
+    "auprc": 0.379,
+    "precisionTop5": 0.333,
+    "precisionTop5NullDist": [
+     0.222,
+     0.667
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": 0.411
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": -0.173
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": -0.202
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.155,
+    "stars": "*",
+    "auroc": 0.618,
+    "auprc": 0.489,
+    "precisionTop5": 0.556,
+    "precisionTop5NullDist": [
+     0.222,
+     0.778
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": -0.314
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": 0.095
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": 0.058
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.12,
+    "stars": "***",
+    "auroc": 0.539,
+    "auprc": 0.585,
+    "precisionTop5": 0.366,
+    "precisionTop5NullDist": [
+     0.506,
+     0.69
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.369
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": -0.189
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.066
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.14
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.101,
+    "stars": "***",
+    "auroc": 0.542,
+    "auprc": 0.615,
+    "precisionTop5": 0.423,
+    "precisionTop5NullDist": [
+     0.535,
+     0.718
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.402
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": -0.157
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.112
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.117
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.075,
+    "stars": "***",
+    "auroc": 0.448,
+    "auprc": 0.306,
+    "precisionTop5": 0.284,
+    "precisionTop5NullDist": [
+     0.275,
+     0.377
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.322
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": -0.092
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": 0.619
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": 0.018
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.073,
+    "stars": "**",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.243
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.098
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.175
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.129
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.065,
+    "stars": "*",
+    "auroc": 0.511,
+    "auprc": 0.643,
+    "precisionTop5": 0.582,
+    "precisionTop5NullDist": [
+     0.527,
+     0.727
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": -0.173
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": 0.019
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": -0.016
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": -0.103
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.057,
+    "stars": "***",
+    "auroc": 0.467,
+    "auprc": 0.303,
+    "precisionTop5": 0.24,
+    "precisionTop5NullDist": [
+     0.269,
+     0.382
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.034
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": 0.064
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": -0.472
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": -0.021
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.055,
+    "stars": "*",
+    "auroc": 0.546,
+    "auprc": 0.785,
+    "precisionTop5": 0.754,
+    "precisionTop5NullDist": [
+     0.692,
+     0.862
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.182
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": -0.093
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": -0.05
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": -0.06
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.028,
+    "stars": "",
+    "auroc": 0.51,
+    "auprc": 0.635,
+    "precisionTop5": 0.691,
+    "precisionTop5NullDist": [
+     0.545,
+     0.727
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": 0.309
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": -0.065
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": -0.013
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": 0.087
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.022,
+    "stars": "",
+    "auroc": 0.515,
+    "auprc": 0.57,
+    "precisionTop5": 0.31,
+    "precisionTop5NullDist": [
+     0.451,
+     0.676
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": -0.172
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": 0.101
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.043
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.135
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.012,
+    "stars": "",
+    "auroc": 0.524,
+    "auprc": 0.793,
+    "precisionTop5": 0.892,
+    "precisionTop5NullDist": [
+     0.707,
+     0.862
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.391
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": 0.1
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": -0.154
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": 0.047
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.011,
+    "stars": "",
+    "auroc": 0.495,
+    "auprc": 0.696,
+    "precisionTop5": 0.723,
+    "precisionTop5NullDist": [
+     0.568,
+     0.77
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.07
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.086
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": 0.056
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.194
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.008,
+    "stars": "",
+    "auroc": 0.523,
+    "auprc": 0.624,
+    "precisionTop5": 0.658,
+    "precisionTop5NullDist": [
+     0.521,
+     0.713
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.246
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": -0.07
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": 0.111
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": 0.249
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.005,
+    "stars": "",
+    "auroc": 0.496,
+    "auprc": 0.589,
+    "precisionTop5": 0.324,
+    "precisionTop5NullDist": [
+     0.549,
+     0.691
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": -0.084
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": 0.111
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.016
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.122
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TNP",
+  "param": "\"hscale\": 0=Kyte and Doolittle",
+  "column": "total_CDR_length",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.182,
+    "stars": "***",
+    "auroc": 0.406,
+    "auprc": 0.624,
+    "precisionTop5": 0.462,
+    "precisionTop5NullDist": [
+     0.6,
+     0.77
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.292
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.055
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.054
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.179
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.18,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.138
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.067
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.216
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.081
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.176,
+    "stars": "*",
+    "auroc": 0.441,
+    "auprc": 0.374,
+    "precisionTop5": 0.111,
+    "precisionTop5NullDist": [
+     0.333,
+     0.778
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": 0.425
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": -0.207
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": -0.149
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.173,
+    "stars": "***",
+    "auroc": 0.433,
+    "auprc": 0.572,
+    "precisionTop5": 0.671,
+    "precisionTop5NullDist": [
+     0.521,
+     0.712
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.074
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": 0.106
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": 0.001
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": -0.202
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.131,
+    "stars": "",
+    "auroc": 0.604,
+    "auprc": 0.475,
+    "precisionTop5": 0.333,
+    "precisionTop5NullDist": [
+     0.111,
+     0.667
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": -0.312
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": 0.125
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": 0.14
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.117,
+    "stars": "***",
+    "auroc": 0.538,
+    "auprc": 0.583,
+    "precisionTop5": 0.38,
+    "precisionTop5NullDist": [
+     0.479,
+     0.69
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.331
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": -0.187
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.09
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.114
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.095,
+    "stars": "***",
+    "auroc": 0.541,
+    "auprc": 0.613,
+    "precisionTop5": 0.465,
+    "precisionTop5NullDist": [
+     0.521,
+     0.733
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.36
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": -0.154
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.163
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.087
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.073,
+    "stars": "*",
+    "auroc": 0.509,
+    "auprc": 0.636,
+    "precisionTop5": 0.473,
+    "precisionTop5NullDist": [
+     0.526,
+     0.709
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": -0.138
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": 0.022
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": -0.074
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": -0.17
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.068,
+    "stars": "***",
+    "auroc": 0.452,
+    "auprc": 0.306,
+    "precisionTop5": 0.24,
+    "precisionTop5NullDist": [
+     0.279,
+     0.373
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.297
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": -0.091
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": 0.607
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": 0.022
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.059,
+    "stars": "*",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.193
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.085
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.12
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.315
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.055,
+    "stars": "***",
+    "auroc": 0.466,
+    "auprc": 0.307,
+    "precisionTop5": 0.294,
+    "precisionTop5NullDist": [
+     0.269,
+     0.392
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.056
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": 0.051
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": -0.408
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": -0.047
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.053,
+    "stars": "*",
+    "auroc": 0.531,
+    "auprc": 0.584,
+    "precisionTop5": 0.437,
+    "precisionTop5NullDist": [
+     0.493,
+     0.663
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": -0.181
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": 0.098
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.031
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.006
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.046,
+    "stars": "",
+    "auroc": 0.536,
+    "auprc": 0.782,
+    "precisionTop5": 0.754,
+    "precisionTop5NullDist": [
+     0.692,
+     0.846
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.186
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": -0.084
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": 0.044
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": -0.004
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.043,
+    "stars": "",
+    "auroc": 0.477,
+    "auprc": 0.679,
+    "precisionTop5": 0.708,
+    "precisionTop5NullDist": [
+     0.584,
+     0.755
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.031
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.082
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": 0.054
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.23
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.033,
+    "stars": "",
+    "auroc": 0.511,
+    "auprc": 0.599,
+    "precisionTop5": 0.394,
+    "precisionTop5NullDist": [
+     0.52,
+     0.718
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": -0.092
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": 0.106
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.025
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.005
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.033,
+    "stars": "",
+    "auroc": 0.507,
+    "auprc": 0.635,
+    "precisionTop5": 0.673,
+    "precisionTop5NullDist": [
+     0.509,
+     0.728
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": 0.306
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": -0.068
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": 0.031
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": 0.092
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": -0.005,
+    "stars": "",
+    "auroc": 0.522,
+    "auprc": 0.62,
+    "precisionTop5": 0.63,
+    "precisionTop5NullDist": [
+     0.507,
+     0.712
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.201
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": -0.067
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": 0.166
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": 0.271
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.004,
+    "stars": "",
+    "auroc": 0.52,
+    "auprc": 0.787,
+    "precisionTop5": 0.862,
+    "precisionTop5NullDist": [
+     0.677,
+     0.862
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.351
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": 0.09
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": -0.153
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": 0.022
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "Nanobody Polyreactivity Scorer",
+  "param": null,
+  "column": "origFACS lr onehot",
+  "transform": null,
+  "version": null,
+  "license": null,
+  "benchmarks": [
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.165,
+    "stars": "***",
+    "auroc": 0.587,
+    "auprc": 0.737,
+    "precisionTop5": 0.764,
+    "precisionTop5NullDist": [
+     0.61,
+     0.792
+    ],
+    "n": 1432,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": -0.082
+     },
+     "IgG": {
+      "n": 815,
+      "spearman": -0.237
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": -0.05
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.204
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TNP",
+  "param": "\"hscale\": 0=Kyte and Doolittle",
+  "column": "CDR3_compactness",
+  "transform": "transformed (benchmark-derived)",
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.162,
+    "stars": "***",
+    "auroc": 0.43,
+    "auprc": 0.545,
+    "precisionTop5": 0.466,
+    "precisionTop5NullDist": [
+     0.52,
+     0.685
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.129
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": 0.077
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": -0.053
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": -0.357
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.146,
+    "stars": "",
+    "auroc": 0.464,
+    "auprc": 0.385,
+    "precisionTop5": 0.222,
+    "precisionTop5NullDist": [
+     0.111,
+     0.667
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": 0.342
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": -0.139
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": -0.181
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": -0.5
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.135,
+    "stars": "***",
+    "auroc": 0.434,
+    "auprc": 0.627,
+    "precisionTop5": 0.385,
+    "precisionTop5NullDist": [
+     0.6,
+     0.785
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.208
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.032
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.052
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.28
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": -0.122,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.08
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.056
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.203
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": -0.041
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.114,
+    "stars": "***",
+    "auroc": 0.538,
+    "auprc": 0.583,
+    "precisionTop5": 0.437,
+    "precisionTop5NullDist": [
+     0.493,
+     0.663
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.309
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": -0.118
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.142
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.129
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.113,
+    "stars": "***",
+    "auroc": 0.423,
+    "auprc": 0.279,
+    "precisionTop5": 0.181,
+    "precisionTop5NullDist": [
+     0.279,
+     0.382
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.333
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": -0.031
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": 0.577
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": -0.057
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": -0.096,
+    "stars": "***",
+    "auroc": 0.547,
+    "auprc": 0.616,
+    "precisionTop5": 0.423,
+    "precisionTop5NullDist": [
+     0.521,
+     0.704
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.339
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": -0.076
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.17
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": -0.099
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.093,
+    "stars": "",
+    "auroc": 0.564,
+    "auprc": 0.441,
+    "precisionTop5": 0.222,
+    "precisionTop5NullDist": [
+     0.222,
+     0.667
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": -0.191
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": 0.075
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": 0.272
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.5
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.085,
+    "stars": "**",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.157
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": -0.095
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": 0.124
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.041
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.061,
+    "stars": "*",
+    "auroc": 0.49,
+    "auprc": 0.601,
+    "precisionTop5": 0.562,
+    "precisionTop5NullDist": [
+     0.507,
+     0.699
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.253
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": -0.042
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": 0.058
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": 0.357
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": -0.027,
+    "stars": "",
+    "auroc": 0.503,
+    "auprc": 0.621,
+    "precisionTop5": 0.436,
+    "precisionTop5NullDist": [
+     0.526,
+     0.727
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": -0.133
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": 0.016
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": 0.102
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": -0.08
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.026,
+    "stars": "",
+    "auroc": 0.479,
+    "auprc": 0.677,
+    "precisionTop5": 0.646,
+    "precisionTop5NullDist": [
+     0.585,
+     0.785
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.038
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.11
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.039
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.278
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": -0.018,
+    "stars": "",
+    "auroc": 0.514,
+    "auprc": 0.328,
+    "precisionTop5": 0.309,
+    "precisionTop5NullDist": [
+     0.279,
+     0.373
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.02
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": 0.013
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": -0.591
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": 0.042
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.012,
+    "stars": "",
+    "auroc": 0.505,
+    "auprc": 0.632,
+    "precisionTop5": 0.564,
+    "precisionTop5NullDist": [
+     0.545,
+     0.71
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": 0.272
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": -0.064
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": 0.09
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": 0.079
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": -0.007,
+    "stars": "",
+    "auroc": 0.502,
+    "auprc": 0.547,
+    "precisionTop5": 0.296,
+    "precisionTop5NullDist": [
+     0.478,
+     0.677
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": -0.147
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": 0.034
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": 0.018
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.131
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.005,
+    "stars": "",
+    "auroc": 0.481,
+    "auprc": 0.568,
+    "precisionTop5": 0.394,
+    "precisionTop5NullDist": [
+     0.535,
+     0.705
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": -0.017
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": 0.024
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.025
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.101
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.004,
+    "stars": "",
+    "auroc": 0.5,
+    "auprc": 0.766,
+    "precisionTop5": 0.738,
+    "precisionTop5NullDist": [
+     0.692,
+     0.846
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.247
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": 0.023
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": 0.044
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": -0.028
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.003,
+    "stars": "",
+    "auroc": 0.55,
+    "auprc": 0.801,
+    "precisionTop5": 0.892,
+    "precisionTop5NullDist": [
+     0.677,
+     0.862
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.35
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": -0.004
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": -0.184
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": 0.025
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "FastDPE",
+  "param": null,
+  "column": "cdrPosCh",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.156,
+    "stars": "***",
+    "auroc": 0.593,
+    "auprc": 0.673,
+    "precisionTop5": 0.753,
+    "precisionTop5NullDist": [
+     0.519,
+     0.704
+    ],
+    "n": 1611,
+    "strata": {
+     "VHH": {
+      "n": 353,
+      "spearman": 0.242
+     },
+     "IgG": {
+      "n": 938,
+      "spearman": 0.072
+     },
+     "ScFv": {
+      "n": 156,
+      "spearman": -0.219
+     },
+     "Near-Germline IgG": {
+      "n": 164,
+      "spearman": -0.363
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.151,
+    "stars": "***",
+    "auroc": 0.583,
+    "auprc": 0.651,
+    "precisionTop5": 0.684,
+    "precisionTop5NullDist": [
+     0.506,
+     0.671
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.358
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.041
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.258
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.137
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.144,
+    "stars": "***",
+    "auroc": 0.574,
+    "auprc": 0.68,
+    "precisionTop5": 0.772,
+    "precisionTop5NullDist": [
+     0.53,
+     0.709
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": 0.349
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.045
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.249
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.057
+     }
+    }
+   },
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.128,
+    "stars": "***",
+    "auroc": 0.581,
+    "auprc": 0.734,
+    "precisionTop5": 0.849,
+    "precisionTop5NullDist": [
+     0.575,
+     0.836
+    ],
+    "n": 1442,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": 0.197
+     },
+     "IgG": {
+      "n": 825,
+      "spearman": 0.205
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.131
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": 0.363
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.091,
+    "stars": "***",
+    "auroc": 0.572,
+    "auprc": 0.377,
+    "precisionTop5": 0.436,
+    "precisionTop5NullDist": [
+     0.269,
+     0.363
+    ],
+    "n": 4671,
+    "strata": {
+     "VHH": {
+      "n": 658,
+      "spearman": 0.325
+     },
+     "IgG": {
+      "n": 3259,
+      "spearman": 0.11
+     },
+     "ScFv": {
+      "n": 290,
+      "spearman": -0.166
+     },
+     "Near-Germline IgG": {
+      "n": 464,
+      "spearman": 0.06
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.048,
+    "stars": "",
+    "auroc": 0.482,
+    "auprc": 0.755,
+    "precisionTop5": 0.847,
+    "precisionTop5NullDist": [
+     0.639,
+     0.806
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": -0.256
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": -0.023
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.076
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.033
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.024,
+    "stars": "",
+    "auroc": 0.516,
+    "auprc": 0.651,
+    "precisionTop5": 0.65,
+    "precisionTop5NullDist": [
+     0.55,
+     0.717
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": 0.265
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": -0.067
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": -0.297
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": 0.056
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.022,
+    "stars": "",
+    "auroc": 0.507,
+    "auprc": 0.488,
+    "precisionTop5": 0.7,
+    "precisionTop5NullDist": [
+     0.195,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": 0.297
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": -0.071
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": -0.271
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.866
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "Nanobody Polyreactivity Scorer",
+  "param": null,
+  "column": "deepFACS lr onehot",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": -0.151,
+    "stars": "***",
+    "auroc": 0.595,
+    "auprc": 0.728,
+    "precisionTop5": 0.597,
+    "precisionTop5NullDist": [
+     0.597,
+     0.778
+    ],
+    "n": 1432,
+    "strata": {
+     "VHH": {
+      "n": 330,
+      "spearman": -0.185
+     },
+     "IgG": {
+      "n": 815,
+      "spearman": -0.15
+     },
+     "ScFv": {
+      "n": 141,
+      "spearman": 0.003
+     },
+     "Near-Germline IgG": {
+      "n": 146,
+      "spearman": -0.183
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "TNP",
+  "param": "\"hscale\": 0=Kyte and Doolittle",
+  "column": "PPC",
+  "transform": null,
+  "version": "1.0",
+  "license": "BSD 3-Clause License",
+  "benchmarks": [
+   {
+    "property": "Polyreactivity (absorbance)",
+    "spearman": 0.136,
+    "stars": "***",
+    "auroc": 0.568,
+    "auprc": 0.721,
+    "precisionTop5": 0.815,
+    "precisionTop5NullDist": [
+     0.585,
+     0.862
+    ],
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": 0.224
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.117
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": 0.027
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.384
+     }
+    }
+   },
+   {
+    "property": "Analytical Size Exclusion Chromatography",
+    "spearman": 0.133,
+    "stars": "***",
+    "auroc": 0.561,
+    "auprc": 0.651,
+    "precisionTop5": 0.726,
+    "precisionTop5NullDist": [
+     0.519,
+     0.699
+    ],
+    "n": 1447,
+    "strata": {
+     "VHH": {
+      "n": 336,
+      "spearman": 0.233
+     },
+     "IgG": {
+      "n": 823,
+      "spearman": 0.074
+     },
+     "ScFv": {
+      "n": 137,
+      "spearman": -0.035
+     },
+     "Near-Germline IgG": {
+      "n": 151,
+      "spearman": -0.386
+     }
+    }
+   },
+   {
+    "property": "Hydrophobicity",
+    "spearman": 0.13,
+    "stars": "***",
+    "auroc": null,
+    "auprc": null,
+    "precisionTop5": null,
+    "precisionTop5NullDist": null,
+    "n": 1294,
+    "strata": {
+     "VHH": {
+      "n": 314,
+      "spearman": -0.059
+     },
+     "IgG": {
+      "n": 723,
+      "spearman": 0.059
+     },
+     "ScFv": {
+      "n": 122,
+      "spearman": -0.044
+     },
+     "Near-Germline IgG": {
+      "n": 135,
+      "spearman": 0.597
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.097,
+    "stars": "***",
+    "auroc": 0.564,
+    "auprc": 0.624,
+    "precisionTop5": 0.577,
+    "precisionTop5NullDist": [
+     0.506,
+     0.691
+    ],
+    "n": 1406,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.378
+     },
+     "IgG": {
+      "n": 829,
+      "spearman": 0.055
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.12
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.193
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.096,
+    "stars": "***",
+    "auroc": 0.529,
+    "auprc": 0.66,
+    "precisionTop5": 0.6,
+    "precisionTop5NullDist": [
+     0.563,
+     0.764
+    ],
+    "n": 1094,
+    "strata": {
+     "VHH": {
+      "n": 276,
+      "spearman": 0.307
+     },
+     "IgG": {
+      "n": 575,
+      "spearman": 0.056
+     },
+     "ScFv": {
+      "n": 126,
+      "spearman": -0.204
+     },
+     "Near-Germline IgG": {
+      "n": 117,
+      "spearman": 0.094
+     }
+    }
+   },
+   {
+    "property": "Titer",
+    "spearman": 0.092,
+    "stars": "***",
+    "auroc": 0.564,
+    "auprc": 0.364,
+    "precisionTop5": 0.289,
+    "precisionTop5NullDist": [
+     0.274,
+     0.373
+    ],
+    "n": 4062,
+    "strata": {
+     "VHH": {
+      "n": 625,
+      "spearman": 0.325
+     },
+     "IgG": {
+      "n": 2761,
+      "spearman": 0.04
+     },
+     "ScFv": {
+      "n": 255,
+      "spearman": -0.134
+     },
+     "Near-Germline IgG": {
+      "n": 421,
+      "spearman": 0.065
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.085,
+    "stars": "***",
+    "auroc": 0.554,
+    "auprc": 0.647,
+    "precisionTop5": 0.592,
+    "precisionTop5NullDist": [
+     0.507,
+     0.677
+    ],
+    "n": 1404,
+    "strata": {
+     "VHH": {
+      "n": 305,
+      "spearman": 0.354
+     },
+     "IgG": {
+      "n": 827,
+      "spearman": 0.065
+     },
+     "ScFv": {
+      "n": 129,
+      "spearman": -0.113
+     },
+     "Near-Germline IgG": {
+      "n": 143,
+      "spearman": 0.09
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": 0.05,
+    "stars": "",
+    "auroc": 0.502,
+    "auprc": 0.436,
+    "precisionTop5": 0.444,
+    "precisionTop5NullDist": [
+     0.111,
+     0.667
+    ],
+    "n": 177,
+    "strata": {
+     "VHH": {
+      "n": 80,
+      "spearman": 0.349
+     },
+     "IgG": {
+      "n": 38,
+      "spearman": -0.011
+     },
+     "ScFv": {
+      "n": 56,
+      "spearman": -0.291
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 0.866
+     }
+    }
+   },
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.049,
+    "stars": "",
+    "auroc": 0.509,
+    "auprc": 0.769,
+    "precisionTop5": 0.877,
+    "precisionTop5NullDist": [
+     0.677,
+     0.846
+    ],
+    "n": 1287,
+    "strata": {
+     "VHH": {
+      "n": 313,
+      "spearman": -0.275
+     },
+     "IgG": {
+      "n": 720,
+      "spearman": 0.08
+     },
+     "ScFv": {
+      "n": 120,
+      "spearman": -0.085
+     },
+     "Near-Germline IgG": {
+      "n": 134,
+      "spearman": 0.039
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "ESM2 Property Predictor",
+  "param": "selected_plm=thermal_stability",
+  "column": "predicted_property",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Thermostability (Tm1)",
+    "spearman": 0.094,
+    "stars": "***",
+    "auroc": 0.543,
+    "auprc": 0.578,
+    "precisionTop5": 0.468,
+    "precisionTop5NullDist": [
+     0.493,
+     0.646
+    ],
+    "n": 1568,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.091
+     },
+     "IgG": {
+      "n": 943,
+      "spearman": 0.094
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": 0.039
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": 0.025
+     }
+    }
+   },
+   {
+    "property": "Thermostability (onset)",
+    "spearman": 0.077,
+    "stars": "**",
+    "auroc": 0.537,
+    "auprc": 0.607,
+    "precisionTop5": 0.494,
+    "precisionTop5NullDist": [
+     0.53,
+     0.696
+    ],
+    "n": 1565,
+    "strata": {
+     "VHH": {
+      "n": 319,
+      "spearman": -0.129
+     },
+     "IgG": {
+      "n": 940,
+      "spearman": 0.078
+     },
+     "ScFv": {
+      "n": 149,
+      "spearman": -0.034
+     },
+     "Near-Germline IgG": {
+      "n": 157,
+      "spearman": -0.016
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm2)",
+    "spearman": 0.026,
+    "stars": "",
+    "auroc": 0.56,
+    "auprc": 0.657,
+    "precisionTop5": 0.6,
+    "precisionTop5NullDist": [
+     0.533,
+     0.734
+    ],
+    "n": 1196,
+    "strata": {
+     "VHH": {
+      "n": 287,
+      "spearman": -0.148
+     },
+     "IgG": {
+      "n": 636,
+      "spearman": 0.063
+     },
+     "ScFv": {
+      "n": 146,
+      "spearman": 0.088
+     },
+     "Near-Germline IgG": {
+      "n": 127,
+      "spearman": -0.053
+     }
+    }
+   },
+   {
+    "property": "Thermostability (Tm3)",
+    "spearman": -0.02,
+    "stars": "",
+    "auroc": 0.496,
+    "auprc": 0.388,
+    "precisionTop5": 0.1,
+    "precisionTop5NullDist": [
+     0.195,
+     0.7
+    ],
+    "n": 189,
+    "strata": {
+     "VHH": {
+      "n": 84,
+      "spearman": -0.164
+     },
+     "IgG": {
+      "n": 42,
+      "spearman": 0.205
+     },
+     "ScFv": {
+      "n": 60,
+      "spearman": 0.265
+     },
+     "Near-Germline IgG": {
+      "n": 3,
+      "spearman": 1
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "Aggrescan3D",
+  "param": null,
+  "column": "maximum_score",
+  "transform": null,
+  "version": null,
+  "license": null,
+  "benchmarks": [
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": -0.015,
+    "stars": "",
+    "auroc": 0.497,
+    "auprc": 0.752,
+    "precisionTop5": 0.694,
+    "precisionTop5NullDist": [
+     0.653,
+     0.847
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.074
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": -0.017
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": -0.053
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.019
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "Aggrescan3D",
+  "param": null,
+  "column": "minimum_score",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.014,
+    "stars": "",
+    "auroc": 0.491,
+    "auprc": 0.752,
+    "precisionTop5": 0.722,
+    "precisionTop5NullDist": [
+     0.694,
+     0.848
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.092
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.007
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.016
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": 0.018
+     }
+    }
+   }
+  ]
+ },
+ {
+  "module": "Aggrescan3D",
+  "param": null,
+  "column": "average_score",
+  "transform": null,
+  "version": "1.0",
+  "license": "MIT License",
+  "benchmarks": [
+   {
+    "property": "Aggregation (Polydispersity idx)",
+    "spearman": 0.012,
+    "stars": "",
+    "auroc": 0.469,
+    "auprc": 0.743,
+    "precisionTop5": 0.708,
+    "precisionTop5NullDist": [
+     0.694,
+     0.861
+    ],
+    "n": 1435,
+    "strata": {
+     "VHH": {
+      "n": 329,
+      "spearman": 0.057
+     },
+     "IgG": {
+      "n": 822,
+      "spearman": 0.019
+     },
+     "ScFv": {
+      "n": 139,
+      "spearman": 0.015
+     },
+     "Near-Germline IgG": {
+      "n": 145,
+      "spearman": -0.021
+     }
+    }
+   }
+  ]
+ }
+]
