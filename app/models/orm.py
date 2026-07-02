@@ -149,6 +149,10 @@ class Module(ModelBase):
     repo_url: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
 
+    # --- YOUR TURN --- from the Module Evaluation scrape: per-module, both nullable strings.
+    # version: e.g. "1.0". license: e.g. "MIT License" / "BSD 3-Clause License" — varies per
+    # module, don't assume a project-wide default.
+
     # server_default=func.now() → the DATABASE writes the timestamp (DEFAULT now()), not Python.
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -221,6 +225,10 @@ class Metric(ModelBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     module: Mapped["Module"] = relationship(back_populates="metrics")
+    # --- YOUR TURN --- one Metric -> many BenchmarkResult (a metric can be validated against
+    # several developability properties; see the Module Evaluation scrape). Mirror the
+    # `metrics` relationship on Module above: back_populates + cascade="all, delete-orphan".
+    # benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(...)
 
 
 class Concept(ModelBase):
@@ -232,6 +240,47 @@ class Concept(ModelBase):
     description: Mapped[str | None] = mapped_column(Text)
 
     metrics: Mapped[list["Metric"]] = relationship(back_populates="concept")
+
+
+# ===========================================================================
+# ░░░  YOUR TURN  ░░░   BenchmarkDataset + BenchmarkResult — from the Module Evaluation scrape.
+#
+# BenchmarkDataset: one row, describing the DPBD reference dataset every benchmark below is
+# validated against. Fields (all nullable except name/description — this is documentation,
+# not something the app writes to at runtime):
+#   id, name (str, unique — "DPBD"), version (str | None), description (Text),
+#   seed_antibody_count / antigen_count / max_variants_per_seed / mutation_strategy_count /
+#   assay_count (all int | None — the page-level paragraph's numbers: 50 seed antibodies,
+#   42 antigens, up to 99 variants/seed, 8 mutation strategies, 6 assays).
+#   Fold the binarization methodology into `description` too (the per-property positive-label
+#   thresholds used to compute AuROC/AuPRC/Precision@Top5%, e.g. "Titer > 0.1 mg/mL",
+#   "Aggregation (polydispersity idx) < median + 1.5*IQR", "Hydrophobicity: undefined —
+#   bimodal distribution, insufficient seed antibodies for a reliable variance estimate").
+#   It's static global methodology prose, not per-row data — doesn't warrant its own table.
+#
+# BenchmarkResult: one row per (metric, property) pair — a Metric can be validated against
+# several developability properties (see Metric.benchmark_results above), each with its own
+# stats. Fields:
+#   id, metric_id (FK -> metrics.id, ondelete="CASCADE"),
+#   benchmark_dataset_id (FK -> benchmark_datasets.id, ondelete="SET NULL", nullable),
+#   property (str — e.g. "Thermostability (Tm1)", "Aggregation (Polydispersity idx)"; plain
+#     String not an enum, since the scrape isn't confirmed to have the full closed vocabulary),
+#   n (int), spearman_correlation (float), spearman_significance (str | None — the "***"),
+#   auroc / auprc / precision_top5 (float | None — NULL here is not always "not scraped yet":
+#     Hydrophobicity rows are NULL by AWS's own design, since no binarization threshold is
+#     defined for it (bimodal distribution) — don't treat that NULL as missing data to chase),
+#   precision_top5_null_dist (ARRAY(Float) | None — [p5, p95] from AWS's 100-permutation null
+#     model, same ARRAY pattern as Metric.property_categories above for a small fixed-size array),
+#   positive_ratio (float | None),
+#   strata (JSONB | None — the per-antibody-format sub-breakdown: VHH/IgG/ScFv/Near-Germline IgG,
+#     each with its own n + spearman; nest it here rather than a further child table since it's
+#     inherently a sub-structure of one benchmark row, not independently queryable),
+#   created_at.
+#
+# Relationships: BenchmarkResult.metric back_populates Metric.benchmark_results;
+# BenchmarkResult.benchmark_dataset is a plain many-to-one (no back_populates needed unless you
+# want BenchmarkDataset.results too).
+# ===========================================================================
 
 
 # ===========================================================================
