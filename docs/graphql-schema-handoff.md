@@ -41,11 +41,16 @@ no history rewrite, no force-push, regardless of which target is picked.
   model, 22.6 no extracting model internals) don't apply to what was collected (published
   benchmark statistics, not experimental "Your Content" or model internals). Don't re-litigate
   this unless new facts surface.
-- Raw scrape data in `seed/raw/module_evaluation_catalog.json` (27 deduped metrics) and
-  `module_evaluation_details.json` (190 metric×property rows) — **known incomplete**: most rows
-  have `"transform": null` even where the UI shows a populated Transformation panel (Mahalanobis
-  μ/σ etc.) — the automation didn't reliably capture that panel before running out of context.
-  Not blocking (the `Metric.transform` JSONB column already exists, backfills fine later).
+- Raw scrape data in `seed/raw/module_evaluation_catalog.json` (**33** deduped metrics, updated
+  2026-07-03 — was 27; see `bio-discovery-scrape-handoff.md` §6, a 6-entry merge bug where raw and
+  `-transformed` cards collapsed onto the same key was found and fixed via manual reconciliation
+  against the live Table view) and `module_evaluation_details.json` (190 metric×property rows,
+  fully unique on `(module, param, column, module_output, property)`). Every catalog entry now also
+  carries a `module_output` field (human-readable card title) — worth a place in the `Module`/
+  `Metric` schema. **Still known incomplete beyond the fixed 6:** most other rows still have
+  `"transform": null` even where the UI shows a populated Transformation panel (Mahalanobis μ/σ
+  etc.) — the original automation didn't reliably capture that panel before running out of
+  context. Not blocking (the `Metric.transform` JSONB column already exists, backfills fine later).
 - `docs/schema-erd.md` — full current + planned ERD, mermaid, renders on GitHub natively and in
   VS Code with any mermaid extension.
 
@@ -84,6 +89,24 @@ This is exactly why the GraphQL schema should come first: `app/graphql/types.py`
 redesign.` — no existing contract to protect. Design what a query needs to return for a
 Candidate's scores (raw values only? resolved Metric metadata? both?) and that answers which of
 the three options above is worth its cost.
+
+**Update (post-PR#2 review, 2026-07-02):** Ryan's leaning toward option 2 (or the option-3
+hybrid) — motivated by wanting to write meaningful queries directly ("show me candidates scored by
+metrics with AUROC > X", "compare candidates across two recipe runs that share a metric"), not just
+by the ambiguity problem. Direction: build an explicit relation from `Candidate` to the specific
+result that scored it, resolved once at import time rather than re-derived per query. Still open
+before this gets typed:
+- Does "the result that scored it" mean a link to `Metric` (which metric produced this value), or
+  something richer that also carries the `BenchmarkResult` context (§6 of
+  `bio-discovery-scrape-handoff.md`) the value should be judged against? These are different
+  tables for different purposes — `BenchmarkResult` describes a metric's *validation* against
+  DPBD, not any individual candidate's score — so "relation to the result used to score them" most
+  likely means `Candidate` → `Metric` (a `candidate_scores` join table per option 2), with
+  `BenchmarkResult` reachable transitively via `Metric` for interpretation (e.g. "is this
+  candidate's score good, per the AUROC this metric achieved on DPBD?"). Confirm before typing.
+- Table shape: `candidate_scores(candidate_id, metric_id, value)` per option 2's sketch — worth
+  deciding here whether `value` duplicates what's already in `Candidate.scores` JSONB or replaces
+  it outright.
 
 ## Next steps, in order
 

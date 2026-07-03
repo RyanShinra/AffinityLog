@@ -103,6 +103,14 @@ Each card has:
   `spearman_correlation: -0.329`, `spearman_significance: "***"`), not stored as one string.
 - **Quoted parameter values can contain embedded quotes** (the `hscale` example) — don't naively
   split on `"..."`.
+- **`(module, param, column)` from the generation note is not always unique — a `-transformed`
+  title suffix can mark a genuinely different card with an identical note.** Confirmed live: FastDPE
+  publishes both "...Structural Fv Charge Symmetry Parameter" and "...-transformed" as separate
+  cards, both resolving to `module=FastDPE, column=SFvCSP` with no param — the note gives no way to
+  tell them apart. The first scrape merged raw+transformed pairs for 6 module/column combos into one
+  catalog entry each, silently doubling their benchmark rows and losing/misattributing the
+  transform note. See §6 for the full writeup. Capture the title's `-transformed` suffix as its own
+  field and fold it into the key alongside `(module, param, column)`.
 
 ---
 
@@ -126,8 +134,19 @@ Suggested order of investigation:
 
 ## 5. Schema additions (on top of the already-planned `002_add_metric_provenance`)
 
-- `Metric.benchmark_stats: JSONB, nullable` — validate through a Pydantic model before write, then
-  store the dump. Don't let the app write arbitrary keys:
+**Superseded (2026-07-03) — do not implement `Metric.benchmark_stats` as written below.** This was
+written before it was confirmed that one `Metric` validates against *several* developability
+properties (see `Metric.benchmark_results` in `app/models/orm.py`'s YOUR-TURN comments and
+`docs/schema-erd.md`) — a single JSONB blob per metric can't represent that, and the
+`stratified`/`strata` field-name drift between here and there was never reconciled. The live design
+is the `BenchmarkResult` table (one row per metric×property) further down this section and in
+`app/models/orm.py` — read that, not the block immediately below. Left in place only so the
+Pydantic validation pattern (`BenchmarkStats.model_validate(raw).model_dump(mode="json")` before
+upsert) isn't lost; adapt it to validate one `BenchmarkResult` row's fields instead of the whole
+`Metric`.
+
+- ~~`Metric.benchmark_stats: JSONB, nullable`~~ — validate through a Pydantic model before write,
+  then store the dump. Don't let the app write arbitrary keys:
 
   ```python
   from enum import StrEnum
@@ -191,3 +210,77 @@ Suggested order of investigation:
 Suggest bundling all of the above into one migration —
 `003_benchmark_stats_and_module_metadata.py` — built on top of `002_add_metric_provenance`, rather
 than a separate pass later.
+
+---
+
+## 6. Post-scrape finding: the scrape key is missing a "transformed" discriminator, not flaky
+
+PR review of the scrape (`metrics-scrape` → `catalog-seed`, PR #2) turned up 44
+`(module, param, column, property)` groups that appear more than once in
+`module_evaluation_catalog.json` (88 of 190 rows) — 36 with conflicting `spearman` values, 8 with
+byte-identical ones. **Root cause confirmed against the live page, not a scraper race condition as
+first suspected (see prior revision of this section — that theory was wrong):**
+
+Ryan traced the first case by hand: the card titled *"FastDPE Structural Fv Charge Symmetry
+Parameter-transformed"* has the generation note *"These predictions can be obtained from the
+FastDPE Amazon Bio Discovery module by evaluating the `"SFvCSP"` column"* — **identical** to the
+note on the plain, untransformed *"FastDPE Structural Fv Charge Symmetry Parameter"* card. Same
+module, same (absent) param, same column — but two genuinely different cards on the live page,
+distinguished only by the `-transformed` title suffix, which the generation note (the thing §3
+told the scraper to trust over the title) doesn't carry at all. The scraper merged them into one
+`module_evaluation_catalog.json` entry, doubling up every one of that entry's benchmark rows.
+
+That single mechanism explains **all 44 groups, both kinds** — confirmed by checking every
+affected entry:
+
+| module | column | entry-level `transform` | benchmarks | props | exact-dup | mismatch |
+|---|---|---|---|---|---|---|
+| FastDPE | cdrHydro | `null` | 2 | 1 | 0 | 1 |
+| FastDPE | SFvCSP | `null` | 16 | 8 | 8 | 0 |
+| FastDPE | cdrLen | `"transformed (benchmark-derived)"` | 16 | 8 | 0 | 8 |
+| TNP | CDR3_length | `"transformed (benchmark-derived)"` | 18 | 9 | 0 | 9 |
+| TNP | CDR3_compactness | `"transformed (benchmark-derived)"` | 18 | 9 | 0 | 9 |
+| TNP | total_CDR_length | `null` | 18 | 9 | 0 | 9 |
+
+1+8+8+9+9+9 = 44 — every duplicate group in the dataset comes from exactly these 6 merged catalog
+entries; nothing outside this table is affected. Two things fall out of this:
+
+- **Exact-dup vs. mismatch is explained by whether the transform is rank-preserving.** Spearman is
+  invariant under any strictly monotonic transform of a variable — so a raw/transformed pair whose
+  transform happens to be monotonic (SFvCSP, apparently) produces byte-identical Spearman values
+  and looked like a harmless re-render; a pair whose transform changes rank order (cdrHydro,
+  cdrLen, all three TNP columns) produces different Spearman values and looked like a data
+  conflict. Same merge bug, two visible symptoms.
+- **The entry-level `transform` field can't be trusted even where it's populated.** cdrLen and both
+  TNP entries show `"transformed (benchmark-derived)"` — true of the transformed card in the pair,
+  but silently applied to the *merged* entry covering both the raw and transformed rows with no way
+  to tell which of each duplicated pair it actually describes. cdrHydro and total_CDR_length show
+  `null` outright, i.e. the transform note was dropped entirely during the merge.
+
+**This is a Metric-catalog undercount, not (only) a benchmark-stat data-quality flag.** Raw and
+`-transformed` are different derived quantities from the same module+column — arguably two
+distinct metrics, not one metric with a data-quality wrinkle. Treating this as a `BenchmarkResult`
+data-quality flag (as originally proposed here) would paper over a missing `Metric`, not fix it —
+withdrawn.
+
+**RESOLVED (2026-07-03).** Ryan pulled the live Table view's "Module output" column (human-readable
+card title, e.g. `FastDPE Structural Fv Charge Symmetry Parameter-transformed`) via manual
+copy-paste — a separate "Module output names" tab in the review workbook, cross-referenced back to
+the original 190 rows by matching `(module, property, n, spearman, auroc)`. That gave every row its
+real per-card `module_output` value, including a genuine `transform` note captured for `cdrHydro`'s
+transformed card (`"Mahalanobis distance to a Gaussian distribution with μ=123.07, σ=16.87"` — the
+first non-null transform note for that entry). Regrouping
+`(module, param, column, module_output)` instead of the old 3-part key split all 6 merged entries
+apart cleanly, zero unresolved conflicts. `seed/raw/module_evaluation_catalog.json` is now
+**33 entries** (was 27) and `module_evaluation_details.json` is still 190 rows, fully unique on
+`(module, param, column, module_output, property)`. Every catalog entry now also carries a
+`module_output` field (added for all 33 entries, not just the 6 that needed it — useful,
+human-readable display text worth carrying into the `Module`/`Metric` schema in migration 003).
+
+One data point from this fix worth remembering: the SFvCSP raw/transformed pair have **identical**
+Spearman (`0.199`, both) but **different** AuROC (`0.647` raw vs. `0.353` transformed — exact
+complements). Confirms the earlier "EXACT_DUP is harmless" read was incomplete — Spearman alone
+doesn't capture whether two cards are really the same data; AuROC (and presumably AuPRC/
+Precision@Top5%) can still differ even when Spearman doesn't, because it isn't invariant the same
+way under whatever transform AWS applies. Good thing these ended up as separate entries rather than
+deduped away.
