@@ -108,12 +108,26 @@ before this gets typed:
   deciding here whether `value` duplicates what's already in `Candidate.scores` JSONB or replaces
   it outright.
 
+**Update (2026-07-03):** the scrape merge-bug fix (§6 of `bio-discovery-scrape-handoff.md`) split 6
+raw/`-transformed` card pairs into separate catalog entries, which surfaced a related Metric-side
+question worth deciding alongside the Candidate/scores one above, since both affect the same
+`app/graphql/types.py` design pass: `Metric` gets a `VariantKind.TRANSFORM` member and a
+self-referential `transform_of_metric_id` (§7 of `bio-discovery-scrape-handoff.md`, scaffolded as
+YOUR-TURN comments in `orm.py`, not typed yet). Worth deciding now, before the GraphQL types are
+written, not after: does a `Metric` type expose its raw/transformed sibling as a queryable field
+(e.g. `metric.transformOf` / `metric.transformedVariant`), or stay opaque and let the importer
+resolve it internally? Given the whole point of this project's GraphQL-first ordering is that "richer
+queries for a future frontend" is the actual goal (not just fixing the ambiguity), leaning toward
+exposing it — a frontend comparing a metric's raw vs. transformed behavior is a realistic query
+shape given the SFvCSP AuROC-divergence finding in §6.
+
 ## Next steps, in order
 
 1. Resolve the branch-fold decision above.
 2. **New branch off the consolidated tip** for the GraphQL work — don't build it on
    `metrics-scrape`/`catalog-seed` directly, per Ryan's explicit call.
 3. Design `app/graphql/types.py` / `schema.py` (Strawberry) for at least the catalog side
-   (Module, Metric, Concept) and the Candidate/scores question above.
+   (Module, Metric, Concept), the Candidate/scores question above, and the Metric
+   transform-lineage question just above.
 4. Only after that's settled, finish typing migration `003` and run
    `alembic revision --autogenerate -m "..."`.

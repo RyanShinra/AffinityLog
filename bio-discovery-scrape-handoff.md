@@ -284,3 +284,41 @@ doesn't capture whether two cards are really the same data; AuROC (and presumabl
 Precision@Top5%) can still differ even when Spearman doesn't, because it isn't invariant the same
 way under whatever transform AWS applies. Good thing these ended up as separate entries rather than
 deduped away.
+
+---
+
+## 7. Schema follow-up: raw/transformed pairs need lineage + room for a correlation stat
+
+`Metric`'s existing identity scheme (`app/models/orm.py`) already has the right shape for this —
+`UniqueConstraint(module_id, column_key, variant_kind, variant)` plus a `VariantKind` enum
+(`PARAMETER`, `MODE`, `SOURCE_MODEL`, `COMPONENT`) for "same column, different meaning" cases. It's
+one member short: no `TRANSFORM`. The 6 raw/`-transformed` pairs fixed in §6 are exactly what this
+axis was built for — import them as `variant_kind=TRANSFORM, variant="transformed"` (transformed)
+vs. `variant_kind=TRANSFORM, variant=None` (raw), no constraint change needed. Scaffolded as a
+YOUR-TURN comment on `VariantKind` in `orm.py`, including the Postgres gotcha: adding an enum member
+to a live `SAEnum` needs `ALTER TYPE variantkind ADD VALUE 'transform'` by hand — Alembic
+autogenerate won't emit it, and older Postgres can't add-and-use the new value in one transaction.
+
+Two more things worth reserving room for now, before migration 003 is typed, so they're not an
+afterthought later:
+
+- **Lineage**: a self-referential `Metric.transform_of_metric_id` (nullable FK → `metrics.id`,
+  `ondelete="SET NULL"`), set only on the transformed sibling, pointing back at its raw
+  counterpart. Cheap to add, and without it there's no way to query "give me this metric's raw/
+  transformed pair" — you'd have to re-derive it from `column_key` + `module_id` matching, which is
+  exactly the kind of implicit, easy-to-get-wrong logic that caused the §6 bug in the first place.
+- **Transform-correlation statistic**: `Metric.transform_stats: JSONB | None`, reserved for a
+  correlation stat between a metric and its raw/transformed sibling (e.g.
+  `{"spearman_vs_raw": ..., "n": ..., "computed_at": ...}`). This is **not** derivable from the
+  Module Evaluation scrape — that only gives each metric's correlation against DPBD properties
+  (`BenchmarkResult`), never one metric's values directly against its sibling's. It only becomes
+  computable once real candidate data has both columns imported for the same candidates, so it
+  stays `NULL` until then — same deferred-backfill pattern as `Metric.transform` already uses. The
+  SFvCSP evidence in §6 (identical Spearman-vs-Titer, different AuROC-vs-Titer between the raw and
+  transformed cards) is the concrete reason this is worth reserving rather than assuming the pair is
+  redundant: two metrics that look like duplicates by one statistic can still diverge by another,
+  and a direct raw-vs-transformed correlation is the only way to quantify that without an external
+  property as an intermediary.
+
+Both are documented as YOUR-TURN comments in `app/models/orm.py` now; no code or migration yet —
+same "not typed until the GraphQL schema settles" deferral as the rest of migration 003.

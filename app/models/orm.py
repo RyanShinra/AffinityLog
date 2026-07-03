@@ -82,6 +82,18 @@ class VariantKind(enum.Enum):
     MODE = "mode"
     SOURCE_MODEL = "source_model"
     COMPONENT = "component"
+    # --- YOUR TURN --- add TRANSFORM = "transform" here for the raw vs. "-transformed" card
+    # pairs found in the Module Evaluation scrape (see bio-discovery-scrape-handoff.md §6/§7 —
+    # e.g. FastDPE's SFvCSP column has both a raw and a "-transformed" Metric). This is a live
+    # Postgres ENUM (SAEnum), so adding a member here isn't enough on its own — migration 003
+    # needs `op.execute("ALTER TYPE variantkind ADD VALUE 'transform'")`, and Postgres requires
+    # that statement run outside the migration's other DDL in its own transaction/connection
+    # (can't ADD VALUE and use the new value in the same transaction pre-PG12, and even on newer
+    # versions Alembic's autogenerate won't emit this for you — write it by hand).
+    # Once added: import metrics from the scrape's `module_output` "-transformed" suffix as
+    # variant_kind=TRANSFORM, variant="transformed" — the existing
+    # UniqueConstraint(module_id, column_key, variant_kind, variant) already handles the identity
+    # correctly, no constraint change needed.
 
 
 class Provenance(enum.Enum):
@@ -229,6 +241,28 @@ class Metric(ModelBase):
     # several developability properties; see the Module Evaluation scrape). Mirror the
     # `metrics` relationship on Module above: back_populates + cascade="all, delete-orphan".
     # benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(...)
+
+    # --- YOUR TURN --- transform lineage + room for a future transform-correlation statistic.
+    # A TRANSFORM-variant Metric (see VariantKind above) is a derived quantity of some raw
+    # Metric, not an independent one — worth a self-referential link back to it:
+    #   transform_of_metric_id: Mapped[uuid.UUID | None] = mapped_column(
+    #       UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="SET NULL")
+    #   )
+    #   transform_of: Mapped["Metric | None"] = relationship(remote_side=[id])
+    # Only set on the transformed sibling, pointing at its raw counterpart.
+    #
+    # Separately, reserve a place for a transform-correlation statistic — how much does the
+    # transform actually change the ranking? NOT derivable from the Module Evaluation scrape
+    # alone (that only gives each metric's correlation against DPBD properties, e.g.
+    # BenchmarkResult.spearman_correlation — never one metric's values directly against its
+    # sibling's). Confirmed worth capturing: FastDPE's SFvCSP raw/transformed pair has identical
+    # Spearman against Titer (0.199 both) but different AuROC (0.647 vs 0.353) — proof two
+    # "duplicate-looking" metrics can diverge in ways Spearman alone hides. Only computable once
+    # real candidate data has both the raw and transformed columns imported for the same
+    # candidates:
+    #   transform_stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    #     e.g. {"spearman_vs_raw": ..., "n": ..., "computed_at": ...} — lazily computed post-import,
+    #     not backfillable from the scrape. NULL until then, same pattern as Metric.transform.
 
 
 class Concept(ModelBase):
