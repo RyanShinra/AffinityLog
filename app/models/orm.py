@@ -234,7 +234,9 @@ class Metric(ModelBase):
 
     # Benchmark normalization, e.g. {"type": "mahalanobis_gaussian", "params": {"mu": 3.59, "sigma": 7.47}}
     transform: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    provenance: Mapped[Provenance] = mapped_column(SAEnum(Provenance), default=Provenance.INFERRED, server_default=text("'inferred'"))
+    provenance: Mapped[Provenance] = mapped_column(
+        SAEnum(Provenance), default=Provenance.INFERRED, server_default=text("'inferred'")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     module: Mapped["Module"] = relationship(back_populates="metrics")
