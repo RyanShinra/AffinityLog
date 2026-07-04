@@ -121,13 +121,49 @@ queries for a future frontend" is the actual goal (not just fixing the ambiguity
 exposing it — a frontend comparing a metric's raw vs. transformed behavior is a realistic query
 shape given the SFvCSP AuROC-divergence finding in §6.
 
+## Data generation — the real Bio Discovery run (dropped from this doc; restored 2026-07-04)
+
+`docs/catalog-seed-plan.md` TODO #6 flagged this as a "(later)" item and this handoff lost it.
+Restoring it as a **first-class next step**, because it gates good GraphQL design: we have no real
+candidate output yet — only synthetic `sample_data/her2_nanobody_sample.csv`. Everything about
+`Candidate` / `scores` is being designed against a guess at what a real export looks like.
+
+**Goal:** design and run one real experiment in Amazon Bio Discovery, export the result CSV, and
+study it. First real data; replaces synthetic.
+
+- **Target:** HER2 extracellular domain, PDB `1S78` (per README — the whole reason this project
+  exists).
+- **Budget:** free trial is **5 Experimental Units/month** — the run has to be designed to fit,
+  so recipe choice + number of designs is a real constraint, not a free parameter.
+- **To decide together (this is a design session, not a scripted task):** which recipe/modules,
+  run params (num designs, hotspots, design loops…), and which output columns we *expect* — then
+  cross-check the export's actual headers against the 33-entry catalog.
+- **Payoff, and why it comes before finalizing GraphQL/SQL:** (a) validates the CSV importer
+  against reality; (b) flips `provenance` from `INFERRED` → `AWS_CONFIRMED` for the columns a real
+  run actually emits, and corrects any inferred direction/unit that's wrong; (c) gives us real
+  `Candidate` rows to design the `Candidate`/`scores` GraphQL queries against — instead of
+  guessing the shape, we query the real thing.
+
+## SQL schema ≠ GraphQL schema (design principle)
+
+The GraphQL schema is the **apparent representation** — the shape a frontend/consumer sees, and the
+actual point of this project's "GraphQL-first" ordering. The SQL schema is free to differ: designed
+for retrieval and storage sanity, **not** required to be a 1:1 mirror of the GraphQL types. A
+`candidate_scores` join table, a `scores` JSONB column, and a resolver that stitches them into one
+tidy `Candidate.scores: [ScoredMetric]` GraphQL field can all coexist — the resolver is exactly the
+seam that lets the two schemas diverge. Design the GraphQL shape for the consumer first; let it
+*inform* the SQL (see step 5 below), but don't collapse them into the same table layout by reflex.
+
 ## Next steps, in order
 
-1. Resolve the branch-fold decision above.
-2. **New branch off the consolidated tip** for the GraphQL work — don't build it on
-   `metrics-scrape`/`catalog-seed` directly, per Ryan's explicit call.
-3. Design `app/graphql/types.py` / `schema.py` (Strawberry) for at least the catalog side
-   (Module, Metric, Concept), the Candidate/scores question above, and the Metric
-   transform-lineage question just above.
-4. Only after that's settled, finish typing migration `003` and run
-   `alembic revision --autogenerate -m "..."`.
+1. **Merge `catalog-seed` → `main`** via PR (Chapter 2 + scrape + scaffolds; ~27k lines). An
+   "incomplete" PR is expected at this size — migration `003` is still TODOs, not typed. ✅ decided.
+2. **Design + run the real Bio Discovery experiment** (section above) → export CSV, study it.
+3. **Design the GraphQL schema** (`app/graphql/types.py` / `schema.py`, Strawberry) for the catalog
+   side (Module, Metric, Concept), the Candidate/scores question, and the Metric transform-lineage
+   question above — now informed by real output from step 2, and by the SQL≠GraphQL principle above.
+4. **Feed the GraphQL design back into the SQL**: make any last-minute schema changes it implies,
+   then finish typing migration `003` and `alembic revision --autogenerate -m "..."`. This SQL work
+   is its own PR.
+5. **Implement the GraphQL layer** (with TODO markers for Ryan to type the meaningful parts).
+   Separate PR after step 4.
