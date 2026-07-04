@@ -120,6 +120,37 @@ Three schema/importer consequences, all significant:
    to be the parent bulk experiment, or the importer resolves per-row `experimentId`. **Flag for the
    GraphQL/REST design pass**, alongside the Candidate↔Metric question in `graphql-schema-handoff.md`.
 
+### 8. The export is under-specified for provenance — AffinityLog's Experiment table IS the fix
+The output CSV alone can't tell you *what experiment produced it or how it was configured*. Precisely:
+
+- **What the CSV carries:** candidate scores, the `experimentId`, and — easy to miss — the target's
+  full amino-acid **sequence** (the `/T` half of the `sequence` column; every `.T` metric is
+  computed on it).
+- **What it does NOT carry:** the target's **identity** (that it's `1N8Z`, chain C), and the run
+  **config** — hotspots (253–283), framework (`h-NbBCII10`), model (esm/amplify). These live only on
+  the experiment's GUI "Input parameters" panel, reachable via `experimentId`.
+
+So candidate↔candidate comparison is easy; input→output provenance requires a join AffinityLog must
+supply. **This is the reason the `experiments` table exists** — `Experiment.params` (JSONB: model,
+hotspots, num_designs), `target_id`→`Target`, `recipe_id`→`Recipe`, `source_filename` are exactly
+the provenance the export omits. AffinityLog *is* the join Bio Discovery's CSV doesn't provide, and
+this validates the two-step REST design (`POST /experiments` with the known inputs, *then*
+`POST /experiments/{id}/candidates/import`): step 1 exists **because** the CSV can't carry the inputs.
+
+**The workflow constraint that makes this concrete (ties to the CLAUDE.md no-API rule):** the entire
+Bio Discovery experiment setup is **GUI clicking** — no API, and no config-export button observed.
+So the input values cannot be pulled programmatically; the operator must **manually transcribe** them
+(target id, hotspots, framework, model) from the Bio Discovery GUI into a **companion input form/GUI
+that AffinityLog provides**. That companion form is a real, required build item, not a nicety — it's
+the only way the provenance ever enters the system. Design implications:
+- The experiment-creation input shape (the fields the operator re-keys) is part of the GraphQL/REST
+  API design pass — it's the human-facing half of "capture inputs at import time."
+- Because one CSV spans multiple experiments (§7), the operator transcribes inputs **per
+  `experimentId`** (e.g. the esm and amplify subexperiments are two Experiment records differing only
+  in `params.model`), then the CSV rows attach to the matching record.
+- A screenshot of the GUI "Input parameters" panel is literally the missing half of each import —
+  worth keeping alongside the CSV until the companion form exists.
+
 ## To investigate (page 2)
 
 - **The 42-module ↔ benchmark-catalog mapping.** Trace each of the 42 recipe-builder palette
