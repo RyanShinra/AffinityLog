@@ -100,6 +100,7 @@ class Provenance(enum.Enum):
     INFERRED = "inferred"
     AWS_CONFIRMED = "aws_confirmed"
 
+
 # ---------------------------------------------------------------------------
 # Association table: Recipe <-> Module (the one many-to-many).
 # A recipe IS its composition of modules; defined before the classes that use it.
