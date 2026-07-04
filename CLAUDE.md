@@ -104,6 +104,32 @@ Docker only. Do not add a deploy step to CI until the next sprint.
 
 ---
 
+## Dev environment (multi-machine)
+
+- **PC:** WSL Ubuntu is the default shell — VS Code opens the repo via the `/mnt/f/...` mount
+  (same working tree, not a separate clone). Assume WSL bash unless the user says otherwise;
+  avoid defaulting to PowerShell or Git Bash for Python/Alembic/Docker work.
+- **Mac:** native terminal.
+- **`.venv` is OS-specific and gitignored** — build it fresh per machine/shell
+  (`python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"` on WSL/Mac;
+  `python -m venv .venv && .venv\Scripts\pip install -e ".[dev]"` if ever run natively on Windows).
+  Since PC WSL and PC-native share one `.venv` folder path on disk, rebuilding from WSL
+  overwrites a Windows-built one (and vice versa) — expected, not a bug.
+- **Docker Desktop's WSL2 backend is shared** — containers started from PowerShell are visible
+  and usable from WSL bash (`docker compose ps`) without restarting, as long as WSL integration
+  is enabled for the Ubuntu distro (Docker Desktop → Settings → Resources → WSL Integration).
+- **Lint/format autofix runs two ways, both need one-time setup per machine:**
+  - *Pre-commit hook* (`.pre-commit-config.yaml`, ruff --fix + black) — git hooks live in
+    `.git/hooks/`, which isn't tracked, so run `.venv/bin/pre-commit install` once per
+    clone/machine after building `.venv`. From then on every `git commit` autofixes and
+    reformats staged files before the commit lands.
+  - *VS Code format-on-save* (`.vscode/settings.json`) — needs the `ms-python.black-formatter`
+    and `charliermarsh.ruff` extensions (listed in `.vscode/extensions.json`, VS Code will
+    prompt to install them) on whichever machine's VS Code you're using; this is separate from
+    the pre-commit hook and doesn't carry over between Mac/PC automatically.
+
+---
+
 ## Quick start
 
 ```bash

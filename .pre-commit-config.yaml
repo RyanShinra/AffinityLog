@@ -1,0 +1,13 @@
+repos:
+  # ruff handles lint (import sorting, upgrades, etc.) only -- NOT ruff-format. This repo's
+  # stack (CLAUDE.md, CI) is ruff for lint + black for formatting; running ruff-format
+  # alongside black would fight over formatting opinions and thrash on every commit.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        args: [--fix]
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black
