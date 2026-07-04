@@ -131,8 +131,8 @@ candidate output yet — only synthetic `sample_data/her2_nanobody_sample.csv`. 
 **Goal:** design and run one real experiment in Amazon Bio Discovery, export the result CSV, and
 study it. First real data; replaces synthetic.
 
-- **Target:** HER2 extracellular domain, PDB `1S78` (per README — the whole reason this project
-  exists).
+- **Target:** HER2 extracellular domain, PDB `1N8Z` (the HER2/Herceptin-Fab co-crystal; chosen
+  over 1S78 as the better-studied structure — the whole reason this project exists).
 - **Budget:** free trial is **5 Experimental Units/month** — the run has to be designed to fit,
   so recipe choice + number of designs is a real constraint, not a free parameter.
 - **To decide together (this is a design session, not a scripted task):** which recipe/modules,
