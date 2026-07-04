@@ -118,6 +118,15 @@ Docker only. Do not add a deploy step to CI until the next sprint.
 - **Docker Desktop's WSL2 backend is shared** — containers started from PowerShell are visible
   and usable from WSL bash (`docker compose ps`) without restarting, as long as WSL integration
   is enabled for the Ubuntu distro (Docker Desktop → Settings → Resources → WSL Integration).
+- **Lint/format autofix runs two ways, both need one-time setup per machine:**
+  - *Pre-commit hook* (`.pre-commit-config.yaml`, ruff --fix + black) — git hooks live in
+    `.git/hooks/`, which isn't tracked, so run `.venv/bin/pre-commit install` once per
+    clone/machine after building `.venv`. From then on every `git commit` autofixes and
+    reformats staged files before the commit lands.
+  - *VS Code format-on-save* (`.vscode/settings.json`) — needs the `ms-python.black-formatter`
+    and `charliermarsh.ruff` extensions (listed in `.vscode/extensions.json`, VS Code will
+    prompt to install them) on whichever machine's VS Code you're using; this is separate from
+    the pre-commit hook and doesn't carry over between Mac/PC automatically.
 
 ---
 

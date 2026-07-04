@@ -10,6 +10,19 @@
         "sessionmaker",
         "thermostability"
     ],
+    "cSpell.ignorePaths": [
+        "package-lock.json",
+        "node_modules",
+        "vscode-extension",
+        ".git/{info,lfs,logs,refs,objects}/**",
+        ".git/{index,*refs,*HEAD}",
+        ".vscode",
+        ".vscode-insiders",
+        "sample_data/structures"
+    ],
+    "cSpell.ignoreWords": [
+        "venv",
+    ],
     "continue.enableNextEdit": false,
     "editor.inlineSuggest.enabled": true,
     "editor.inlineSuggest.minShowDelay": 200,
@@ -22,4 +35,12 @@
     },
     "editor.quickSuggestionsDelay": 500,
     "editor.inlineSuggest.suppressInSnippetMode": false,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    }
 }
