@@ -1,7 +1,7 @@
 # SYNTHETIC PLACEHOLDER DATA — NOT REAL EXPERIMENTAL OUTPUT
 # Generated to model the expected shape of an Amazon Bio Discovery CSV export.
 # Replace this file with a real Bio Discovery export when available.
-# Target: HER2 extracellular domain (PDB 1S78)
+# Target: HER2 extracellular domain (PDB 1N8Z)
 # Recipe: BoltzGen nanobody design (hypothetical)
 sequence_id,sequence,Kd (nM),humanness_score,aggregation_propensity,stability_score,paratope_surface_area
 NB-001,QVQLQESGGGLVQAGGSLRLSCAASGFPFSNYAMGWYRQAPGKQRELVAGISSGGRTIYADSVKGRFTISRDNAKNTVYLQMNSLKPEDTAVYYCAADRPYYCSSTSCPRDYWGQGTQVTVSS,2.1,0.87,0.12,82.3,1420.5

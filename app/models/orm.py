@@ -339,13 +339,13 @@ class Project(ModelBase):
 
 
 class Target(ModelBase):
-    """The antigen designed against (e.g. HER2 / 1S78). Reusable across experiments."""
+    """The antigen designed against (e.g. HER2 / 1N8Z). Reusable across experiments."""
 
     __tablename__ = "targets"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(500))
-    pdb_id: Mapped[str | None] = mapped_column(String(16))  # "1S78"
+    pdb_id: Mapped[str | None] = mapped_column(String(16))  # "1N8Z"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     experiments: Mapped[list["Experiment"]] = relationship(back_populates="target")

@@ -131,8 +131,8 @@ candidate output yet — only synthetic `sample_data/her2_nanobody_sample.csv`. 
 **Goal:** design and run one real experiment in Amazon Bio Discovery, export the result CSV, and
 study it. First real data; replaces synthetic.
 
-- **Target:** HER2 extracellular domain, PDB `1S78` (per README — the whole reason this project
-  exists).
+- **Target:** HER2 extracellular domain, PDB `1N8Z` (the HER2/Herceptin-Fab co-crystal; chosen
+  over 1S78 as the better-studied structure — the whole reason this project exists).
 - **Budget:** free trial is **5 Experimental Units/month** — the run has to be designed to fit,
   so recipe choice + number of designs is a real constraint, not a free parameter.
 - **To decide together (this is a design session, not a scripted task):** which recipe/modules,
@@ -153,6 +153,21 @@ for retrieval and storage sanity, **not** required to be a 1:1 mirror of the Gra
 tidy `Candidate.scores: [ScoredMetric]` GraphQL field can all coexist — the resolver is exactly the
 seam that lets the two schemas diverge. Design the GraphQL shape for the consumer first; let it
 *inform* the SQL (see step 5 below), but don't collapse them into the same table layout by reflex.
+
+## TODO (deferred, good enough for the portfolio piece as-is)
+
+- **`Experiment.params` stays opaque `JSON` for now.** It's stored as `params` JSONB (validated:
+  De Novo Design vs Directed Evolution have entirely disjoint param sets — a bag, not columns) and
+  exposed in GraphQL as an opaque `JSON` scalar. Display queries work (`experiment(id) { params }`);
+  cross-experiment filtering by a param value (e.g. "all runs where model=esm") does **not** without
+  Postgres JSON-path operators — acceptable, since display >> param-filtering for a demo.
+  **Future symmetry, only if a param catalog gets built:** the deferred "surface required inputs
+  from the README survey" idea (see §"Known design gap" / point 2) *is* a param catalog — a
+  `ModuleInput`/`ParamSpec` table. If that lands, `params` can get the exact `ScoreEntry` treatment:
+  project it as `[ParamEntry { key, value, spec }]`, resolved and queryable, degrading to
+  `{key, value}` for uncataloged params — the same pattern `scores`→`ScoreEntry` uses. Until there's
+  a catalog to interpret against, opaque JSON is the honest representation. (Diagram annotated in
+  `docs/schema-erd.md`.)
 
 ## Next steps, in order
 

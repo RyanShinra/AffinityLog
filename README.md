@@ -9,7 +9,8 @@ A portfolio backend API that ingests and serves Amazon Bio Discovery antibody de
 At the AWS Summit in June 2026, I saw a demo of **Amazon Bio Discovery** — AWS's computational
 antibody engineering platform. It reconnected me to a Chemical Engineering background I hadn't
 used professionally, and I signed up for the free trial (5 Experimental Units/month) to run a
-real antibody design experiment against the **HER2 extracellular domain (PDB 1S78)**.
+real antibody design experiment against the **HER2 extracellular domain (PDB 1N8Z)** — the
+HER2/Herceptin-Fab co-crystal (antigen chain), chosen over 1S78 as the better-studied structure.
 
 AffinityLog is the backend that will ingest and serve that experimental output. It's also a
 portfolio project alongside [MyTower](https://github.com/RyanShinra/MyTower), demonstrating
@@ -58,8 +59,8 @@ REST handles what REST does best; GraphQL handles richly-shaped queries that a f
 | `id` | UUID |
 | `name` | Human label |
 | `recipe_name` | Bio Discovery workflow name |
-| `target_name` | e.g. "HER2 extracellular domain (PDB 1S78)" |
-| `target_pdb_id` | e.g. "1S78" |
+| `target_name` | e.g. "HER2 extracellular domain (PDB 1N8Z)" |
+| `target_pdb_id` | e.g. "1N8Z" |
 | `source_filename` | Imported CSV filename |
 | `notes` | Free text |
 | `created_at` | |
@@ -110,8 +111,8 @@ curl -X POST http://localhost:8000/experiments \
   -d '{
     "name": "HER2 Nanobody Run 1",
     "recipe_name": "BoltzGen nanobody design",
-    "target_name": "HER2 extracellular domain (PDB 1S78)",
-    "target_pdb_id": "1S78"
+    "target_name": "HER2 extracellular domain (PDB 1N8Z)",
+    "target_pdb_id": "1N8Z"
   }'
 # Returns: {"id": "<uuid>", ...}
 ```
