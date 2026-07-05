@@ -121,6 +121,14 @@ Nodes = types, arrows = fields that reference another type. Dashed = a projectio
 backing FK** (synthesized by a resolver). `ScoreEntry` is the standout: **a type backed by no table
 at all** — the resolver builds it per-query from a `scores` JSONB entry + a catalog `Metric` lookup.
 
+**Convention:** this is an *edges-only* view — scalar fields (`id`, `tier`, `recommendation`,
+`sequenceId`, `pdbId`, …) exist on every type but aren't drawn, since they aren't references. The
+one scalar worth flagging is `Experiment.params` (the `[params: JSON]` node below): it's **present**
+in the API, just **opaque** — a JSON blob we don't interpret, because (unlike `scores`, which has the
+`Metric` catalog to resolve against) there's no param catalog yet. See the TODO in
+`graphql-schema-handoff.md`. Note `scores` is *not* absent here — it's the `→ ScoreEntry` edge (the
+interpreted projection); only its raw JSONB backing lives SQL-side.
+
 ```mermaid
 graph LR
   Q([Query])
@@ -147,6 +155,7 @@ graph LR
   E -->|target| T
   E -->|recipe| R[Recipe]
   E -->|candidates| C
+  E -.->|params| PJ["params: JSON<br/>opaque, uninterpreted"]
   Mo -->|metrics| Me
 ```
 

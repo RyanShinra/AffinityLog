@@ -154,6 +154,21 @@ tidy `Candidate.scores: [ScoredMetric]` GraphQL field can all coexist — the re
 seam that lets the two schemas diverge. Design the GraphQL shape for the consumer first; let it
 *inform* the SQL (see step 5 below), but don't collapse them into the same table layout by reflex.
 
+## TODO (deferred, good enough for the portfolio piece as-is)
+
+- **`Experiment.params` stays opaque `JSON` for now.** It's stored as `params` JSONB (validated:
+  De Novo Design vs Directed Evolution have entirely disjoint param sets — a bag, not columns) and
+  exposed in GraphQL as an opaque `JSON` scalar. Display queries work (`experiment(id) { params }`);
+  cross-experiment filtering by a param value (e.g. "all runs where model=esm") does **not** without
+  Postgres JSON-path operators — acceptable, since display >> param-filtering for a demo.
+  **Future symmetry, only if a param catalog gets built:** the deferred "surface required inputs
+  from the README survey" idea (see §"Known design gap" / point 2) *is* a param catalog — a
+  `ModuleInput`/`ParamSpec` table. If that lands, `params` can get the exact `ScoreEntry` treatment:
+  project it as `[ParamEntry { key, value, spec }]`, resolved and queryable, degrading to
+  `{key, value}` for uncataloged params — the same pattern `scores`→`ScoreEntry` uses. Until there's
+  a catalog to interpret against, opaque JSON is the honest representation. (Diagram annotated in
+  `docs/schema-erd.md`.)
+
 ## Next steps, in order
 
 1. **Merge `catalog-seed` → `main`** via PR (Chapter 2 + scrape + scaffolds; ~27k lines). An
