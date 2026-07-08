@@ -19,10 +19,12 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 PROVENANCE_COLUMN_NAME: Final[str] = "provenance"
-PROVENANCE_COLUMN_DEFAULT: Final[str] = "'inferred'"
 METRICS_TABLE_NAME: Final[str] = "metrics"
 PROVENANCE_ENUM_NAME: Final[str] = "provenance"
 PROVENANCE_ENUM_VALUES: Final[Sequence[str]] = ("INFERRED", "AWS_CONFIRMED")
+# First entry is the default — single source of truth, so this can't drift out of sync with the
+# enum labels above again the way the old hardcoded "'inferred'" (wrong case) did.
+PROVENANCE_COLUMN_DEFAULT: Final[str] = f"'{PROVENANCE_ENUM_VALUES[0]}'"
 
 
 def upgrade() -> None:
