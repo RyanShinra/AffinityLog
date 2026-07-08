@@ -23,7 +23,8 @@
         "sample_data/structures"
     ],
     "cSpell.ignoreWords": [
-        "venv",
+        "checkfirst",
+        "venv"
     ],
     "continue.enableNextEdit": false,
     "editor.inlineSuggest.enabled": true,
