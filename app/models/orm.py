@@ -19,8 +19,10 @@ from typing import Any
 
 from sqlalchemy import (
     ARRAY,
+    INTEGER,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     String,
@@ -82,18 +84,16 @@ class VariantKind(enum.Enum):
     MODE = "mode"
     SOURCE_MODEL = "source_model"
     COMPONENT = "component"
-    # --- YOUR TURN --- add TRANSFORM = "transform" here for the raw vs. "-transformed" card
-    # pairs found in the Module Evaluation scrape (see bio-discovery-scrape-handoff.md §6/§7 —
-    # e.g. FastDPE's SFvCSP column has both a raw and a "-transformed" Metric). This is a live
-    # Postgres ENUM (SAEnum), so adding a member here isn't enough on its own — migration 003
-    # needs `op.execute("ALTER TYPE variantkind ADD VALUE 'transform'")`, and Postgres requires
-    # that statement run outside the migration's other DDL in its own transaction/connection
-    # (can't ADD VALUE and use the new value in the same transaction pre-PG12, and even on newer
-    # versions Alembic's autogenerate won't emit this for you — write it by hand).
-    # Once added: import metrics from the scrape's `module_output` "-transformed" suffix as
-    # variant_kind=TRANSFORM, variant="transformed" — the existing
-    # UniqueConstraint(module_id, column_key, variant_kind, variant) already handles the identity
-    # correctly, no constraint change needed.
+    # For the raw vs. "-transformed" card pairs found in the Module Evaluation scrape (see
+    # bio-discovery-scrape-handoff.md §6/§7 — e.g. FastDPE's SFvCSP column has both a raw and a
+    # "-transformed" Metric). This is a live Postgres ENUM (SAEnum): adding a member here isn't
+    # enough on its own — migration 003 needs `op.execute("ALTER TYPE variantkind ADD VALUE
+    # 'transform'")` run outside the migration's other DDL in its own transaction (can't ADD VALUE
+    # and use the new value in the same transaction pre-PG12; autogenerate won't emit this).
+    # Imported from the scrape's `module_output` "-transformed" suffix as variant_kind=TRANSFORM,
+    # variant="transformed" — the existing UniqueConstraint(module_id, column_key, variant_kind,
+    # variant) already handles the identity correctly.
+    TRANSFORM = "transform"
 
 
 class Provenance(enum.Enum):
@@ -162,9 +162,10 @@ class Module(ModelBase):
     repo_url: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
 
-    # --- YOUR TURN --- from the Module Evaluation scrape: per-module, both nullable strings.
-    # version: e.g. "1.0". license: e.g. "MIT License" / "BSD 3-Clause License" — varies per
-    # module, don't assume a project-wide default.
+    # From the Module Evaluation scrape. version e.g. "1.0"; license e.g. "MIT License" /
+    # "BSD 3-Clause License" — varies per module, no project-wide default.
+    version: Mapped[str | None] = mapped_column(String(64))
+    license: Mapped[str | None] = mapped_column(String(128))
 
     # server_default=func.now() → the DATABASE writes the timestamp (DEFAULT now()), not Python.
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -240,32 +241,31 @@ class Metric(ModelBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     module: Mapped["Module"] = relationship(back_populates="metrics")
-    # --- YOUR TURN --- one Metric -> many BenchmarkResult (a metric can be validated against
-    # several developability properties; see the Module Evaluation scrape). Mirror the
-    # `metrics` relationship on Module above: back_populates + cascade="all, delete-orphan".
-    # benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(...)
+    # One Metric -> many BenchmarkResult (a metric can be validated against several developability
+    # properties; see the Module Evaluation scrape). Mirrors the `metrics` relationship on Module.
+    benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(
+        back_populates="metric", cascade="all, delete-orphan"
+    )
 
-    # --- YOUR TURN --- transform lineage + room for a future transform-correlation statistic.
-    # A TRANSFORM-variant Metric (see VariantKind above) is a derived quantity of some raw
-    # Metric, not an independent one — worth a self-referential link back to it:
-    #   transform_of_metric_id: Mapped[uuid.UUID | None] = mapped_column(
-    #       UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="SET NULL")
-    #   )
-    #   transform_of: Mapped["Metric | None"] = relationship(remote_side=[id])
-    # Only set on the transformed sibling, pointing at its raw counterpart.
-    #
-    # Separately, reserve a place for a transform-correlation statistic — how much does the
-    # transform actually change the ranking? NOT derivable from the Module Evaluation scrape
-    # alone (that only gives each metric's correlation against DPBD properties, e.g.
-    # BenchmarkResult.spearman_correlation — never one metric's values directly against its
-    # sibling's). Confirmed worth capturing: FastDPE's SFvCSP raw/transformed pair has identical
-    # Spearman against Titer (0.199 both) but different AuROC (0.647 vs 0.353) — proof two
-    # "duplicate-looking" metrics can diverge in ways Spearman alone hides. Only computable once
-    # real candidate data has both the raw and transformed columns imported for the same
-    # candidates:
-    #   transform_stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    #     e.g. {"spearman_vs_raw": ..., "n": ..., "computed_at": ...} — lazily computed post-import,
-    #     not backfillable from the scrape. NULL until then, same pattern as Metric.transform.
+    # A TRANSFORM-variant Metric (see VariantKind above) is a derived quantity of some raw Metric,
+    # not an independent one — this is the lineage link back to its raw counterpart. Only set on
+    # the transformed sibling.
+    transform_of_metric_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="SET NULL")
+    )
+    transform_of: Mapped["Metric | None"] = relationship(remote_side=[id])
+
+    # A transform-correlation statistic: how much does the transform actually change the ranking?
+    # NOT derivable from the Module Evaluation scrape (that only gives each metric's correlation
+    # against DPBD properties, e.g. BenchmarkResult.spearman_correlation — never one metric's
+    # values directly against its sibling's). Worth capturing: FastDPE's SFvCSP raw/transformed
+    # pair has identical Spearman against Titer (0.199 both) but different AuROC (0.647 vs 0.353) —
+    # proof two "duplicate-looking" metrics can diverge in ways Spearman alone hides. Only
+    # computable once real candidate data has both the raw and transformed columns imported for
+    # the same candidates, e.g. {"spearman_vs_raw": ..., "n": ..., "computed_at": ...} — lazily
+    # computed post-import, not backfillable from the scrape. NULL until then, same pattern as
+    # Metric.transform.
+    transform_stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class Concept(ModelBase):
@@ -280,21 +280,45 @@ class Concept(ModelBase):
 
 
 # ===========================================================================
-# ░░░  YOUR TURN  ░░░   BenchmarkDataset + BenchmarkResult — from the Module Evaluation scrape.
+# BenchmarkDataset + BenchmarkResult — from the Module Evaluation scrape.
 #
 # BenchmarkDataset: one row, describing the DPBD reference dataset every benchmark below is
-# validated against. Fields (all nullable except name/description — this is documentation,
-# not something the app writes to at runtime):
-#   id, name (str, unique — "DPBD"), version (str | None), description (Text),
-#   seed_antibody_count / antigen_count / max_variants_per_seed / mutation_strategy_count /
-#   assay_count (all int | None — the page-level paragraph's numbers: 50 seed antibodies,
-#   42 antigens, up to 99 variants/seed, 8 mutation strategies, 6 assays).
-#   Fold the binarization methodology into `description` too (the per-property positive-label
-#   thresholds used to compute AuROC/AuPRC/Precision@Top5%, e.g. "Titer > 0.1 mg/mL",
-#   "Aggregation (polydispersity idx) < median + 1.5*IQR", "Hydrophobicity: undefined —
-#   bimodal distribution, insufficient seed antibodies for a reliable variance estimate").
-#   It's static global methodology prose, not per-row data — doesn't warrant its own table.
+# validated against. All fields nullable except name/description — this is documentation, not
+# something the app writes to at runtime. `description` also carries the binarization methodology
+# (the per-property positive-label thresholds used to compute AuROC/AuPRC/Precision@Top5%, e.g.
+# "Titer > 0.1 mg/mL", "Aggregation (polydispersity idx) < median + 1.5*IQR", "Hydrophobicity:
+# undefined — bimodal distribution, insufficient seed antibodies for a reliable variance estimate")
+# — static global methodology prose, not per-row data, so it doesn't warrant its own table.
 #
+
+
+class BenchmarkDataset(ModelBase):
+    """Describes the DPBD reference dataset used to validate the model."""
+
+    __tablename__ = "benchmark_datasets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(64), unique=True)  # "DPBD"
+    version: Mapped[str | None] = mapped_column(String(32))
+
+    # Page-level DPBD paragraph, including the binarization methodology (Titer > 0.1 mg/mL,
+    # median ± 1.5*IQR for others, undefined for Hydrophobicity) — static prose, not per-row data.
+    description: Mapped[str] = mapped_column(Text)
+
+    seed_antibody_count: Mapped[int | None] = mapped_column(INTEGER)
+    antigen_count: Mapped[int | None] = mapped_column(INTEGER)
+    max_variants_per_seed: Mapped[int | None] = mapped_column(INTEGER)
+    mutation_strategy_count: Mapped[int | None] = mapped_column(INTEGER)
+    assay_count: Mapped[int | None] = mapped_column(INTEGER)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Optional convenience side of the FK on BenchmarkResult.benchmark_dataset_id — not required
+    # (that FK works fine without it), added for symmetry with every other relationship in this
+    # file. Needs the matching back_populates added to BenchmarkResult.benchmark_dataset below.
+    results: Mapped[list["BenchmarkResult"]] = relationship(back_populates="benchmark_dataset")
+
+
 # BenchmarkResult: one row per (metric, property) pair — a Metric can be validated against
 # several developability properties (see Metric.benchmark_results above), each with its own
 # stats. Fields:
@@ -315,9 +339,39 @@ class Concept(ModelBase):
 #   created_at.
 #
 # Relationships: BenchmarkResult.metric back_populates Metric.benchmark_results;
-# BenchmarkResult.benchmark_dataset is a plain many-to-one (no back_populates needed unless you
-# want BenchmarkDataset.results too).
+# BenchmarkResult.benchmark_dataset back_populates BenchmarkDataset.results.
 # ===========================================================================
+class BenchmarkResult(ModelBase):
+    """The result of benchmarking a metric for a particular model"""
+
+    __tablename__ = "benchmark_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4
+    )
+
+    metric_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="CASCADE")
+    )
+
+    benchmark_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("benchmark_datasets.id", ondelete="SET NULL"), index=True
+    )
+
+    property: Mapped[str] = mapped_column(String(255))
+    n: Mapped[int] = mapped_column(INTEGER)
+    spearman_correlation: Mapped[float] = mapped_column(Float())
+    spearman_significance: Mapped[str | None] = mapped_column(String(8))
+    auroc: Mapped[float | None] = mapped_column(Float())
+    auprc: Mapped[float | None] = mapped_column(Float())
+    precision_top5: Mapped[float | None] = mapped_column(Float())
+    precision_top5_null_dist: Mapped[list[float] | None] = mapped_column(ARRAY(Float()))
+    positive_ratio: Mapped[float | None] = mapped_column(Float())
+    strata: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    metric: Mapped["Metric"] = relationship(back_populates="benchmark_results")
+    benchmark_dataset: Mapped["BenchmarkDataset | None"] = relationship(back_populates="results")
 
 
 # ===========================================================================
@@ -419,13 +473,6 @@ class Artifact(ModelBase):
     candidate: Mapped["Candidate"] = relationship(back_populates="artifacts")
 
 
-# ===========================================================================
-# ░░░  YOUR TURN  ░░░   Candidate — finish the TODOs below.
-# The id, the experiment_id FK, and the two relationships are pre-wired so the
-# file imports and the Experiment/Artifact sides resolve. Add the rest.
-# ===========================================================================
-
-
 class Candidate(ModelBase):
     """A designed sequence + its scores."""
 
@@ -435,14 +482,12 @@ class Candidate(ModelBase):
         Index("ix_candidates_scores_gin", "scores", postgresql_using="gin"),
     )
 
-    # --- provided (so the file imports & relationships resolve) ---
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     experiment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE")
     )
 
     sequence_id: Mapped[str] = mapped_column(String(255))  # Bio Discovery's per-candidate id
-    fasta_sequence: Mapped[str] = mapped_column(Text)  # the amino-acid sequence
     # The raw {column_key: value} bag — every export column lands here untyped (default=dict → '{}').
     # GIN-indexed above so we can query INSIDE it, e.g. WHERE (scores->>'pseudo_perplexity')::float < 10
     scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict, server_default=text("'{}'"))
@@ -451,6 +496,34 @@ class Candidate(ModelBase):
 
     # --- relationships ---
     experiment: Mapped["Experiment"] = relationship(back_populates="candidates")
+    chains: Mapped[list["CandidateChain"]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan"
+    )
     artifacts: Mapped[list["Artifact"]] = relationship(
         back_populates="candidate", cascade="all, delete-orphan"
     )
+
+
+class Chain(enum.Enum):
+    """Enum for chain types."""
+
+    HEAVY = "H"
+    LIGHT = "L"
+    TARGET = "T"
+
+
+class CandidateChain(ModelBase):
+    """An amino acid chain candidate."""
+
+    __tablename__ = "candidate_chains"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE")
+    )
+    chain: Mapped[Chain] = mapped_column(SAEnum(Chain))
+    sequence: Mapped[str] = mapped_column(Text)
+    ordinal: Mapped[int] = mapped_column(
+        INTEGER, default=0
+    )  # disambiguates repeated labels (e.g. 2 target chains)
+
+    candidate: Mapped["Candidate"] = relationship(back_populates="chains")
