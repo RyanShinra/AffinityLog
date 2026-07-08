@@ -35,9 +35,17 @@ Most of this doc predates a lot of real progress and is now stale in places. Don
 - **Migration `003`'s ORM models are complete** on branch `schema-003` (renamed from
   `graphql-schema` — it turned out to be SQL work, not GraphQL, so the name was wrong). Covers:
   `BenchmarkDataset`, `BenchmarkResult`, `Chain`/`CandidateChain`, `Module.version`/`license`,
-  `VariantKind.TRANSFORM`, transform lineage. **Not yet migrated** — no `alembic revision
-  --autogenerate` run yet, DB still stamped at `002`. That's the actual next step, not "design
-  the GraphQL schema" (already substantially done in chat) or "run the real experiment" (done).
+  `VariantKind.TRANSFORM`, transform lineage. **Not yet migrated. Also: `002` itself had never
+  actually been applied anywhere** (2026-07-07 finding) — a real bug (`PROVENANCE_COLUMN_DEFAULT`
+  was lowercase `'inferred'`, but SQLAlchemy's `SAEnum(Provenance)` labels the Postgres enum by
+  member `.name`, i.e. uppercase `INFERRED`/`AWS_CONFIRMED` — confirmed against the `direction`
+  enum's real stored labels via `psql`) meant `alembic upgrade head` failed on `002`'s
+  `ALTER TABLE`, every time, on every machine, silently, since it was written. Fixed now (commit
+  `0a2482a` on `schema-003`) in both the migration and `orm.py`'s `server_default`. **Next
+  concrete step on the Mac: `alembic upgrade head` (should now clear `002` cleanly), then
+  `alembic revision --autogenerate -m "..." --rev-id 003`, review, apply.** That's the actual
+  next step — not "design the GraphQL schema" (substantially done in chat) or "run the real
+  experiment" (done).
 - **Sequencing correction:** the original plan was 003 lands *before* `types.py`. That's still
   right — but the SDL got designed in parallel/ahead of 003 finishing, informed 003 (the
   `candidate_chains` decision came *from* the GraphQL design work), and now 003 needs to catch up
