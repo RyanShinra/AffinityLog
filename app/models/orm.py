@@ -43,6 +43,9 @@ from app.database import ModelBase
 # ---------------------------------------------------------------------------
 # Enums (controlled vocabularies). Each becomes a native Postgres ENUM type.
 # ---------------------------------------------------------------------------
+# NOTE: SAEnum binds the member .name (not .value) — Postgres enum labels are the
+# UPPERCASE names. Any hand-written `ALTER TYPE ... ADD VALUE` must use the name.
+# ---------------------------------------------------------------------------
 
 
 class ModuleType(enum.Enum):
@@ -84,12 +87,15 @@ class VariantKind(enum.Enum):
     MODE = "mode"
     SOURCE_MODEL = "source_model"
     COMPONENT = "component"
-    # For the raw vs. "-transformed" card pairs found in the Module Evaluation scrape (see
-    # bio-discovery-scrape-handoff.md §6/§7 — e.g. FastDPE's SFvCSP column has both a raw and a
-    # "-transformed" Metric). This is a live Postgres ENUM (SAEnum): adding a member here isn't
-    # enough on its own — migration 003 needs `op.execute("ALTER TYPE variantkind ADD VALUE
-    # 'transform'")` run outside the migration's other DDL in its own transaction (can't ADD VALUE
-    # and use the new value in the same transaction pre-PG12; autogenerate won't emit this).
+    # For the raw vs. "-transformed" card pairs found in the Module Evaluation scrape
+    # (see bio-discovery-scrape-handoff.md §6/§7
+    # — e.g. FastDPE's SFvCSP column has both a raw and a "-transformed" Metric).
+    # This is a live Postgres ENUM (SAEnum):
+    # adding a member here isn't enough on its own
+    # — migration 003 needs
+    # `op.execute("ALTER TYPE variantkind ADD VALUE 'TRANSFORM'")`
+    # run outside the migration's other DDL in its own transaction
+    # (can't ADD VALUE and use the new value in the same transaction pre-PG12; autogenerate won't emit this).
     # Imported from the scrape's `module_output` "-transformed" suffix as variant_kind=TRANSFORM,
     # variant="transformed" — the existing UniqueConstraint(module_id, column_key, variant_kind,
     # variant) already handles the identity correctly.

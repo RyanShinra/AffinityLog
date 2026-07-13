@@ -5,6 +5,33 @@
 > representation, side by side), `bio-discovery-scrape-handoff.md` (the scrape),
 > `docs/first-run-findings.md` (the real Bio Discovery run + its schema implications).
 
+## ⚠️ STATUS UPDATE (2026-07-13, Mac) — newest; read this first
+
+Migration `003` is now **written, applied, and verified drift-free** on branch `schema-003`.
+The 2026-07-07 update below is still accurate for everything *except* its "next concrete step"
+(that step is now done).
+
+- **`003` is applied to the Mac's local DB.** `alembic upgrade head` cleared `002` (the fixed
+  enum-casing bug) and `003` cleanly; `alembic_version` = `003`.
+- **Verified against the live DB, not just the file:** all three new tables
+  (`benchmark_datasets`, `benchmark_results`, `candidate_chains`) exist; `metrics` has
+  `transform_of_metric_id` + `transform_stats` with a **named** self-FK
+  (`fk_metrics_transform_of_metric_id`); `candidates.fasta_sequence` is dropped;
+  `modules.version`/`license` added. A throwaway `--autogenerate` drift probe came back **empty
+  (`pass`)** — ORM and DB are exactly in sync.
+- **The `TRANSFORM` enum-casing trap (the 002 bug, round two) was caught before it shipped.**
+  Autogenerate never emits enum-value additions, so `003` needed a hand-added
+  `op.execute("ALTER TYPE variantkind ADD VALUE IF NOT EXISTS 'TRANSFORM'")`. Critically it's
+  **uppercase `'TRANSFORM'`** (the member `.name`), not the lowercase `.value` the old orm.py
+  comment suggested — SAEnum binds `.name`. Confirmed in `pg_enum`: label is `TRANSFORM`. The
+  misleading comment is fixed, and a one-line invariant note now sits atop the enum section in
+  `orm.py`.
+- **Next concrete step: implement `app/graphql/types.py` / `schema.py`.** 003 has landed, so the
+  SQL side is settled; the GraphQL SDL (designed in chat, mirrored in `docs/schema-erd.md`) can
+  now be typed against a stable schema. PC catch-up: `git pull` on `schema-003`, then run
+  `alembic upgrade head` against the PC's own local container (the migration file syncs via git;
+  each machine applies it to its own DB separately).
+
 ## ⚠️ STATUS UPDATE (2026-07-07, PC) — read this before anything below
 
 Most of this doc predates a lot of real progress and is now stale in places. Don't follow the
