@@ -108,7 +108,7 @@ Each card has:
   publishes both "...Structural Fv Charge Symmetry Parameter" and "...-transformed" as separate
   cards, both resolving to `module=FastDPE, column=SFvCSP` with no param — the note gives no way to
   tell them apart. The first scrape merged raw+transformed pairs for 6 module/column combos into one
-  catalog entry each, silently doubling their benchmark rows and losing/misattributing the
+  catalog entry each, silently doubling their benchmark rows and losing/mis-attributing the
   transform note. See §6 for the full writeup. Capture the title's `-transformed` suffix as its own
   field and fold it into the key alongside `(module, param, column)`.
 

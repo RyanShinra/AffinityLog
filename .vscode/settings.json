@@ -6,7 +6,9 @@
         "biodiscovery",
         "developability",
         "fasta",
+        "Germline",
         "immunogenicity",
+        "Kyte",
         "ondelete",
         "polyreactivity",
         "sessionmaker",
@@ -23,7 +25,8 @@
         "sample_data/structures"
     ],
     "cSpell.ignoreWords": [
-        "venv",
+        "checkfirst",
+        "venv"
     ],
     "continue.enableNextEdit": false,
     "editor.inlineSuggest.enabled": true,

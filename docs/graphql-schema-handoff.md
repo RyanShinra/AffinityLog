@@ -1,9 +1,82 @@
 # Chapter 3 — GraphQL Schema-First Redesign (handoff)
 
-> Read this cold on the Mac to continue. Authored on the PC at the end of a session that did
-> ToS due diligence on the Module Evaluation scrape, scaffolded migration `003`, and drew the
-> first full ERD. Companion docs: `docs/catalog-seed-plan.md` (Chapter 2), `docs/schema-erd.md`
-> (current + planned schema, mermaid), `bio-discovery-scrape-handoff.md` (the scrape itself).
+> Read this cold on the Mac to continue. Companion docs: `docs/catalog-seed-plan.md` (Chapter 2),
+> `docs/schema-erd.md` (current + planned schema, mermaid — SQL ERD *and* the GraphQL apparent
+> representation, side by side), `bio-discovery-scrape-handoff.md` (the scrape),
+> `docs/first-run-findings.md` (the real Bio Discovery run + its schema implications).
+
+## ⚠️ STATUS UPDATE (2026-07-13, Mac) — newest; read this first
+
+Migration `003` is now **written, applied, and verified drift-free** on branch `schema-003`.
+The 2026-07-07 update below is still accurate for everything *except* its "next concrete step"
+(that step is now done).
+
+- **`003` is applied to the Mac's local DB.** `alembic upgrade head` cleared `002` (the fixed
+  enum-casing bug) and `003` cleanly; `alembic_version` = `003`.
+- **Verified against the live DB, not just the file:** all three new tables
+  (`benchmark_datasets`, `benchmark_results`, `candidate_chains`) exist; `metrics` has
+  `transform_of_metric_id` + `transform_stats` with a **named** self-FK
+  (`fk_metrics_transform_of_metric_id`); `candidates.fasta_sequence` is dropped;
+  `modules.version`/`license` added. A throwaway `--autogenerate` drift probe came back **empty
+  (`pass`)** — ORM and DB are exactly in sync.
+- **The `TRANSFORM` enum-casing trap (the 002 bug, round two) was caught before it shipped.**
+  Autogenerate never emits enum-value additions, so `003` needed a hand-added
+  `op.execute("ALTER TYPE variantkind ADD VALUE IF NOT EXISTS 'TRANSFORM'")`. Critically it's
+  **uppercase `'TRANSFORM'`** (the member `.name`), not the lowercase `.value` the old orm.py
+  comment suggested — SAEnum binds `.name`. Confirmed in `pg_enum`: label is `TRANSFORM`. The
+  misleading comment is fixed, and a one-line invariant note now sits atop the enum section in
+  `orm.py`.
+- **Next concrete step: implement `app/graphql/types.py` / `schema.py`.** 003 has landed, so the
+  SQL side is settled; the GraphQL SDL (designed in chat, mirrored in `docs/schema-erd.md`) can
+  now be typed against a stable schema. PC catch-up: `git pull` on `schema-003`, then run
+  `alembic upgrade head` against the PC's own local container (the migration file syncs via git;
+  each machine applies it to its own DB separately).
+
+## ⚠️ STATUS UPDATE (2026-07-07, PC) — read this before anything below
+
+Most of this doc predates a lot of real progress and is now stale in places. Don't follow the
+"Next steps" list at the bottom literally — read this section first.
+
+- **PR #3 and PR #4 are both merged to `main`.** The branch-fold decision, the real Bio Discovery
+  run, and the SQL≠GraphQL / ERD diagram work are all done and merged. See `git log main`.
+- **The real run happened** (§ below is accurate) — findings are in `docs/first-run-findings.md`,
+  not repeated here.
+- **The GraphQL SDL was designed collaboratively in a chat session on the PC — not yet written
+  into this doc.** Real gap: if picking this up fresh, the actual type shapes discussed
+  (`Candidate`, `Experiment`, `ScoreEntry` with no backing table, `Module`/`Metric`/`Concept`,
+  the annotate-only mutation surface) only exist in that conversation and in the GraphQL half of
+  `docs/schema-erd.md`'s diagram + divergence table. Read that diagram first; it's the closest
+  thing to a spec that's actually committed.
+- **Decided, since the "known design gap" section below was written:** `Candidate.fasta_sequence`
+  is gone — replaced by a `candidate_chains` child table (`Chain` enum H/L/T + `CandidateChain`
+  model), because a run can have 0..N chains of each type, not exactly one antibody + one target.
+  This resolves *part* of the old "how does Candidate relate to Metric" question by giving chains
+  their own real relational model; `scores` (the JSONB score bag) is still the open piece — see
+  `docs/schema-erd.md`'s `ScoreEntry` type (a GraphQL type backed by **no table**, resolved by
+  parsing each JSONB key against the `metrics` catalog at query time). That's the current answer
+  to the "candidate_scores join table vs. resolver-time JSONB interpretation" question below:
+  **JSONB + resolver-time interpretation won**, not a join table.
+- **`VariantKind.TRANSFORM` + `Metric.transform_of_metric_id`/`transform_of`/`transform_stats`
+  are now fully typed** (not just scaffolded) — the "expose as `metric.transformOf`" question
+  below is answered: yes, it's a real self-referential relationship now.
+- **Migration `003`'s ORM models are complete** on branch `schema-003` (renamed from
+  `graphql-schema` — it turned out to be SQL work, not GraphQL, so the name was wrong). Covers:
+  `BenchmarkDataset`, `BenchmarkResult`, `Chain`/`CandidateChain`, `Module.version`/`license`,
+  `VariantKind.TRANSFORM`, transform lineage. **Not yet migrated. Also: `002` itself had never
+  actually been applied anywhere** (2026-07-07 finding) — a real bug (`PROVENANCE_COLUMN_DEFAULT`
+  was lowercase `'inferred'`, but SQLAlchemy's `SAEnum(Provenance)` labels the Postgres enum by
+  member `.name`, i.e. uppercase `INFERRED`/`AWS_CONFIRMED` — confirmed against the `direction`
+  enum's real stored labels via `psql`) meant `alembic upgrade head` failed on `002`'s
+  `ALTER TABLE`, every time, on every machine, silently, since it was written. Fixed now (commit
+  `0a2482a` on `schema-003`) in both the migration and `orm.py`'s `server_default`. **Next
+  concrete step on the Mac: `alembic upgrade head` (should now clear `002` cleanly), then
+  `alembic revision --autogenerate -m "..." --rev-id 003`, review, apply.** That's the actual
+  next step — not "design the GraphQL schema" (substantially done in chat) or "run the real
+  experiment" (done).
+- **Sequencing correction:** the original plan was 003 lands *before* `types.py`. That's still
+  right — but the SDL got designed in parallel/ahead of 003 finishing, informed 003 (the
+  `candidate_chains` decision came *from* the GraphQL design work), and now 003 needs to catch up
+  and land before `types.py` implementation starts for real.
 
 ## Branch state — action needed first, before anything else
 
@@ -169,16 +242,16 @@ seam that lets the two schemas diverge. Design the GraphQL shape for the consume
   a catalog to interpret against, opaque JSON is the honest representation. (Diagram annotated in
   `docs/schema-erd.md`.)
 
-## Next steps, in order
+## Next steps, in order (superseded — see STATUS UPDATE above; kept for history)
 
-1. **Merge `catalog-seed` → `main`** via PR (Chapter 2 + scrape + scaffolds; ~27k lines). An
-   "incomplete" PR is expected at this size — migration `003` is still TODOs, not typed. ✅ decided.
-2. **Design + run the real Bio Discovery experiment** (section above) → export CSV, study it.
-3. **Design the GraphQL schema** (`app/graphql/types.py` / `schema.py`, Strawberry) for the catalog
-   side (Module, Metric, Concept), the Candidate/scores question, and the Metric transform-lineage
-   question above — now informed by real output from step 2, and by the SQL≠GraphQL principle above.
-4. **Feed the GraphQL design back into the SQL**: make any last-minute schema changes it implies,
-   then finish typing migration `003` and `alembic revision --autogenerate -m "..."`. This SQL work
-   is its own PR.
-5. **Implement the GraphQL layer** (with TODO markers for Ryan to type the meaningful parts).
-   Separate PR after step 4.
+1. ~~Merge `catalog-seed` → `main`~~ ✅ done (PR #3, then PR #4 for the sample-run chapter).
+2. ~~Design + run the real Bio Discovery experiment~~ ✅ done — `docs/first-run-findings.md`.
+3. ~~Design the GraphQL schema~~ — substantially done in a PC chat session (types, `ScoreEntry`,
+   the `Chain`/`candidate_chains` decision); not yet transcribed into a committed SDL file.
+4. **← actually next:** finish migration `003` — ORM models are complete (branch `schema-003`),
+   run `alembic revision --autogenerate`, hand-add the `ALTER TYPE variantkind ADD VALUE
+   'transform'` (autogenerate won't emit it — see the comment on `VariantKind` in `orm.py`),
+   review, apply, PR to `main`.
+5. **Then:** write `app/graphql/types.py`/`schema.py` for real, using the diagram in
+   `docs/schema-erd.md` as the spec, with `YOUR TURN` markers for the meaningful resolver logic
+   (Ryan is typing this one himself, learning Python/Strawberry GraphQL deliberately).
