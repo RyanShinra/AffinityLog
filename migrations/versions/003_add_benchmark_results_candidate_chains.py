@@ -73,12 +73,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        op.f("ix_benchmark_results_benchmark_dataset_id"),
+        op.f("ix_benchmark_results_metric_id"),
         "benchmark_results",
-        ["benchmark_dataset_id"],
+        ["metric_id"],
         unique=False,
     )
-    op.create_index(op.f("ix_benchmark_results_id"), "benchmark_results", ["id"], unique=False)
     op.create_table(
         "candidate_chains",
         sa.Column("id", sa.UUID(), nullable=False),
@@ -88,6 +87,12 @@ def upgrade() -> None:
         sa.Column("ordinal", sa.INTEGER(), nullable=False),
         sa.ForeignKeyConstraint(["candidate_id"], ["candidates.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        op.f("ix_candidate_chains_candidate_id"),
+        "candidate_chains",
+        ["candidate_id"],
+        unique=False,
     )
     op.drop_column("candidates", "fasta_sequence")
     op.add_column("metrics", sa.Column("transform_of_metric_id", sa.UUID(), nullable=True))
@@ -119,9 +124,10 @@ def downgrade() -> None:
     op.add_column(
         "candidates", sa.Column("fasta_sequence", sa.TEXT(), autoincrement=False, nullable=False)
     )
+    op.drop_index(op.f("ix_candidate_chains_candidate_id"), table_name="candidate_chains")
     op.drop_table("candidate_chains")
-    op.drop_index(op.f("ix_benchmark_results_id"), table_name="benchmark_results")
-    op.drop_index(op.f("ix_benchmark_results_benchmark_dataset_id"), table_name="benchmark_results")
+    sa.Enum(name="chain").drop(op.get_bind(), checkfirst=True)
+    op.drop_index(op.f("ix_benchmark_results_metric_id"), table_name="benchmark_results")
     op.drop_table("benchmark_results")
     op.drop_table("benchmark_datasets")
     # ### end Alembic commands ###

@@ -352,16 +352,14 @@ class BenchmarkResult(ModelBase):
 
     __tablename__ = "benchmark_results"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     metric_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="CASCADE")
+        UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="CASCADE"), index=True
     )
 
     benchmark_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("benchmark_datasets.id", ondelete="SET NULL"), index=True
+        UUID(as_uuid=True), ForeignKey("benchmark_datasets.id", ondelete="SET NULL")
     )
 
     property: Mapped[str] = mapped_column(String(255))
@@ -524,7 +522,7 @@ class CandidateChain(ModelBase):
     __tablename__ = "candidate_chains"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE")
+        UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"), index=True
     )
     chain: Mapped[Chain] = mapped_column(SAEnum(Chain))
     sequence: Mapped[str] = mapped_column(Text)
