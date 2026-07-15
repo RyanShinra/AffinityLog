@@ -5,7 +5,47 @@
 > representation, side by side), `bio-discovery-scrape-handoff.md` (the scrape),
 > `docs/first-run-findings.md` (the real Bio Discovery run + its schema implications).
 
-## ⚠️ STATUS UPDATE (2026-07-13, Mac) — newest; read this first
+## ⚠️ STATUS UPDATE (2026-07-15, Mac) — NEWEST; start here
+
+**Migration `003` is MERGED TO MAIN** (PR #5, merge commit on `origin/main`) — including the
+index cleanup + the repeatable-downgrade fix (the `chain` enum-type drop). The SQL schema side is
+done and shipped. The 2026-07-13 note below is accurate but predates the merge and the index fix.
+
+**Start the GraphQL work on a NEW branch off `main`** — don't build on `schema-003` (it's merged
+and done). That was Ryan's explicit call: fresh branch off the consolidated tip.
+
+**Real round-2 data is landing NOW and should inform the GraphQL types — don't design in a
+vacuum.** As of this note, a round-2 Bio Discovery run is executing (EvoProtGrad directed evolution
+seeded from round-1's lead nanobody → Boltz2 + sequence scorers), with a small sweep to follow
+Thursday. See [[project_aws_trial_deadline]] for the run plan/status. Why it matters for `types.py`:
+- **BioPhi is in the recipe → real humanness data.** This validates or reshapes the *speculative*
+  `humanness_score` first-class column (nothing had confirmed Bio Discovery emits humanness before).
+  Check the new export before committing the GraphQL shape for it.
+- **EvoProtGrad emits directed-evolution columns** (sampling count, first-appearance iteration,
+  PoE, pseudolikelihood ratio) — new `raw_scores` keys to make sure the JSONB/`ScoreEntry` design
+  absorbs cleanly.
+- **The sweep = multiple experiments over one HER2 target** — the real stress-test for
+  `Experiment.params` and the "one CSV spans multiple experiments" handling (first-run-findings
+  §7–8). GeoDock was dropped (wiring bug); Boltz2 covers the binding read.
+- **Trial expires Fri 2026-07-17** — after that, no more runs; the data captured by then is all
+  there'll be. Analyze the round-2 export(s) into `docs/first-run-findings.md` (or a round-2
+  sibling) the way round 1 was.
+
+**Supporting artifacts added this session** (committed alongside this note): `scripts/split_sequences_to_fasta.py`
+(splits a results-CSV `sequence` cell into per-chain FASTA — the import-time inverse of
+`candidate_chains`), `sample_data/structures/1N8Z_HER2_target_chainT.pdb` (the T-labeled target BD
+actually uses; the older `1N8Z_chainC_HER2.pdb` is the raw C-labeled extract), and
+`experiment_results/round2_seeds/` (the round-2 seed FASTAs).
+
+**The actual next step is unchanged:** design + implement `app/graphql/types.py` and `schema.py`
+(Strawberry) against the now-stable, now-merged schema. Read the GraphQL half of
+`docs/schema-erd.md` first — it's the closest thing to a committed spec (the SDL was designed in
+chat, mirrored there). Open questions already leaned (see below): `Candidate.scores` → resolver-time
+`ScoreEntry` (JSONB, no backing table) won over a join table; transform lineage IS exposed
+(`metric.transformOf`). PC catch-up if switching machines: `git pull` on `main`, rebuild `.venv`,
+`docker compose up -d db`, `alembic upgrade head`.
+
+## ⚠️ STATUS UPDATE (2026-07-13, Mac) — superseded by the 2026-07-15 note above; kept for detail
 
 Migration `003` is now **written, applied, and verified drift-free** on branch `schema-003`.
 The 2026-07-07 update below is still accurate for everything *except* its "next concrete step"
