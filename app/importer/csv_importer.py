@@ -75,7 +75,11 @@ def build_scores(row: dict[str, str]) -> dict[str, str]:
 
     # YOUR TURN — ~5 lines. A dict comprehension over row.items() does it.
     """
-    raise NotImplementedError("build_scores: see docstring above")
+    result: dict[str, str] = {}
+    for key, value in row.items():
+        if key not in STRUCTURAL_COLUMNS and len(value) > 0:
+            result[key] = value
+    return result
 
 
 def parse_chains(row: dict[str, str]) -> list[CandidateChain]:
@@ -88,10 +92,13 @@ def parse_chains(row: dict[str, str]) -> list[CandidateChain]:
     labels = [lbl.strip() for lbl in row.get("sequenceType", "").split("/") if lbl.strip()]
     parts = [p.strip() for p in row.get("sequence", "").split("/") if p.strip()]
 
+    if not labels:
+        raise ValueError(f"row {row.get('id')!r}: no labels in sequenceType — refusing to guess")
+
     if len(labels) != len(parts):
         raise ValueError(
-            f"row {row.get('id')!r}: sequenceType has {len(labels)} label(s) "
-            f"({labels}) but sequence has {len(parts)} part(s) — refusing to guess"
+            f"row {row.get('id')!r}: sequenceType has {len(labels)} label(s) ({labels})"
+            f"but sequence has {len(parts)} part(s) — refusing to guess"  # pyright: ignore[reportImplicitStringConcatenation]
         )
 
     seen: defaultdict[str, int] = defaultdict(int)
@@ -109,6 +116,7 @@ def group_rows_by_experiment(rows: list[dict[str, str]]) -> dict[str | None, lis
     non-swept and per-subexperiment exports omit it. ``None`` therefore means "this whole
     CSV is one experiment", not "unknown experiment".
     """
+
     grouped: defaultdict[str | None, list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         key = (row.get("experimentId") or "").strip() or None
@@ -133,11 +141,25 @@ async def load_csv(
     Returns the created Experiments (not yet committed — the caller owns the transaction).
     """
     with csv_path.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
+        # This clever library function will [apparently] read the header row and mate it to a dictionary for each row.
+        # Each row is a dictionary mapping column names to values. The file, then, is a list of those.
+        rows: list[dict[str, str]] = list(csv.DictReader(fh, restval=""))
+
     if not rows:
         raise ValueError(f"{csv_path} has no data rows")
 
+    required_structural_cols: frozenset[str] = STRUCTURAL_COLUMNS - {
+        "experimentId"
+    }  # experimentId is legitimately optional
+
+    missing_structural_cols: frozenset[str] = required_structural_cols - rows[0].keys()
+    if missing_structural_cols:
+        raise ValueError(
+            f"{csv_path} missing required column(s): {sorted(missing_structural_cols)}"
+        )
+
     experiments: list[Experiment] = []
+
     for experiment_id, group in group_rows_by_experiment(rows).items():
         experiment = Experiment(
             name=name if experiment_id is None else f"{name} [{experiment_id[:8]}]",
