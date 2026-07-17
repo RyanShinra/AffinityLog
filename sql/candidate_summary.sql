@@ -30,7 +30,10 @@ SELECT
     round((c.scores->>'biophi.OASis Percentile_After.H')::numeric, 3)  AS humanness_oasis,
     round((c.scores->>'humatchclassify.CNN_H')::numeric, 3)            AS humatch_human,
     c.scores->>'temstapro.thermophilicity.H'                           AS thermo_class,       -- categorical, keep as text
-    (c.scores->>'structure_analysis_boltz2.num_epitope_residues')::int AS epitope_residues
+    (c.scores->>'structure_analysis_boltz2.num_epitope_residues')::int AS epitope_residues,
+    -- The epitope residue LIST (semicolon-delimited HER2 residue numbers, in the Boltz2 PDB's own
+    -- numbering) — the 3D viewer paints these on chain T. Kept as raw text; the API splits it.
+    c.scores->>'structure_analysis_boltz2.epitope_residues'            AS epitope_list
 
 FROM candidates c
 JOIN      experiments e      ON e.id = c.experiment_id     -- inner: every candidate has a run

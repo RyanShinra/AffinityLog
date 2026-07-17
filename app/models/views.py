@@ -40,3 +40,4 @@ class CandidateSummary(ModelBase):
     humatch_human: Mapped[float | None]
     thermo_class: Mapped[str | None]
     epitope_residues: Mapped[int | None]
+    epitope_list: Mapped[str | None]  # raw "87;89;90;…" — the router splits it into ints for the 3D viewer

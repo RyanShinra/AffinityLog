@@ -38,6 +38,17 @@ _STRUCTURES_DIR = Path("experiment_results")
 _CANDIDATE_ID = re.compile(r"^[0-9a-f]{32}$")  # a Bio Discovery candidate id — nothing else may open a file
 
 
+def _epitope_ints(raw: str | None) -> list[int]:
+    """Split the raw ``"87;89;90;…"`` epitope string into residue numbers for the 3D viewer.
+
+    These are HER2 (chain T) residue numbers in the Boltz2 PDB's own numbering — the viewer selects
+    ``chain T and resi <these>`` and paints them red. Non-numeric tokens are dropped defensively.
+    """
+    if not raw:
+        return []
+    return [int(tok) for tok in raw.split(";") if tok.strip().isdigit()]
+
+
 @router.get("/demo", response_class=HTMLResponse)
 async def demo_page(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
@@ -48,7 +59,21 @@ async def demo_page(
     )
     by_id = {row.candidate_id: row for row in result.scalars().all()}
     candidates = [by_id[cid] for cid in FEATURED if cid in by_id]  # preserve the FEATURED order
-    return templates.TemplateResponse(request, "demo.html", {"candidates": candidates})
+
+    # A JSON-friendly payload the browser's 3Dmol code consumes: where to fetch each structure, and
+    # which chain-T residues to highlight. Built server-side so the template stays logic-free.
+    viewers = [
+        {
+            "candidate_id": c.candidate_id,
+            "label": c.candidate,
+            "experiment": c.experiment,
+            "chains": c.chains,
+            "pdb_url": f"/demo/pdb/{c.candidate_id}",
+            "epitope": _epitope_ints(c.epitope_list),
+        }
+        for c in candidates
+    ]
+    return templates.TemplateResponse(request, "demo.html", {"candidates": candidates, "viewers": viewers})
 
 
 @router.get("/demo/pdb/{candidate_id}", response_class=PlainTextResponse)
