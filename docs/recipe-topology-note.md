@@ -60,22 +60,64 @@ topology. Storing modules-without-edges throws away the explanation for the data
   `designResults → antibodySequences`, are a further refinement in the handle markup.) **So the deferral is
   a storage-modeling choice, not a capture blocker** — the "one gild too far" is the *storage*, not the grab.
 
-## Reference: most complex recipe — "HER2 Round 3 take 1"
+## Recipe DAG catalog (all successful runs)
 
-The most-wired recipe in the corpus (used by Exp 3/5/6), extracted from the saved recipe Diagram page
-(`HTML Extracts/Recipe - HER2 Round 3 take 1 - Diagram.html`) by `scrape_recipe_dag`:
+Every recipe's wiring, extracted from its saved diagram by `scrape_recipe_dag` (React Flow nodes +
+edge `aria-label`s) and rendered as Mermaid (GitHub draws these natively).
 
+### De Novo Design — Run 1
+```mermaid
+flowchart LR
+    rfantibody[RFantibody] --> temstapro[TemStaPro]
+    rfantibody --> plm[PLM Pseudo-Perplexity]
+    rfantibody --> fastdpe[FastDPE]
+    rfantibody --> boltz2[Boltz2]
 ```
-evoprotgrad ─┬─→ boltz2
-             ├─→ biophi ──→ humatchclassify
-             └─→ temstapro
+RFantibody designs; everything scores the design. **No humanization branch** → one candidate per
+subexperiment, no design→humanized split.
+
+### HER2 Round 2 Again-copy-4 — Run 9
+```mermaid
+flowchart LR
+    evoprotgrad[EvoProtGrad] --> boltz2[Boltz2]
+    evoprotgrad --> fastdpe[FastDPE]
+    evoprotgrad --> plm[PLM Pseudo-Perplexity]
+    evoprotgrad --> biophi[BioPhi]
+    evoprotgrad --> npr[Nanobody Polyreactivity]
+    evoprotgrad --> temstapro[TemStaPro]
+```
+EvoProtGrad evolves; six scorers hang off it. BioPhi humanizes but **nothing scores its output** → the
+humanized row carries only BioPhi's own humanness.
+
+### HER2 Round 3 take 1 — Exp 3, 5, 6 (most complex)
+```mermaid
+flowchart LR
+    evoprotgrad[EvoProtGrad] --> boltz2[Boltz2]
+    evoprotgrad --> temstapro[TemStaPro]
+    evoprotgrad --> biophi[BioPhi]
+    biophi --> humatchclassify[Humatch Classify]
+```
+The only **two-level** DAG: BioPhi's humanized output feeds Humatch — which is why humanized rows in
+Exp 3/5/6 carry Humatch scores. Deepest humanization branch in the corpus.
+
+### Boltz2 Solo — Exp 8, 11
+```mermaid
+flowchart LR
+    boltz2[Boltz2]
 ```
 
-- **nodes (5):** evoprotgrad, boltz2, biophi, temstapro, humatchclassify
-- **edges (4):** evoprotgrad→boltz2 · evoprotgrad→biophi · evoprotgrad→temstapro · biophi→humatchclassify
+### ESM2 Only — Exp 9, 10
+```mermaid
+flowchart LR
+    esm2pp[ESM2 Property Predictor]
+```
 
-This graph **is** the design→humanized partition we decoded from the data all corpus: EvoProtGrad's design
-output feeds the structure/stability scorers (Boltz2, TemStaPro); BioPhi's *humanized* output feeds Humatch.
-That's exactly why design rows carry Boltz2/TemStaPro scores while humanized rows carry Humatch — the wiring
-*inferred from the exports* and the wiring *read from the diagram* agree. A worked worst-case to design
-storage against, and proof the capture is trivial.
+## The payoff: DAG depth predicts data shape
+
+The humanization branch's depth *predicts* the design→humanized partition decoded from empty cells:
+- **De Novo Design** — no BioPhi → no humanized row at all.
+- **Round 2** — `EvoProtGrad → BioPhi` (depth 1) → humanized row scored by BioPhi only.
+- **Round 3** — `EvoProtGrad → BioPhi → Humatch` (depth 2) → humanized row scored by BioPhi *and* Humatch.
+
+Topology and data are the same fact from two directions. Every recipe's wiring is now captured and one
+`scrape_recipe_dag` call from JSON — the **storage** modeling (above) is all that remains deferred.
