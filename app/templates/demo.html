@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AffinityLog — the flexible schema, in the flesh</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { background:#0d1117; color:#c9d1d9; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; margin:0; padding:2rem 2.5rem; }
+    h1 { color:#58a6ff; margin:0 0 .25rem; font-size:1.5rem; }
+    p.sub { color:#8b949e; margin:.25rem 0 1.5rem; }
+    table { border-collapse: collapse; font-size:.9rem; }
+    th, td { border:1px solid #30363d; padding:.45rem .8rem; text-align:left; white-space:nowrap; }
+    th { background:#161b22; color:#8b949e; font-weight:600; }
+    td.num { text-align:right; font-variant-numeric: tabular-nums; }
+    td.null { color:#484f58; }
+    code { color:#79c0ff; }
+    .note { margin-top:1.25rem; color:#8b949e; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <h1>AffinityLog — the flexible schema, in the flesh</h1>
+  <p class="sub">Featured antibody&ndash;HER2 complexes, pulled live from the <code>candidate_summary</code> view. Empty cells = a metric that recipe never emitted. <em>(3D viewers land next.)</em></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>candidate</th><th>experiment</th><th>chains</th><th>#scores</th>
+        <th>binding&nbsp;ipTM</th><th>pLDDT</th><th>humanness</th><th>thermo</th><th>epitope</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for c in candidates %}
+      <tr>
+        <td><code>{{ c.candidate }}</code></td>
+        <td>{{ c.experiment }}</td>
+        <td>{{ c.chains }}</td>
+        <td class="num">{{ c.n_scores }}</td>
+        <td class="num {{ 'null' if c.binding_iptm is none }}">{{ c.binding_iptm if c.binding_iptm is not none else '—' }}</td>
+        <td class="num {{ 'null' if c.complex_plddt is none }}">{{ c.complex_plddt if c.complex_plddt is not none else '—' }}</td>
+        <td class="num {{ 'null' if c.humanness_oasis is none }}">{{ c.humanness_oasis if c.humanness_oasis is not none else '—' }}</td>
+        <td class="{{ 'null' if c.thermo_class is none }}">{{ c.thermo_class or '—' }}</td>
+        <td class="num {{ 'null' if c.epitope_residues is none }}">{{ c.epitope_residues if c.epitope_residues is not none else '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="note">Served by FastAPI from the <code>candidate_summary</code> view via the read-only <code>CandidateSummary</code> model — Postgres &rarr; API &rarr; browser, all local. Structures &amp; tabs next.</p>
+</body>
+</html>
