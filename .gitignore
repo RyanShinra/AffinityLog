@@ -15,3 +15,11 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Excel lock files
+~$*.xlsx
+
+# Bio Discovery saved-page render-asset sidecars (CSS/JS/images) — archived compressed
+# as "HTML Extracts/render-assets.tar.gz". The scrapers only read the .html files, so the
+# raw sidecars are redundant in git; keep them locally, restore from the tarball if needed.
+HTML Extracts/*_files/
