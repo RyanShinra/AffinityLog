@@ -156,6 +156,117 @@ expected. `iptm=0.70` is honestly moderate, not overconfident.
 
 ---
 
+## Runs 9/10 — ESM2 Property Predictor, humanization before/after, 2026-07-16 — *launched*
+
+**Question (science, not schema):** what did BioPhi's humanization do to *developability*? Pairs with the
+Boltz2 binding comparison to give a 2x2 on the same molecule: {evolved, humanized} x {binding, developability}.
+
+**Config:** recipe "ESM2 Only" — **ESM2 Property Predictor alone**, standalone (single-module recipes are
+legal; Run 8 proved it). Two runs, each fed one HL-only seed built from Exp 6's exact chains:
+- **before** = `round6_seeds/evolved_HL.fasta` (H=120, L=107)
+- **after**  = `round6_seeds/evolved_humanized_HL.fasta` (H=120, L=106 — humanization dropped a residue)
+
+Target deliberately omitted — this scores the antibody, not the complex.
+
+**Why two runs, not one pipeline:** a scorer only sees the branch it's wired to (TemStaPro scored the design
+row, Humatch the humanized row), and module-uniqueness forbids a second instance. So one pipeline run cannot
+produce ESM2PP scores on *both* stages. Two standalone runs also score the *exact* Exp 6 molecules, lining the
+developability comparison up with the binding one.
+
+**`Fine-tuned Regression Model` is a List-mode enum** (multi-select): `thermal_stability`,
+`degradation_stability`, `solubility`, `immunogenicity`, `hydrophobicity`. **Costed at ~0.1 EU per property**
+(2 checked = 0.2), so ~0.5 EU for all five — i.e. **the column set is chosen by an input param**, a sharper
+version of the EvoProtGrad esm/amplify finding: here the *operator* picks which columns exist.
+
+**Predictions to check:**
+- **`immunogenicity` should drop** after humanization — that is literally humanization's purpose. If it
+  doesn't, something's wrong with the run or the humanizer.
+- **`hydrophobicity` / `solubility`** — the genuinely open question ("did we pay for humanness with
+  developability?"). Human frameworks are usually well-behaved, but a framework swap can expose a patch.
+- **The light chain should move more than the heavy** — it took the indel (107 -> 106).
+- **`thermal_stability` is a Concept-table fixture**: same concept as TemStaPro's thermostability, different
+  module. Second real occupant for `Metric.concept_id` after humanness (BioPhi vs Humatch).
+- **Export shape unknown:** if each property is its own subexperiment, each run may return **N `experimentId`s**
+  (discriminator = regression head, not PLM) rather than one row with five columns. Either shape loads fine via
+  `group_rows_by_experiment` — but it would be a *new flavour* of swept dimension.
+
+**Queue vs compute (operational note):** estimates quote *compute*, not wall time. Run 8: 2-3 min quoted, 48 min
+actual. These: 1-2 min quoted, 40+ min and counting. The gap is queueing.
+
+### RESULT (Run 9, evolved/before) — the strongest "column name is not enough" case in the whole corpus
+45 cols, **5 rows = 5 `experimentId`s** (one subexperiment per checked property — the discriminator is the
+regression head). **The output column is fully generic: `esm2propertypredictor.predicted_property.H` / `.L`**
+— NOT named by property. All five properties report into the *same* column name; which row is
+hydrophobicity vs solubility vs immunogenicity vs thermal vs degradation is **not in the CSV at all**. It is
+recoverable *only* via `experimentId` → the subexperiment's `Fine-tuned Regression Model` input param.
+
+This is `model_type=esm/amplify` (first-run §7) taken to the limit: there the column at least said `esm2pseudo`;
+here it says nothing distinguishing. **Consequences:**
+- **Definitive proof** that metric identity must be `(module, column, discriminator)` and that the discriminator
+  can be an input param recoverable only from `Experiment.params`. The five numbers are meaningless without the
+  provenance join — this is the sharpest possible validation of first-run §8 and the whole reason `experiments`
+  exists.
+- **Operational:** the property label MUST be transcribed from the GUI per subexperiment; the export can't carry
+  it. (Order *might* follow checkbox order thermal/degradation/solubility/immunogenicity/hydrophobicity, with
+  `mmseqs.index` 0-4 as a hint — unconfirmed; needs the params panel.)
+- Built-in passes (`cdr_indices`, `liabilities`, `hdbscan`, `mmseqs`) re-ran identically on all 5 rows (same
+  antibody, so identical values) — confirms built-ins run per-row regardless of the swept param.
+- `esm2propertypredictor.name.H/.L` = the chain label (`H`/`L`) — redundant with `sequenceType`, a no-op column.
+- Loads fine (5 Experiments via `group_rows_by_experiment`), but the generic key means the *same* `scores` key
+  appears across all 5 Experiments — cross-experiment comparison REQUIRES the params-side property label.
+
+### THE PAYOFF — the provenance join caught a real analysis error (Runs 9 vs 10, corrected via the "Rosetta Stone")
+Operator built `experiment_results/file id mapping.xlsx` by hand, correlating each candidate/sub-experiment ID to
+its property (the transcription first-run §8 said was unavoidable). It revealed two things:
+1. **The property↔sub-experiment-order mapping is INCONSISTENT between runs.** Exp 9: hydrophobicity = ordinal 4,
+   thermal = ordinal 1. Exp 10: hydrophobicity = ordinal 1, thermal = ordinal 5. So you **cannot** align the two
+   exports by row order (`mmseqs.index`) — doing so pairs *different properties* against each other.
+2. A first-pass analysis that aligned by row order produced large, plausible-looking, **wrong** deltas
+   (e.g. "immunogenicity −0.22, hydrophobicity +0.53"). Matched correctly by property via the mapping, the real
+   deltas are all < ~0.05 except `thermal_stability.L` (−0.16). **The dramatic story was a misalignment artifact.**
+
+**This is the strongest validation in the whole corpus of why `Experiment.params` / the provenance join exists:**
+without it, a CSV-only pipeline aligns "5 rows of `predicted_property`" by position and ships confident, wrong
+answers. The join is the artifact that makes correct cross-experiment analysis *possible*, not just prettier.
+
+**Corrected science result (humanization, evolved → humanized):** developability barely moved (all |Δ| < 0.05
+except thermal_stability.L −0.16 — the light chain took the indel); the "immunogenicity should drop" prediction
+did **not** clearly hold. Binding was the clearest effect: Boltz2 `protein_iptm` 0.793 → 0.702 (−0.09). Net: a
+small humanness-for-affinity trade, with modest developability impact. (Property *directions* still un-transcribed;
+magnitudes are small enough that it barely matters.)
+
+---
+
+## Provenance recovery — the HTML-scraper capstone (2026-07-17)
+
+The generic-`predicted_property` problem (Run 9/10) forced the provenance for the ESM2 sweeps to be
+recovered **by hand** — clicking into all ten sub-experiments and transcribing candidate↔property into
+`experiment_results/file id mapping.xlsx`. We then proved that hand-work is automatable:
+
+- **`scripts/scrape_input_parameters.py`** — parses a browser-saved page (stdlib only, no deps). An
+  Overview page → the Input Parameters table as JSON; a Results page → the candidate↔sub-experiment
+  links. Validated on Exp 5: all 4 candidate→sub-experiment links recovered from the DOM matched the
+  mapping independently derived from the CSV's `experimentId` column.
+- **`scripts/rebuild_rosetta_stone.py`** — composes the two (per-sub-experiment property from Overview
+  + candidate from Results) into candidate→property, and **self-checks against the xlsx: 10/10 exact**.
+  The AI-written scraper reproduces the hand-built spreadsheet and proves itself correct against the
+  human oracle.
+
+**The scrape-vs-compute dividing line (a durable principle):**
+- **Scrape what the CSV *omits*** — input parameters, the candidate↔sub-experiment↔property mapping.
+  This genuinely isn't in the export; it lives only in the console DOM (or a manual transcription).
+- **Compute what the CSV *implies*** — e.g. the **CDR positional grid** is just `sequence` sliced by
+  the `cdr_indices.*` boundaries (both in the export). Reconstructed it directly; CDR-H3 cleanly
+  separates both experimental axes (design S→A on humanization; esm `GFYAMDY` vs amplify `GSYALDY`).
+  No scraping needed — a natural GraphQL computed field for later.
+
+**The one remaining MANUAL step (honest future work):** capturing the HTML itself — the per-page
+`ctrl-S` save. Parsing is solved; *capture* is not. In a real setting that's a headless-browser /
+browser-automation loop (or Claude-in-Chrome). It's the only un-automated link in the
+capture → scrape → structured-data pipeline — genuine "that's what interns are for" toil.
+
+---
+
 ## Cross-cutting design findings
 
 ### Modules disagree on how to represent an ABSENT chain (found 2026-07-16)
