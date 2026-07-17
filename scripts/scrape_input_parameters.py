@@ -129,6 +129,28 @@ def scrape_candidate_map(results_html_path: Path) -> list[dict[str, str]]:
     return [{"candidate": c, "subexperiment": s} for c, s in dict.fromkeys(parser.rows)]
 
 
+def scrape_recipe_dag(diagram_html_path: Path) -> dict[str, list]:
+    """Recover a recipe's node/edge topology from a saved recipe-builder *Diagram* page.
+
+    The recipe canvas is a React Flow (xyflow) graph rendered to the DOM: module nodes carry
+    ``class="react-flow__node" data-id="<module>"`` and edges carry a human-readable
+    ``aria-label="Edge from <src> to <tgt>"``. So the wiring the CSV omits is directly
+    extractable — no opaque canvas. (Port-level handles, e.g. designResults -> antibodySequences,
+    are a further refinement available in the edge/handle markup.)
+
+    Validated on "HER2 Round 3 take 1": 5 nodes, 4 edges
+    (evoprotgrad -> {boltz2, temstapro, biophi}; biophi -> humatchclassify) — matching the
+    design->humanized partition independently decoded from the exports.
+    """
+    raw = diagram_html_path.read_text(encoding="utf-8")
+    nodes = sorted(set(re.findall(r'react-flow__node[^"]*"[^>]*data-id="([^"]+)"', raw)))
+    edges = [
+        {"from": m.group(1), "to": m.group(2)}
+        for m in re.finditer(r'aria-label="Edge from (\S+) to (\S+)"', raw)
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(f"usage: {sys.argv[0]} <saved-page.html>   (Overview -> params; Results -> candidate map)")
