@@ -19,6 +19,13 @@ SELECT
     -- one "H/L/T" string; DISTINCT + ORDER keep it stable ("H/L/T", not "T/H/L").
     string_agg(DISTINCT cc.chain::text, '/' ORDER BY cc.chain::text) AS chains,
 
+    -- Fingerprint of the ANTIBODY (heavy+light only, target excluded): the same binder folded with
+    -- or without a HER2 target gets the SAME hash — so "one molecule, two rows across experiments"
+    -- is visible right here. Two rows sharing this value ARE the same antibody. (12 hex chars is
+    -- plenty to eyeball; the empty cell means an antibody with no H/L, i.e. a target-only row.)
+    left(md5(string_agg(cc.sequence, '|' ORDER BY cc.chain::text)
+             FILTER (WHERE cc.chain::text IN ('HEAVY', 'LIGHT'))), 12) AS antibody_hash,
+
     -- How many metrics live in this candidate's JSONB bag (varies by recipe).
     (SELECT count(*) FROM jsonb_object_keys(c.scores)) AS n_scores,
 

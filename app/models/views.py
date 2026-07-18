@@ -33,6 +33,7 @@ class CandidateSummary(ModelBase):
     candidate: Mapped[str]
     experiment: Mapped[str]
     chains: Mapped[str | None]
+    antibody_hash: Mapped[str | None]  # H+L fingerprint; equal across rows = the same antibody
     n_scores: Mapped[int]
     binding_iptm: Mapped[float | None]
     complex_plddt: Mapped[float | None]

@@ -34,6 +34,12 @@
     td.num { text-align:right; font-variant-numeric: tabular-nums; }
     td.null { color:#484f58; }
     .note { margin-top:1.25rem; color:#8b949e; font-size:.85rem; }
+
+    /* --- provenance panel --- */
+    .lineage { margin:0 0 1.5rem; }
+    .lineage .fp { color:#8b949e; font-size:.8rem; margin:0 0 .4rem; }
+    tr.feat td { background:#132a13; }              /* the row that's also a 3D tab above */
+    tr.feat td:first-child { border-left:2px solid #3fb950; }
   </style>
 </head>
 <body>
@@ -55,7 +61,7 @@
   <table>
     <thead>
       <tr>
-        <th>candidate</th><th>experiment</th><th>chains</th><th>#scores</th>
+        <th>candidate</th><th>experiment</th><th>chains</th><th>fingerprint</th><th>#scores</th>
         <th>binding&nbsp;ipTM</th><th>pLDDT</th><th>humanness</th><th>thermo</th><th>epitope</th>
       </tr>
     </thead>
@@ -65,6 +71,7 @@
         <td><code>{{ c.candidate }}</code></td>
         <td>{{ c.experiment }}</td>
         <td>{{ c.chains }}</td>
+        <td class="{{ 'null' if c.antibody_hash is none }}"><code>{{ c.antibody_hash or '—' }}</code></td>
         <td class="num">{{ c.n_scores }}</td>
         <td class="num {{ 'null' if c.binding_iptm is none }}">{{ c.binding_iptm if c.binding_iptm is not none else '—' }}</td>
         <td class="num {{ 'null' if c.complex_plddt is none }}">{{ c.complex_plddt if c.complex_plddt is not none else '—' }}</td>
@@ -75,6 +82,32 @@
     {% endfor %}
     </tbody>
   </table>
+
+  {% if lineages %}
+  <h2>One molecule, two experiments — follow the fingerprint</h2>
+  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. The featured 3D structure is the <span style="color:#3fb950">highlighted</span> row.</p>
+  {% for hash, rows in lineages.items() %}
+    <div class="lineage">
+      <p class="fp">antibody_hash <code>{{ hash }}</code></p>
+      <table>
+        <thead>
+          <tr><th>experiment</th><th>candidate</th><th>chains</th><th>binding&nbsp;ipTM</th><th>humanness&nbsp;(OASis)</th></tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr class="{{ 'feat' if r.is_featured }}">
+            <td>{{ r.experiment }}</td>
+            <td><code>{{ r.candidate }}</code></td>
+            <td>{{ r.chains }}</td>
+            <td class="num {{ 'null' if r.binding_iptm is none }}">{{ r.binding_iptm if r.binding_iptm is not none else '—' }}</td>
+            <td class="num {{ 'null' if r.humanness_oasis is none }}">{{ r.humanness_oasis if r.humanness_oasis is not none else '—' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+  {% endif %}
 
   <p class="note">Served by FastAPI from the <code>candidate_summary</code> view via the read-only <code>CandidateSummary</code> model, structures fetched same-origin from <code>/demo/pdb/{id}</code> — Postgres &rarr; API &rarr; 3Dmol, all local.</p>
 
@@ -88,6 +121,15 @@
     const stage = document.getElementById("stage");
     const caption = document.getElementById("caption");
     const viewer = $3Dmol.createViewer(stage, { backgroundColor: "#0d1117" });
+
+    // Flip the scroll-zoom to the conventional direction (wheel up = zoom IN). 3Dmol has no invert
+    // option, so we catch the wheel event in the capture phase — before it reaches 3Dmol's own
+    // handler — stop it there, and drive the zoom ourselves.
+    stage.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      viewer.zoom(e.deltaY < 0 ? 1.1 : 0.9, 50);  // up -> 1.1 (in), down -> 0.9 (out)
+    }, { capture: true, passive: false });
 
     // Fetch one candidate's PDB text and (re)draw it: cartoon per chain, epitope residues in red.
     async function show(v) {

@@ -28,11 +28,14 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 # The three antibody-HER2 complexes we feature — all loaded AND with Boltz2 structures on disk.
+# Labels below are grounded in sequence identity (the antibody_hash), not guesswork: the design and
+# humanized lines are the SAME parent trastuzumab, forked at the humanization step (their H+L chains
+# were mutated), then each folded against HER2 in a later run.
 FEATURED: list[str] = [
-    "05f95b5a8caa4a85a2f9a8513817a0c5",  # de novo nanobody -> HER2        (H/T)
-    "449d46884cbc4249ab5e9ab4706fc890",  # evolved trastuzumab -> HER2      (H/L/T)
-    "8981aae116524c7683f6e3e310f32e43",  # humanized trastuzumab -> HER2    (H/L/T)
-]
+    "05f95b5a8caa4a85a2f9a8513817a0c5",  # independent de novo nanobody -> HER2   (H/T)     ipTM 0.40
+    "449d46884cbc4249ab5e9ab4706fc890",  # design line -> HER2  (H/L/T) ipTM 0.79  == Round 6 a6d1540b
+    "8981aae116524c7683f6e3e310f32e43",  # humanized line -> HER2 (H/L/T) ipTM 0.70 == Round 6 15bad6f9
+]                                        #   (…where its OASis humanness 0.24 lives — different row)
 
 _STRUCTURES_DIR = Path("experiment_results")
 _CANDIDATE_ID = re.compile(r"^[0-9a-f]{32}$")  # a Bio Discovery candidate id — nothing else may open a file
@@ -73,7 +76,36 @@ async def demo_page(
         }
         for c in candidates
     ]
-    return templates.TemplateResponse(request, "demo.html", {"candidates": candidates, "viewers": viewers})
+
+    # Provenance: pull every row sharing an antibody fingerprint with a featured complex. Where a
+    # molecule appears in >1 experiment, its scores are split across those rows (humanness on one,
+    # structure on another) — the same-hash grouping reunites them, complementary NULLs and all.
+    featured_hashes = {c.antibody_hash for c in candidates if c.antibody_hash}
+    lineages: dict[str, list[dict[str, object]]] = {}
+    if featured_hashes:
+        kin = await session.execute(
+            select(CandidateSummary)
+            .where(CandidateSummary.antibody_hash.in_(featured_hashes))
+            .order_by(CandidateSummary.experiment)
+        )
+        featured_ids = set(FEATURED)
+        for row in kin.scalars().all():
+            lineages.setdefault(row.antibody_hash, []).append(
+                {
+                    "experiment": row.experiment,
+                    "candidate": row.candidate,
+                    "chains": row.chains,
+                    "binding_iptm": row.binding_iptm,
+                    "humanness_oasis": row.humanness_oasis,
+                    "is_featured": row.candidate_id in featured_ids,
+                }
+            )
+        # Only a fingerprint shared by >1 row tells a cross-experiment story; drop the singletons.
+        lineages = {h: rows for h, rows in lineages.items() if len(rows) > 1}
+
+    return templates.TemplateResponse(
+        request, "demo.html", {"candidates": candidates, "viewers": viewers, "lineages": lineages}
+    )
 
 
 @router.get("/demo/pdb/{candidate_id}", response_class=PlainTextResponse)
