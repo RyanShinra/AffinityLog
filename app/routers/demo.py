@@ -25,7 +25,13 @@ from app.database import get_session
 from app.models.views import CandidateSummary
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
+
+# Anchor every path to the repo root derived from THIS file, never the process working directory.
+# app/routers/demo.py -> parents[2] is the repo root. Without this, both the templates and the
+# structure files resolve against wherever uvicorn happened to be launched from.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+templates = Jinja2Templates(directory=str(_REPO_ROOT / "app" / "templates"))
 
 # The three antibody-HER2 complexes we feature — all loaded AND with Boltz2 structures on disk.
 # Labels below are grounded in sequence identity (the antibody_hash), not guesswork: the design and
@@ -35,10 +41,12 @@ FEATURED: list[str] = [
     "05f95b5a8caa4a85a2f9a8513817a0c5",  # independent de novo nanobody -> HER2   (H/T)     ipTM 0.40
     "449d46884cbc4249ab5e9ab4706fc890",  # design line -> HER2  (H/L/T) ipTM 0.79  == Round 6 a6d1540b
     "8981aae116524c7683f6e3e310f32e43",  # humanized line -> HER2 (H/L/T) ipTM 0.70 == Round 6 15bad6f9
-]                                        #   (…where its OASis humanness 0.24 lives — different row)
+]  #   (…where its OASis humanness 0.24 lives — different row)
 
-_STRUCTURES_DIR = Path("experiment_results")
-_CANDIDATE_ID = re.compile(r"^[0-9a-f]{32}$")  # a Bio Discovery candidate id — nothing else may open a file
+_STRUCTURES_DIR = _REPO_ROOT / "experiment_results"
+# A Bio Discovery candidate id — nothing else may open a file. Matched with fullmatch(), not
+# match(): `$` would also accept a trailing newline, and this gate guards filesystem access.
+_CANDIDATE_ID = re.compile(r"[0-9a-f]{32}")
 
 
 def _epitope_ints(raw: str | None) -> list[int]:
@@ -53,13 +61,9 @@ def _epitope_ints(raw: str | None) -> list[int]:
 
 
 @router.get("/demo", response_class=HTMLResponse)
-async def demo_page(
-    request: Request, session: Annotated[AsyncSession, Depends(get_session)]
-) -> HTMLResponse:
+async def demo_page(request: Request, session: Annotated[AsyncSession, Depends(get_session)]) -> HTMLResponse:
     """Render the demo page from the featured rows of the candidate_summary view (typed, no raw SQL)."""
-    result = await session.execute(
-        select(CandidateSummary).where(CandidateSummary.candidate_id.in_(FEATURED))
-    )
+    result = await session.execute(select(CandidateSummary).where(CandidateSummary.candidate_id.in_(FEATURED)))
     by_id = {row.candidate_id: row for row in result.scalars().all()}
     candidates = [by_id[cid] for cid in FEATURED if cid in by_id]  # preserve the FEATURED order
 
@@ -90,7 +94,12 @@ async def demo_page(
         )
         featured_ids = set(FEATURED)
         for row in kin.scalars().all():
-            lineages.setdefault(row.antibody_hash, []).append(
+            # Unreachable via the IN filter above (SQL `IN` never matches NULL), but stating the
+            # invariant explicitly is what lets the dict be keyed by a plain str.
+            row_hash = row.antibody_hash
+            if row_hash is None:
+                continue
+            lineages.setdefault(row_hash, []).append(
                 {
                     "experiment": row.experiment,
                     "candidate": row.candidate,
@@ -113,7 +122,7 @@ async def demo_page(
 async def demo_pdb(candidate_id: str) -> PlainTextResponse:
     """Return a candidate's PDB text — with the untrusted id validated before any filesystem access."""
     # 1) Only a 32-hex candidate id may proceed — no traversal, no wildcards, nothing else.
-    if not _CANDIDATE_ID.match(candidate_id):
+    if not _CANDIDATE_ID.fullmatch(candidate_id):
         raise HTTPException(status_code=400, detail="invalid candidate id")
     # 2) We build the search pattern; the user string never becomes a raw path.
     matches = list(_STRUCTURES_DIR.glob(f"*/{candidate_id}_boltz2.pdb"))

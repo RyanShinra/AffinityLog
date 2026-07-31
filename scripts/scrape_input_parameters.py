@@ -32,9 +32,7 @@ from pathlib import Path
 
 _PARAM_HEADERS = ["Name", "Value", "Description", "Module", "Parameter configuration"]
 # Visible text that marks the end of the parameters table (unrelated page chrome / next section).
-_TABLE_STOP = frozenset(
-    {"Train Model", "Import custom module", "Request BYOM Access", "Overview", "Wet lab orders"}
-)
+_TABLE_STOP = frozenset({"Train Model", "Import custom module", "Request BYOM Access", "Overview", "Wet lab orders"})
 
 
 class _VisibleText(HTMLParser):
@@ -77,7 +75,9 @@ def scrape(html_path: Path) -> dict[str, object]:
                 break
             row.append(chunk)
             if len(row) == len(_PARAM_HEADERS):
-                params.append(dict(zip(["name", "value", "description", "module", "config"], row)))
+                # strict=True: the guard above already guarantees equal lengths — this makes that
+                # invariant enforced rather than assumed, so a layout change fails loudly.
+                params.append(dict(zip(["name", "value", "description", "module", "config"], row, strict=True)))
                 row = []
 
     return {"experiment": name, "recipe": value_after("Recipe"), "input_parameters": params}
@@ -144,10 +144,7 @@ def scrape_recipe_dag(diagram_html_path: Path) -> dict[str, list]:
     """
     raw = diagram_html_path.read_text(encoding="utf-8")
     nodes = sorted(set(re.findall(r'react-flow__node[^"]*"[^>]*data-id="([^"]+)"', raw)))
-    edges = [
-        {"from": m.group(1), "to": m.group(2)}
-        for m in re.finditer(r'aria-label="Edge from (\S+) to (\S+)"', raw)
-    ]
+    edges = [{"from": m.group(1), "to": m.group(2)} for m in re.finditer(r'aria-label="Edge from (\S+) to (\S+)"', raw)]
     return {"nodes": nodes, "edges": edges}
 
 
