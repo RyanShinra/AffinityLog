@@ -48,9 +48,7 @@ FASTA_WRAP = 60  # standard FASTA line width
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("csv_path", type=Path, help="Bio Discovery results CSV")
     p.add_argument(
         "--out-dir",

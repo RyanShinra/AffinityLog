@@ -24,6 +24,11 @@ jobs:
         run: black --check .
       - name: mypy
         run: mypy app/
+      # The candidate_summary view is written down twice on purpose: sql/ is the copy you iterate
+      # on, the migration is what actually runs. This fails the build if they define different
+      # columns — i.e. the .sql changed without a new migration. Comments are ignored.
+      - name: view / migration in sync
+        run: python scripts/check_view_migration.py
 
   test:
     name: Tests (Postgres via testcontainers)

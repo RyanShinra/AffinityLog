@@ -33,16 +33,11 @@ async def run(csv_path: Path, name: str) -> None:
         print(f"Loaded {len(experiments)} experiment(s) from {csv_path.name}:")
         for experiment in experiments:
             chains = sum(len(c.chains) for c in experiment.candidates)
-            print(
-                f"  - {experiment.name}: "
-                f"{len(experiment.candidates)} candidate(s), {chains} chain(s)"
-            )
+            print(f"  - {experiment.name}: " f"{len(experiment.candidates)} candidate(s), {chains} chain(s)")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("csv_path", type=Path, help="Bio Discovery results CSV to load")
     parser.add_argument("--name", required=True, help="human-readable experiment name")
     args = parser.parse_args()

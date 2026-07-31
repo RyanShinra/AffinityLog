@@ -366,6 +366,48 @@ none — single experiments have no parent to combine.
   (target)** — one antibody per file, optional target. Confirms the `Chain` enum vocabulary (H/L/T)
   our 003 `CandidateChain` uses.
 
+### One score key, three physical meanings — resolved by a sibling table (found 2026-07-31)
+
+**How we found it (worth keeping for the portfolio narrative — this was an *iteration*, not a plan).**
+The demo page had three hardcoded candidates and looked finished. Widening it to every candidate with
+a structure on disk (3 → 9) was supposed to be a mechanical change. Reading the widened result set is
+what exposed the bug: five of the nine had **no `TARGET` chain at all**, yet were carrying the highest
+"binding" scores on the page.
+
+**The finding.** `boltz2.protein_iptm` is a single, stable JSONB key that measures a physically
+different thing depending on which chains went into the fold — and **the bag does not record which**:
+
+| chains folded | n | what ipTM actually measures | observed range |
+|---|---|---|---|
+| `HEAVY` | 4 | nothing — one chain has no interface | 0.000 |
+| `HEAVY/LIGHT` | 6 | the antibody's own heavy–light **pairing** | 0.948 – 0.962 |
+| `HEAVY/LIGHT/TARGET`, `HEAVY/TARGET` | 4 | genuine antibody–HER2 **binding** | 0.196 – 0.793 |
+
+The three bands **do not overlap**, and they rank exactly as the physics demands: H/L pairing is nearly
+deterministic (those chains evolved to snap together), so it scores ~0.95, while real binding is the
+hard prediction problem and scores far lower. **Consequence: a naive "sort by ipTM" ranks every
+target-less fold above every real HER2 complex.** The column name (`binding_iptm`) was actively lying
+on 10 of 14 rows.
+
+**The fix.** Meaning was recovered from a **sibling table, not the bag** — `candidate_chains` knows
+which chains exist, so a `CASE` over `bool_or(cc.chain = 'TARGET')` in `candidate_summary` derives an
+`interface_kind` label per row, and `binding_iptm` was renamed to the honest `iptm`. This is the same
+lesson as §"Column sets depend on INPUT PARAMS" one level up: **the score bag is never self-describing;
+its neighbours are what interpret it.** The normalized `candidate_chains` table earning its keep.
+
+**Verified, not assumed:** all 9 PDBs' `ATOM` chain IDs were checked against `candidate_chains` — 9/9
+match, so the classification isn't running off stale metadata.
+
+**Residual limits (do NOT over-claim):**
+1. ipTM is **assembly-wide**, so even within `antibody-target complex` a 2-chain `H/T` nanobody and a
+   3-chain `H/L/T` fold aren't strictly comparable — different interface counts feed one statistic.
+   Comparisons are only clean between rows with the *same* chain composition.
+2. `interface_kind` infers what the score measured from sibling chain rows. If a recipe ever emitted an
+   ipTM computed over a *subset* of the chains present, the label would lie silently. The real fix is
+   **recipe-DAG provenance** (which module consumed which chains) — see `recipe-topology-note.md`.
+3. `bool_or` over an empty group returns **NULL, not false** (LEFT JOIN), which would fall through the
+   `CASE` and mislabel a chainless candidate — guarded with a leading `count(cc.id) = 0` branch.
+
 ---
 
 ## Doc debt this surfaced (to reconcile)

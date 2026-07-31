@@ -148,15 +148,11 @@ async def load_csv(
     if not rows:
         raise ValueError(f"{csv_path} has no data rows")
 
-    required_structural_cols: frozenset[str] = STRUCTURAL_COLUMNS - {
-        "experimentId"
-    }  # experimentId is legitimately optional
+    required_structural_cols: frozenset[str] = STRUCTURAL_COLUMNS - {"experimentId"}  # experimentId is legitimately optional
 
     missing_structural_cols: frozenset[str] = required_structural_cols - rows[0].keys()
     if missing_structural_cols:
-        raise ValueError(
-            f"{csv_path} missing required column(s): {sorted(missing_structural_cols)}"
-        )
+        raise ValueError(f"{csv_path} missing required column(s): {sorted(missing_structural_cols)}")
 
     experiments: list[Experiment] = []
 
