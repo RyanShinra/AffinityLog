@@ -74,6 +74,10 @@ experiments, two halves of one trade-off**, reunited by the `antibody_hash` fing
   model's *confidence in how the two proteins are positioned against each other*. Rough reading:
   > 0.8 confident complex, ~0.7 moderate, ~0.4 shaky. **It is not an affinity (K<sub>d</sub>)** —
   it says "I'm this sure they dock like this", not "binds this tightly".
+  It is also **assembly-wide**: for a 3-chain H/L/T fold the heavy–light interface is baked into the
+  same number as the antibody–HER2 one. So it only compares cleanly between structures with the
+  *same* chain composition — and it means nothing at all for a fold with no target in it (see
+  `interface_kind` in the `candidate_summary` view, and the stress log entry for 2026-07-31).
 - **OASis percentile (humanness)** — BioPhi slides a window along the antibody and asks how
   often each short peptide actually appears in real human antibody repertoires (the OAS
   database). Higher percentile = more human-looking = lower predicted immunogenicity risk. The
@@ -104,6 +108,10 @@ exploratory sprawl.
    anecdote, not a titration curve.
 3. **Direction, not magnitude.** The humanization→binding drop matches the known phenomenon
    *directionally*. Do not quote 0.09 as if it were a measured ΔΔG.
+   The 0.79 vs 0.70 comparison **is** fair in one specific way that matters: both are `H/L/T` folds,
+   so the same interfaces feed both numbers. The de novo nanobody's 0.40 in the table above is a
+   2-chain `H/T` fold and is **not** strictly comparable to either — it is listed to show the third
+   design route, not to rank it against the other two.
 4. **Exploratory provenance.** Many early runs were "try a module" experiments; the messiness
    is genuine, and absorbing it is the schema's job.
 

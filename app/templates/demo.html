@@ -35,6 +35,18 @@
     td.null { color:#484f58; }
     .note { margin-top:1.25rem; color:#8b949e; font-size:.85rem; }
 
+    /* --- column tooltips: hover a header to learn what the metric is --- */
+    th[data-tip] { position:relative; cursor:help; text-decoration:underline dotted #6e7681; text-underline-offset:3px; }
+    th[data-tip]:hover::after {
+      content: attr(data-tip);
+      position:absolute; left:0; top:100%; z-index:20;
+      width:17rem; white-space:normal; font-weight:400; font-size:.78rem; line-height:1.4;
+      background:#1c2128; color:#c9d1d9; border:1px solid #444c56; border-radius:6px;
+      padding:.55rem .65rem; box-shadow:0 6px 18px rgba(0,0,0,.55);
+    }
+    /* Right-anchor the last few so the bubble can't run off the page edge. */
+    th[data-tip].tip-left:hover::after { left:auto; right:0; }
+
     /* --- provenance panel --- */
     .lineage { margin:0 0 1.5rem; }
     .lineage .fp { color:#8b949e; font-size:.8rem; margin:0 0 .4rem; }
@@ -61,8 +73,17 @@
   <table>
     <thead>
       <tr>
-        <th>candidate</th><th>experiment</th><th>chains</th><th>fingerprint</th><th>#scores</th>
-        <th>interface</th><th>ipTM</th><th>pLDDT</th><th>humanness</th><th>thermo</th><th>epitope</th>
+        <th data-tip="Bio Discovery's candidate id, shortened to 8 characters. The full 32-hex id is what names the structure file on disk.">candidate</th>
+        <th data-tip="The Bio Discovery run that produced this row. A single CSV export can span several experiments.">experiment</th>
+        <th data-tip="Which chains went into the fold. HEAVY and LIGHT are the antibody's own two chains; TARGET is the antigen it was folded against (HER2 here).">chains</th>
+        <th data-tip="md5 of the heavy+light sequences, target excluded. Two rows sharing this value are the SAME antibody — it's how one molecule is traced across experiments.">fingerprint</th>
+        <th data-tip="How many metrics this candidate's JSONB bag holds. It varies by recipe — absorbing that variation without a schema change is the whole point.">#scores</th>
+        <th data-tip="What the ipTM value actually measures, derived from which chains are present. Without a TARGET chain there is no binding to score.">interface</th>
+        <th data-tip="Interface predicted TM-score (0–1): the model's confidence in how the chains sit relative to each other. NOT an affinity. Only compare it between rows of the same interface kind.">ipTM</th>
+        <th data-tip="Predicted Local Distance Difference Test (0–1): confidence in the fold's shape itself, averaged over the complex. Independent of whether it binds.">pLDDT</th>
+        <th data-tip="BioPhi's OASis percentile: how often this antibody's short peptides actually occur in human antibody repertoires. Higher = more human-looking = lower predicted immunogenicity risk.">humanness</th>
+        <th class="tip-left" data-tip="TemStaPro's predicted thermostability class — mesophilic or thermophilic. Categorical, not a number.">thermo</th>
+        <th class="tip-left" data-tip="How many HER2 residues the model predicts are in contact with the antibody. These are the residues painted red in the 3D viewer.">epitope</th>
       </tr>
     </thead>
     <tbody>
@@ -93,7 +114,14 @@
       <p class="fp">antibody_hash <code>{{ hash }}</code></p>
       <table>
         <thead>
-          <tr><th>experiment</th><th>candidate</th><th>chains</th><th>interface</th><th>ipTM</th><th>humanness&nbsp;(OASis)</th></tr>
+          <tr>
+            <th data-tip="The Bio Discovery run this row came from. The same molecule appearing under two runs is exactly what this panel is showing.">experiment</th>
+            <th data-tip="Bio Discovery's candidate id, shortened to 8 characters.">candidate</th>
+            <th data-tip="Which chains went into this fold. The chain list is what makes the two rows' scores differ.">chains</th>
+            <th data-tip="What this row's ipTM measures. Read it before comparing the numbers down the column — they are not always the same quantity.">interface</th>
+            <th class="tip-left" data-tip="Interface predicted TM-score (0–1). A fold with no HER2 in it scores the antibody's own heavy–light pairing, which runs much higher than real binding — so these are only comparable within one interface kind.">ipTM</th>
+            <th class="tip-left" data-tip="BioPhi's OASis humanness percentile. It appears on the row where the molecule was humanized, not on the row where it was folded — that's the split this panel reunites.">humanness&nbsp;(OASis)</th>
+          </tr>
         </thead>
         <tbody>
         {% for r in rows %}
