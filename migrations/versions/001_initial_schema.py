@@ -214,9 +214,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("experiment_id", "sequence_id", name="uq_candidate_seq"),
     )
-    op.create_index(
-        "ix_candidates_scores_gin", "candidates", ["scores"], unique=False, postgresql_using="gin"
-    )
+    op.create_index("ix_candidates_scores_gin", "candidates", ["scores"], unique=False, postgresql_using="gin")
     op.create_table(
         "artifacts",
         sa.Column("id", sa.UUID(), nullable=False),

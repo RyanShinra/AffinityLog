@@ -55,9 +55,7 @@ def test_metric_value_type_excludes_artifact() -> None:
 
 def _foreign_key_on(table: Table, column_name: str) -> ForeignKey:
     """The FK *held by* `column_name` on `table` (fk.parent), not the column it points at."""
-    fk: ForeignKey | None = next(
-        (fk for fk in table.foreign_keys if fk.parent.name == column_name), None
-    )
+    fk: ForeignKey | None = next((fk for fk in table.foreign_keys if fk.parent.name == column_name), None)
     assert fk is not None, f"no foreign key on column {table.name}.{column_name}"
     return fk
 

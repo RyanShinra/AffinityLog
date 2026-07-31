@@ -66,9 +66,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(
-            ["benchmark_dataset_id"], ["benchmark_datasets.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["benchmark_dataset_id"], ["benchmark_datasets.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["metric_id"], ["metrics.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -121,9 +119,7 @@ def downgrade() -> None:
     op.drop_constraint("fk_metrics_transform_of_metric_id", "metrics", type_="foreignkey")
     op.drop_column("metrics", "transform_stats")
     op.drop_column("metrics", "transform_of_metric_id")
-    op.add_column(
-        "candidates", sa.Column("fasta_sequence", sa.TEXT(), autoincrement=False, nullable=False)
-    )
+    op.add_column("candidates", sa.Column("fasta_sequence", sa.TEXT(), autoincrement=False, nullable=False))
     op.drop_index(op.f("ix_candidate_chains_candidate_id"), table_name="candidate_chains")
     op.drop_table("candidate_chains")
     sa.Enum(name="chain").drop(op.get_bind(), checkfirst=True)
