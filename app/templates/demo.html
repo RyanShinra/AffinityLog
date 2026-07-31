@@ -62,7 +62,7 @@
     <thead>
       <tr>
         <th>candidate</th><th>experiment</th><th>chains</th><th>fingerprint</th><th>#scores</th>
-        <th>binding&nbsp;ipTM</th><th>pLDDT</th><th>humanness</th><th>thermo</th><th>epitope</th>
+        <th>interface</th><th>ipTM</th><th>pLDDT</th><th>humanness</th><th>thermo</th><th>epitope</th>
       </tr>
     </thead>
     <tbody>
@@ -73,7 +73,8 @@
         <td>{{ c.chains }}</td>
         <td class="{{ 'null' if c.antibody_hash is none }}"><code>{{ c.antibody_hash or '—' }}</code></td>
         <td class="num">{{ c.n_scores }}</td>
-        <td class="num {{ 'null' if c.binding_iptm is none }}">{{ c.binding_iptm if c.binding_iptm is not none else '—' }}</td>
+        <td>{{ c.interface_kind }}</td>
+        <td class="num {{ 'null' if c.iptm is none }}">{{ c.iptm if c.iptm is not none else '—' }}</td>
         <td class="num {{ 'null' if c.complex_plddt is none }}">{{ c.complex_plddt if c.complex_plddt is not none else '—' }}</td>
         <td class="num {{ 'null' if c.humanness_oasis is none }}">{{ c.humanness_oasis if c.humanness_oasis is not none else '—' }}</td>
         <td class="{{ 'null' if c.thermo_class is none }}">{{ c.thermo_class or '—' }}</td>
@@ -85,13 +86,14 @@
 
   {% if lineages %}
   <h2>One molecule, two experiments — follow the fingerprint</h2>
-  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. The featured 3D structure is the <span style="color:#3fb950">highlighted</span> row.</p>
+  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. The featured 3D structure is the <span style="color:#3fb950">highlighted</span> row.<br />
+  <strong>Check the <em>interface</em> column before comparing ipTM down a lineage:</strong> a fold with no HER2 in it scores the antibody's own heavy&ndash;light pairing, not binding &mdash; same column, different physical meaning.</p>
   {% for hash, rows in lineages.items() %}
     <div class="lineage">
       <p class="fp">antibody_hash <code>{{ hash }}</code></p>
       <table>
         <thead>
-          <tr><th>experiment</th><th>candidate</th><th>chains</th><th>binding&nbsp;ipTM</th><th>humanness&nbsp;(OASis)</th></tr>
+          <tr><th>experiment</th><th>candidate</th><th>chains</th><th>interface</th><th>ipTM</th><th>humanness&nbsp;(OASis)</th></tr>
         </thead>
         <tbody>
         {% for r in rows %}
@@ -99,7 +101,8 @@
             <td>{{ r.experiment }}</td>
             <td><code>{{ r.candidate }}</code></td>
             <td>{{ r.chains }}</td>
-            <td class="num {{ 'null' if r.binding_iptm is none }}">{{ r.binding_iptm if r.binding_iptm is not none else '—' }}</td>
+            <td>{{ r.interface_kind }}</td>
+            <td class="num {{ 'null' if r.iptm is none }}">{{ r.iptm if r.iptm is not none else '—' }}</td>
             <td class="num {{ 'null' if r.humanness_oasis is none }}">{{ r.humanness_oasis if r.humanness_oasis is not none else '—' }}</td>
           </tr>
         {% endfor %}

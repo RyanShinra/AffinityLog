@@ -34,8 +34,9 @@ class CandidateSummary(ModelBase):
     experiment: Mapped[str]
     chains: Mapped[str | None]
     antibody_hash: Mapped[str | None]  # H+L fingerprint; equal across rows = the same antibody
+    interface_kind: Mapped[str]  # what the ipTM measures: complex / H-L pairing / single chain
     n_scores: Mapped[int]
-    binding_iptm: Mapped[float | None]
+    iptm: Mapped[float | None]  # was binding_iptm — the name lied on rows with no TARGET chain
     complex_plddt: Mapped[float | None]
     humanness_oasis: Mapped[float | None]
     humatch_human: Mapped[float | None]

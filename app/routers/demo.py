@@ -95,7 +95,8 @@ async def demo_page(
                     "experiment": row.experiment,
                     "candidate": row.candidate,
                     "chains": row.chains,
-                    "binding_iptm": row.binding_iptm,
+                    "interface_kind": row.interface_kind,
+                    "iptm": row.iptm,
                     "humanness_oasis": row.humanness_oasis,
                     "is_featured": row.candidate_id in featured_ids,
                 }
