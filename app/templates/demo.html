@@ -4,8 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AffinityLog — the flexible schema, in the flesh</title>
-  <!-- 3Dmol.js: WebGL molecular viewer. Loads the structure text we serve from /demo/pdb/{id}. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.2/3Dmol-min.js"></script>
+  <!-- 3Dmol.js: WebGL molecular viewer. Loads the structure text we serve from /demo/pdb/{id}.
+       Vendored (v2.4.2, BSD-3-Clause — see app/static/vendor/3Dmol-LICENSE.txt) rather than pulled
+       from a CDN, so the demo runs with no network at all and the "all local" claim below is true. -->
+  <script src="/static/vendor/3Dmol-min.js"></script>
   <style>
     :root { color-scheme: dark; }
     body { background:#0d1117; color:#c9d1d9; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; margin:0; padding:2rem 2.5rem; }

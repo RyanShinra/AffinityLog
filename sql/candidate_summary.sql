@@ -6,6 +6,15 @@
 --
 -- Apply:  docker exec -i affinitylog-db-1 psql -U affinitylog -d affinitylog < sql/candidate_summary.sql
 -- Use:    SELECT * FROM candidate_summary;
+--
+-- ⚠ THIS FILE IS THE ITERATION COPY, NOT WHAT SHIPS.
+-- The version that actually gets applied lives inline in
+-- migrations/versions/004_add_candidate_summary_view.py — a migration must be an immutable
+-- snapshot, so it can't just read this file. Iterate here freely (re-apply with the command
+-- above, paste into TablePlus, etc.), but **before opening a PR, if you changed the view's
+-- columns, cut a new migration** with the updated SQL copied in.
+--     scripts/check_view_migration.py  (also run in CI) fails the build if the two disagree.
+--     It compares column lists only, so re-wording these comments is free.
 
 -- DROP first: CREATE OR REPLACE VIEW can only append columns, not reorder/insert one mid-list.
 DROP VIEW IF EXISTS candidate_summary;
