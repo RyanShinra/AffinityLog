@@ -4,12 +4,12 @@ A backend for antibody-design experiment data — built around one problem: **th
 means different things depending on what was fed into it.**
 
 The data comes from [Amazon Bio Discovery](https://aws.amazon.com/bio-discovery/), AWS's
-computational antibody engineering platform, demoed at the June 2026 AWS Summit. Over a free trial I
-ran 11 real experiments against **HER2** (the target of trastuzumab/Herceptin), exported the results,
-and built this to store and interpret them.
+computational antibody engineering platform, demoed at the June 2026 AWS Summit. Eleven real
+experiments were run against **HER2** (the target of trastuzumab/Herceptin) over a free trial; this
+repository stores and interprets their exported results.
 
 It is a portfolio project — FastAPI, async SQLAlchemy 2.0, PostgreSQL 16, Alembic, Docker — but the
-interesting part is not the stack. It is what the data turned out to require.
+stack is not the interesting part. What the data turned out to require is.
 
 ---
 
@@ -248,7 +248,7 @@ Postgres comes from [testcontainers](https://testcontainers.com/) automatically;
 | `migrations/versions/` | 001–006 |
 | `seed/catalog.json` | the curated meaning layer |
 | `scripts/` | loaders, the score-key extractor, and the HTML provenance scrapers |
-| `docs/schema-stress-log.md` | **the most interesting file in the repo** — a running log of what each experiment taught us about the schema, including the ipTM finding |
+| `docs/schema-stress-log.md` | **the most interesting file in the repo** — a running log of what each experiment revealed about the schema, including the ipTM finding |
 | `docs/demo-biology.md` | the biology, written for a software engineer |
 
 ---
@@ -272,38 +272,50 @@ Kept here rather than in a private list, because a portfolio repo should be hone
 
 ## How this was built, and who built what
 
-Worth stating plainly, because it is half the point of the exercise.
+Stated plainly, because it is half the point of the exercise.
 
-I am a senior backend engineer — TypeScript and Node primarily, Python developing — and this project
-runs two goals at once: learn Python data-layer design properly (SQLAlchemy 2.0 async, Alembic, and
-the Postgres features I had read about but never actually reached for), and work out what it looks
-like to use an AI engineer as a genuine collaborator on a domain I am new to, rather than as a
-fancier autocomplete.
+Ryan O. is a senior backend engineer working primarily in TypeScript and Node, with Python
+developing. This project runs two goals at once: learning Python data-layer design properly
+(SQLAlchemy 2.0 async, Alembic, and the Postgres features that are easy to read about and harder to
+reach for), and finding out what it looks like to use an AI engineer as a collaborator on an
+unfamiliar domain rather than as a fancier autocomplete.
 
 The division of labour:
 
-- **I own the decisions.** Scope, schema shape, what gets built next, what gets deferred, what a
-  column should be called, and when a mechanically-derived answer is good enough versus when it has
-  to be right. Also the domain judgment — I ran the experiments and know what the platform was
+- **The decisions are the author's.** Scope, schema shape, what gets built next, what gets deferred,
+  what a column should be called, and when a mechanically-derived answer is good enough versus when
+  it has to be right. Domain judgment too — he ran the experiments and knows what the platform was
   actually doing.
-- **Claude does most of the typing, and knows this design space better than I do.** Postgres's
+- **Claude did most of the typing, and knows this design space better.** Postgres's
   `UNIQUE NULLS NOT DISTINCT` and why it makes an upsert idempotent, that a view's ORM model has to
-  stay out of Alembic's metadata, the asyncpg parameter-binding quirks — those came from the AI, and
-  I understand them now because they were explained rather than just inserted.
-- **The load-bearing bits I wrote myself, on purpose.** The `CASE` expression that classifies
-  interface kind, the sequential-revision hook in `migrations/env.py`, the enum migration in `005`,
-  the CSV score-parsing in the importer. Typing the piece that encodes the actual decision is how the
-  learning happens; having it reviewed afterwards is how the bugs get caught.
-- **It goes both ways.** Claude has been confidently wrong here in ways I caught — most memorably an
-  Alembic `autocommit_block()` recommendation that cannot work in this codebase at all. A fair
-  number of the comments in this repo exist because a wrong answer turned out to be worth recording
-  next to the right one.
+  stay out of Alembic's metadata, the asyncpg parameter-binding quirks — all of that came from the
+  model, and stuck because it was explained rather than merely inserted.
+- **The pieces that encode a decision were written by hand, on purpose.** The `CASE` expression that
+  classifies interface kind, the sequential-revision hook in `migrations/env.py`, the enum migration
+  in `005`, the CSV score-parsing in the importer. Typing the part that carries the judgment is where
+  the learning happens; review afterwards is where the bugs get caught.
+- **It goes both ways.** Claude has been confidently wrong here — most memorably an Alembic
+  `autocommit_block()` recommendation that cannot work in this codebase at all, caught only by
+  running it. Several comments in this repo exist because a wrong answer turned out to be worth
+  recording next to the right one.
 
-That collaboration is also where the findings came from. The ipTM discovery in
-`docs/schema-stress-log.md` surfaced because widening the demo from three structures to nine raised a
-question neither of us had thought to ask — and then took a deliberately slow afternoon of checking
-against the actual data instead of accepting the first plausible explanation. The commit history is
-the honest record of that, wrong turns included.
+The findings came out of that back-and-forth. The ipTM discovery in `docs/schema-stress-log.md`
+surfaced because widening the demo from three structures to nine raised a question neither party had
+thought to ask, and then took a slow afternoon of checking against the data rather than accepting the
+first plausible explanation. The commit history is the honest record, wrong turns included.
+
+### Authorship
+
+**Author: Ryan O.** — decisions, direction, domain expertise, and accountability for what is here.
+
+**Prose and much of the code: Claude** (Anthropic), via Claude Code, reviewed and approved by the
+author. Commits carry `Co-Authored-By: Claude` where that applies.
+
+This follows the convention emerging across academic publishing and open-source projects: an AI is
+credited as a tool and its use disclosed, but not listed as an author, because authorship carries
+responsibility that a model cannot hold. If something here is wrong, that is the author's problem to
+answer for — which is also why every factual claim in this README was verified against the running
+database or the repository before it was written.
 
 ## A note on the data
 
