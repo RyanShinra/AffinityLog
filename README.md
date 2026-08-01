@@ -222,6 +222,20 @@ Every loader is idempotent — re-run them freely; they converge rather than dup
 
 Then open **http://localhost:8000/demo**.
 
+### What the demo shows
+
+Three panels, top to bottom. **A 3D viewer** of every predicted structure in the corpus, grouped by
+what was actually folded — antibody heavy chain in blue, light chain in green, HER2 target in grey,
+and the residues the model predicts are in contact painted red. **A table of every candidate**, where
+the empty cells are the interesting part: they show which metrics a given recipe did and did not
+emit. **A provenance panel** that follows one antibody across two separate experiments, using a
+sequence fingerprint to prove they are the same molecule even though one run scored its humanness and
+the other folded its structure.
+
+The tab groups are the ipTM problem made visible: the ~0.95 scores in the middle group are *not*
+better binders, they are folds with no target in them. Hover any column header for what the metric
+means and how it misleads.
+
 > Structures are read from `experiment_results/` on disk. Running the app inside Docker needs that
 > directory bind-mounted, or `/demo/pdb/{id}` will 404 — see the open items below.
 
@@ -294,15 +308,41 @@ The division of labour:
   classifies interface kind, the sequential-revision hook in `migrations/env.py`, the enum migration
   in `005`, the CSV score-parsing in the importer. Typing the part that carries the judgment is where
   the learning happens; review afterwards is where the bugs get caught.
-- **It goes both ways.** Claude has been confidently wrong here — most memorably an Alembic
-  `autocommit_block()` recommendation that cannot work in this codebase at all, caught only by
-  running it. Several comments in this repo exist because a wrong answer turned out to be worth
-  recording next to the right one.
+### What two heads actually bought
 
-The findings came out of that back-and-forth. The ipTM discovery in `docs/schema-stress-log.md`
-surfaced because widening the demo from three structures to nine raised a question neither party had
-thought to ask, and then took a slow afternoon of checking against the data rather than accepting the
-first plausible explanation. The commit history is the honest record, wrong turns included.
+The useful part was not one party checking the other's work. It was that the two fail in different
+directions, so between them they cover ground neither covers alone. Four kinds of error showed up,
+and each needed a different catcher.
+
+**Confidently wrong about *this* environment.** The model's failures were rarely nonsense; they were
+generically-true advice that happens to be false here, which is the hardest kind to spot by reading.
+Alembic's `autocommit_block()` is the textbook way to add a Postgres enum value — and it cannot work
+in this codebase, because `env.py` opens the transaction through SQLAlchemy, so Alembic never owns
+one to suspend. It fails on an assertion before running any SQL. Also: a `notes` column confidently
+referenced on a table that did not have one; `ON CONFLICT (name)` written against three tables with
+no unique constraint on `name`; a Postgres array passed as `'{A,B}'` to a driver that wanted a list.
+Every one of those was caught the same way — by running it, not by reviewing it.
+
+**Right about things the author had not met yet.** In the other direction: `UNIQUE NULLS NOT DISTINCT`
+and why it is the difference between an idempotent seeder and one that silently multiplies rows on
+every run; that a view's ORM model must stay out of Alembic's metadata or autogenerate will try to
+`DROP TABLE` it; that `alembic revision` skips `env.py` entirely unless `revision_environment` is set.
+
+**Known only to the human.** Some facts are not in the code or the data at all. Recipes in Bio
+Discovery are *reusable* — configured per run with different molecules — which makes experiments
+relate to them many-to-one. That single correction changed the recipe model from one-row-per-
+experiment to shared rows, and it could only come from someone who had used the platform.
+
+**Known to neither, until the data was asked.** The ipTM finding is the clearest case. It did not
+come from insight; it came from widening the demo from three structures to nine and noticing that
+five of them contained no target. Verifying it meant querying every metric across every interface
+kind — which then contradicted the obvious hypothesis that the "i" in ipLDDT marked the
+interface-dependent ones. It does not; `complex_iplddt` stays meaningful for a lone chain. The rule
+had to be measured, not reasoned.
+
+The pattern across all four: **the disagreements were more productive than the agreements.** Several
+comments in this repository exist to record a wrong answer beside the right one, because the wrong
+one was the more instructive half. The commit history is the honest version, wrong turns included.
 
 ### Authorship
 
