@@ -98,11 +98,48 @@ async def _experiment_module_sets(session: AsyncSession) -> list[tuple[str, str,
     return [(row[0], row[1], list(row[2])) for row in result.all()]
 
 
-async def _get_or_create_recipe(session: AsyncSession, name: str) -> str:
-    """Look-then-insert: `recipes` has no unique constraint on name (same gap as targets/projects)."""
+async def _resolve_modules(session: AsyncSession, names: list[str]) -> list[str]:
+    """Map module names to ids, warning about any the catalog does not know.
+
+    Resolving up front means the SAME set drives both identity lookup and linking. If a name had no
+    row we would otherwise store a subset of what we searched by, and the recipe would never match
+    itself on the next run.
+    """
+    resolved: list[str] = []
+    for name in names:
+        row = (await session.execute(text("SELECT id FROM modules WHERE name = :n"), {"n": name})).first()
+        if row is None:
+            # The module catalog is behind the corpus — run seed_metric_skeleton.py, which
+            # auto-registers every module that emitted a column.
+            print(f"  WARNING: no module row named '{name}' — excluded from this recipe")
+            continue
+        resolved.append(str(row[0]))
+    return sorted(resolved)
+
+
+async def _get_or_create_recipe(session: AsyncSession, name: str, module_ids: list[str]) -> str:
+    """Find the recipe whose module set is EXACTLY this one, else create it.
+
+    Identity is the module set, so that is what the lookup matches on. Matching on the derived
+    `name` instead would be wrong: `recipe_name` is built from the headline modules plus a count, so
+    two genuinely different pipelines that share their headline modules and module count collapse to
+    the same string — for example {rfantibody, ..., hdbscan} and {rfantibody, ..., mmseqs}, both 11
+    modules, both "RFantibody + ESM2 (11 modules)". The second would then reuse the first's row and
+    its own modules would be merged in, silently fusing two pipelines into one recipe.
+
+    HAVING array_agg(...) = the sorted id array is an exact set comparison: same members, same
+    count. A recipe that merely CONTAINS these modules does not match.
+    """
     existing = await session.execute(
-        text("SELECT id FROM recipes WHERE name = :name AND recipe_type = :rtype"),
-        {"name": name, "rtype": RECIPE_TYPE},
+        text("""
+            SELECT r.id
+              FROM recipes r
+              JOIN recipe_modules rm ON rm.recipe_id = r.id
+             WHERE r.recipe_type = :rtype
+             GROUP BY r.id
+            HAVING array_agg(rm.module_id::text ORDER BY rm.module_id::text) = CAST(:module_ids AS text[])
+            """),
+        {"rtype": RECIPE_TYPE, "module_ids": module_ids},
     )
     if (row := existing.first()) is not None:
         return str(row[0])
@@ -116,27 +153,20 @@ async def _get_or_create_recipe(session: AsyncSession, name: str) -> str:
     return str(created.scalar_one())
 
 
-async def _link_modules(session: AsyncSession, recipe_id: str, modules: list[str]) -> None:
-    """Populate recipe_modules. Membership only — the edges have nowhere to go (see the TODO)."""
-    for module_name in modules:
-        result = await session.execute(
+async def _link_modules(session: AsyncSession, recipe_id: str, module_ids: list[str]) -> None:
+    """Populate recipe_modules from ids already resolved by _resolve_modules.
+
+    Membership only — the edges have nowhere to go (see the TODO at the top of this module).
+    """
+    for module_id in module_ids:
+        await session.execute(
             text("""
                 INSERT INTO recipe_modules (recipe_id, module_id)
-                SELECT CAST(:recipe_id AS uuid), m.id FROM modules m WHERE m.name = :module_name
+                VALUES (CAST(:recipe_id AS uuid), CAST(:module_id AS uuid))
                 ON CONFLICT (recipe_id, module_id) DO NOTHING
-                RETURNING module_id
                 """),
-            {"recipe_id": recipe_id, "module_name": module_name},
+            {"recipe_id": recipe_id, "module_id": module_id},
         )
-        if result.first() is None:
-            # Either already linked (a re-run) or there is no module row of that name. The latter
-            # would mean the module catalog is behind the corpus — run seed_metric_skeleton.py,
-            # which auto-registers every module that emitted a column. Check rather than assume,
-            # because the failure is otherwise invisible: the INSERT ... SELECT simply matches no
-            # rows and reports success.
-            known = await session.execute(text("SELECT 1 FROM modules WHERE name = :n"), {"n": module_name})
-            if known.first() is None:
-                print(f"  WARNING: no module row named '{module_name}' — recipe link skipped")
 
 
 async def seed(dry_run: bool = False) -> None:
@@ -158,8 +188,10 @@ async def seed(dry_run: bool = False) -> None:
 
         linked = 0
         for modules, members in groups.items():
-            recipe_id = await _get_or_create_recipe(session, recipe_name(list(modules)))
-            await _link_modules(session, recipe_id, list(modules))
+            # Resolve first: the same id set is then used for BOTH the identity lookup and linking.
+            module_ids = await _resolve_modules(session, list(modules))
+            recipe_id = await _get_or_create_recipe(session, recipe_name(list(modules)), module_ids)
+            await _link_modules(session, recipe_id, module_ids)
             for exp_id, _ in members:
                 # COALESCE so a hand-corrected recipe_id is never overwritten by a re-run.
                 result = await session.execute(
