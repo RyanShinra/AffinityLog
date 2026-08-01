@@ -38,6 +38,36 @@ most of the design below.
 
 ---
 
+## What the data actually is (60 seconds, no biology needed)
+
+An **antibody** is a protein whose entire job is to stick to one specific target and nothing else.
+The target here is **HER2**, a receptor that is overproduced in roughly one in five breast cancers —
+and the target of the real drug trastuzumab (Herceptin).
+
+Designing one is a search problem, and Bio Discovery runs it as a pipeline of ML models. Each model
+answers one question a drug program has to ask, and each writes its answers as columns in the CSV
+export. That is what this database stores:
+
+| the question | modules | what they emit |
+|---|---|---|
+| **Does it stick to the target?** | Boltz2 | Predicts the 3D structure of antibody and target *together*, then scores its own confidence: **ipTM** (0–1, "is this interface real?") and **pLDDT** (0–1, "is this shape right?"). Neither is a measured binding strength — they are the model's confidence in its own picture. |
+| **Where does it grab?** | structure analysis | Reads that predicted structure geometrically: which target residues are in contact (the **epitope**), how many, how close. This is what the demo paints red. |
+| **Will the patient's immune system attack the drug itself?** | BioPhi, Humatch | An antibody that doesn't look human can provoke an immune response against the drug. **Humanness** scores how closely the sequence resembles real human antibodies — BioPhi's *OASis* is a percentile against a database of observed human antibody sequences; Humatch is a neural net trained on the same question. Running both is deliberate: they can disagree. |
+| **Can we actually manufacture and store it?** | liabilities, TemStaPro | Certain amino-acid motifs oxidise, degrade, or pick up sugar molecules in the wrong place over time. These count them. TemStaPro predicts heat tolerance. A brilliant binder that falls apart in a vial is not a drug. |
+| **Is this sequence even plausible?** | ESM2, EvoProtGrad | Protein language models — trained on known protein sequences much as an LLM is trained on text. **Pseudo-perplexity** is literally "how surprised is the model by this sequence". EvoProtGrad uses one to mutate a starting antibody toward better scores. |
+| **Design one from scratch** | RFantibody | Generates a new binder against a target rather than improving an existing one. Much harder, and the scores show it. |
+
+Two things worth knowing before reading any number in this repo:
+
+1. **Everything here is predicted.** No wet-lab assay was run. These are model outputs, and a
+   confident model can be confidently wrong.
+2. **The same metric name means different things across models.** pLDDT is 0–1 in Boltz2 but 0–100 in
+   ColabFold; "ipTM" from a folding model and from a binder-design model are used differently. That
+   is why the catalog keys a metric by its *producing module*, never by column name alone — and why
+   the ipTM problem above is a symptom of a general disease, not a one-off.
+
+---
+
 ## What is actually here
 
 **Working today**
@@ -194,6 +224,41 @@ Kept here rather than in a private list, because a portfolio repo should be hone
 - **Everything here is predicted, not measured.** ipTM, pLDDT and humanness are model outputs, not
   assay results. Folding in published reference data to get measured ground truth is the stretch goal
   in `docs/published-data-goal.md`.
+
+## How this was built, and who built what
+
+Worth stating plainly, because it is half the point of the exercise.
+
+I am a senior backend engineer — TypeScript and Node primarily, Python developing — and this project
+runs two goals at once: learn Python data-layer design properly (SQLAlchemy 2.0 async, Alembic, and
+the Postgres features I had read about but never actually reached for), and work out what it looks
+like to use an AI engineer as a genuine collaborator on a domain I am new to, rather than as a
+fancier autocomplete.
+
+The division of labour:
+
+- **I own the decisions.** Scope, schema shape, what gets built next, what gets deferred, what a
+  column should be called, and when a mechanically-derived answer is good enough versus when it has
+  to be right. Also the domain judgment — I ran the experiments and know what the platform was
+  actually doing.
+- **Claude does most of the typing, and knows this design space better than I do.** Postgres's
+  `UNIQUE NULLS NOT DISTINCT` and why it makes an upsert idempotent, that a view's ORM model has to
+  stay out of Alembic's metadata, the asyncpg parameter-binding quirks — those came from the AI, and
+  I understand them now because they were explained rather than just inserted.
+- **The load-bearing bits I wrote myself, on purpose.** The `CASE` expression that classifies
+  interface kind, the sequential-revision hook in `migrations/env.py`, the enum migration in `005`,
+  the CSV score-parsing in the importer. Typing the piece that encodes the actual decision is how the
+  learning happens; having it reviewed afterwards is how the bugs get caught.
+- **It goes both ways.** Claude has been confidently wrong here in ways I caught — most memorably an
+  Alembic `autocommit_block()` recommendation that cannot work in this codebase at all. A fair
+  number of the comments in this repo exist because a wrong answer turned out to be worth recording
+  next to the right one.
+
+That collaboration is also where the findings came from. The ipTM discovery in
+`docs/schema-stress-log.md` surfaced because widening the demo from three structures to nine raised a
+question neither of us had thought to ask — and then took a deliberately slow afternoon of checking
+against the actual data instead of accepting the first plausible explanation. The commit history is
+the honest record of that, wrong turns included.
 
 ## A note on the data
 
