@@ -1,7 +1,16 @@
 # AffinityLog — Claude Code Project Memory
 
-Read this before contributing in any session. This is a multi-machine project (Mac + PC).
-A new session should be able to contribute without re-litigating the decisions below.
+Read this before contributing in any session. This is a multi-machine project (Mac + PC), so
+**assume no memory of previous sessions carries over** — everything needed lives in the repo.
+
+Starting cold, read in this order:
+
+1. **this file** — conventions, how the owner works, what not to reintroduce
+2. **`README.md`** — what the project is and the problem it solves; current by construction
+3. **`docs/README.md`** — an index of the other docs, marking which are current and which are
+   historical handoffs that will contradict the README (the README wins)
+
+Then verify anything load-critical against the running database rather than against a document.
 
 ---
 
@@ -103,6 +112,30 @@ binding), but no ECS infrastructure exists yet. Deploy target for this sprint is
 Docker only. Do not add a deploy step to CI until the next sprint.
 
 ---
+
+## Working with the owner (read this before writing code)
+
+The owner is a senior backend engineer — TypeScript/Node primary, Python developing. This project is
+partly a vehicle for learning Python data-layer design, so *how* work happens matters as much as what
+ships. These were learned the hard way; they are not preferences to optimise away.
+
+- **Discuss the approach before building it.** For anything past a trivial edit, propose the plan,
+  name the decision points, and wait. Building first pre-empts the owner's input and wastes his time.
+- **Leave the decision-carrying code to him.** He writes the pieces that encode a judgment — the
+  `CASE` classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score
+  parsing. Scaffold around it, mark the spot, explain the trade-offs, and offer a "fill in the
+  blanks" version rather than assuming he wants to type boilerplate.
+- **Consult the linter before saying "run it."** Editor diagnostics have caught errors that were then
+  shipped anyway; treat ruff/mypy/black as a pre-run gate, and reason about the installed library's
+  real signatures rather than the remembered ones.
+- **Move deliberately; verify against the data.** One checked query beats three plausible paragraphs.
+  Nearly every finding in `docs/schema-stress-log.md` came from stopping to measure something instead
+  of asserting it — including the ipTM discovery, which contradicted the obvious hypothesis. When he
+  asks a probing question ("what's the bonehead case here?"), that is a genuine request to find the
+  failure mode, not doubt to be reassured away.
+- **SQL background:** fluent at reading and writing queries, but new to authoring `.sql` files and
+  DDL. Explain file structure, statement shape, and *where a clause goes* — not query semantics,
+  which he already knows. `CASE` reads as a chained ternary; that framing lands.
 
 ## Non-obvious conventions
 
