@@ -1,7 +1,16 @@
 # AffinityLog — Claude Code Project Memory
 
-Read this before contributing in any session. This is a multi-machine project (Mac + PC).
-A new session should be able to contribute without re-litigating the decisions below.
+Read this before contributing in any session. This is a multi-machine project (Mac + PC), so
+**assume no memory of previous sessions carries over** — everything needed lives in the repo.
+
+Starting cold, read in this order:
+
+1. **this file** — conventions, how the owner works, what not to reintroduce
+2. **`README.md`** — what the project is and the problem it solves; current by construction
+3. **`docs/README.md`** — an index of the other docs, marking which are current and which are
+   historical handoffs that will contradict the README (the README wins)
+
+Then verify anything load-critical against the running database rather than against a document.
 
 ---
 
@@ -40,27 +49,42 @@ Both live on the same FastAPI app. CORS is open (`*`) — this is a local portfo
 
 ## Data model rationale
 
-Two core tables: `experiments` and `candidates`.
+Three layers. See `README.md` for the full explanation and `app/models/orm.py` for the commented
+schema.
 
-**Why normalized columns + JSONB:**
-Bio Discovery "recipes" (chained computational workflows) produce different score columns.
-Three metrics are common enough across antibody design to deserve first-class columns with
-indexes: `binding_affinity_kd` (nM, lower = tighter), `humanness_score` (0–1, BioPhi-style),
-`aggregation_propensity` (Aggrescan3D-style). Everything else goes into `raw_scores` (JSONB),
-queryable via GraphQL's JSON scalar. This avoids schema changes when a new recipe emits
-different score columns.
+1. **`candidates.scores` (JSONB, GIN-indexed)** — the bag. Keyed by the full export header
+   (`boltz2.protein_iptm`), values stored as **text, uncoerced**. 200 distinct keys in the corpus;
+   a new recipe needs no migration.
+2. **`candidate_chains`** — 0..N chains per candidate (HEAVY/LIGHT/TARGET) with sequences. Not a
+   nicety: chain composition is what disambiguates the bag (below), and hashing heavy+light gives an
+   antibody fingerprint that tracks one molecule across experiments.
+3. **The catalog** (`modules` → `metrics` → `concepts`) — what a score MEANS. Metric identity is
+   `(module, column_key, variant_kind, variant)`, because column names collide.
+
+**The finding that drove the design (2026-07-31):** `boltz2.protein_iptm` measures three different
+physical quantities depending on which chains were folded — real HER2 binding (0.196–0.793), the
+antibody's own heavy–light pairing (~0.95), or nothing at all (0.000 for a lone chain). The
+meaningless values score HIGHEST, so a naive sort inverts the ranking. The discriminator is not in
+the key or the value; it is derived from `candidate_chains` by a CASE in the `candidate_summary`
+view, and stored in the catalog as `VariantKind.INTERFACE`. Full write-up in
+`docs/schema-stress-log.md`.
+
+**Do not reintroduce** `binding_affinity_kd` / `humanness_score` / `aggregation_propensity` /
+`raw_scores` — those were the pre-003 schema and were removed deliberately.
 
 ---
 
 ## Current data status
 
-**SYNTHETIC PLACEHOLDER DATA ONLY.** No real Bio Discovery experiment has been run yet.
-`sample_data/her2_nanobody_sample.csv` is a generated fixture with plausible sequence IDs,
-synthetic FASTA-like sequences, and realistic score distributions. When a real export lands:
+**REAL DATA.** 11 Bio Discovery experiments were run against HER2 during the free trial
+(2026-06 to 2026-07); 9 exported successfully and are loaded: 9 experiments, 14 candidates,
+26 chains, 11 predicted structures, 144 catalogued metrics. Raw CSVs and structures live in
+`experiment_results/`, archived HTML in `HTML Extracts/`.
 
-1. Drop the real CSV into `sample_data/`.
-2. Update column mapping in `app/importer/column_mapping.py` if column names differ.
-3. That should be the only required change — schema is designed to absorb column variation.
+Loading is by script, not by API — `scripts/load_experiment.py` for CSVs, then
+`seed_catalog.py` → `seed_metric_skeleton.py` → `seed_corpus_context.py` → `seed_recipes.py`.
+All idempotent. `sample_data/her2_nanobody_sample.csv` is the old synthetic fixture and is no
+longer representative of the schema.
 
 ---
 
@@ -89,16 +113,50 @@ Docker only. Do not add a deploy step to CI until the next sprint.
 
 ---
 
+## Working with the owner (read this before writing code)
+
+The owner is a senior backend engineer — TypeScript/Node primary, Python developing. This project is
+partly a vehicle for learning Python data-layer design, so *how* work happens matters as much as what
+ships. These were learned the hard way; they are not preferences to optimise away.
+
+- **Discuss the approach before building it.** For anything past a trivial edit, propose the plan,
+  name the decision points, and wait. Building first pre-empts the owner's input and wastes his time.
+- **Leave the decision-carrying code to him.** He writes the pieces that encode a judgment — the
+  `CASE` classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score
+  parsing. Scaffold around it, mark the spot, explain the trade-offs, and offer a "fill in the
+  blanks" version rather than assuming he wants to type boilerplate.
+- **Consult the linter before saying "run it."** Editor diagnostics have caught errors that were then
+  shipped anyway; treat ruff/mypy/black as a pre-run gate, and reason about the installed library's
+  real signatures rather than the remembered ones.
+- **Move deliberately; verify against the data.** One checked query beats three plausible paragraphs.
+  Nearly every finding in `docs/schema-stress-log.md` came from stopping to measure something instead
+  of asserting it — including the ipTM discovery, which contradicted the obvious hypothesis. When he
+  asks a probing question ("what's the bonehead case here?"), that is a genuine request to find the
+  failure mode, not doubt to be reassured away.
+- **SQL background:** fluent at reading and writing queries, but new to authoring `.sql` files and
+  DDL. Explain file structure, statement shape, and *where a clause goes* — not query semantics,
+  which he already knows. `CASE` reads as a chained ternary; that framing lands.
+
 ## Non-obvious conventions
 
-- `raw_scores` stores extra CSV columns as `dict[str, str]` (raw string values from the CSV,
-  not coerced). Downstream callers handle type coercion if needed.
-- Alembic migration file: `migrations/versions/001_initial_schema.py`. Run `alembic upgrade head`
-  before starting the server (docker-compose does this automatically).
-- The GraphQL context passes the SQLAlchemy engine (not a session) so each resolver opens
-  its own session — avoids session-lifetime issues with async GraphQL resolvers.
-- Column name variants are mapped in `app/importer/column_mapping.py`. When a real Bio
-  Discovery export arrives with different headers, add variants there.
+- `candidates.scores` stores every CSV column as `dict[str, str]` (raw strings, not coerced).
+  `scripts/seed_metric_skeleton.py` infers each metric's `value_type` from those strings.
+- Migrations run 001–006. `alembic upgrade head` before starting the server (docker-compose does it).
+  **Use `alembic revision -m "..."` to scaffold** — `env.py` has a hook that numbers revisions
+  sequentially, and `revision_environment = true` makes it fire for plain revisions too. Do not
+  hand-write migration files.
+- **`app/models/views.py` is deliberately NOT imported by `migrations/env.py`** — it maps the
+  `candidate_summary` VIEW, and importing it would make autogenerate emit CREATE/DROP TABLE for it.
+- The view is created by migration 004 and duplicated in `sql/candidate_summary.sql` (the
+  iterate-in-TablePlus copy). `scripts/check_view_migration.py` runs in CI and fails the build if
+  the two define different columns.
+- **Tombstoned (115-byte placeholders, not yet rebuilt):** `app/graphql/{types,schema}.py`,
+  `app/routers/experiments.py`, `app/importer/column_mapping.py`, `app/schemas/pydantic.py`.
+  The live HTTP surface is only `/health`, `/demo`, `/demo/pdb/{id}`, `/static`.
+- The GraphQL context is designed to pass the SQLAlchemy engine (not a session) so each resolver
+  opens its own — avoids session-lifetime issues with async resolvers. Not yet implemented.
+- asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
+  parameter cannot be reused across an INSERT target column and a comparison.
 - Tests use testcontainers (pulls `postgres:16-alpine` at runtime) or `TEST_DATABASE_URL`
   env var if you want to point at an existing Postgres.
 

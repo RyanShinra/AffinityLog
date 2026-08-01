@@ -1,5 +1,18 @@
 # Chapter 3 — GraphQL Schema-First Redesign (handoff)
 
+> ⚠️ **HISTORICAL in its factual claims, CURRENT in its design. See [`README.md`](README.md) here.**
+>
+> Written before real data landed. Statements below that no real candidate output exists, and any
+> description of the pre-003 columns (`binding_affinity_kd`, `humanness_score`, `raw_scores`), are
+> **out of date** — see the root `README.md` for the schema as it now stands.
+>
+> **The design intent still holds** and is the reason the catalog exists: GraphQL is the *apparent
+> representation*, shaped for how a client wants to read the data, and deliberately not a 1:1
+> mirror of the SQL schema. The `metrics` catalog (144 rows, with display names, units, directions
+> and caveats) was built specifically to feed the `ScoreEntry` resolver described here.
+>
+> The resolvers remain unimplemented — `app/graphql/{types,schema}.py` are 115-byte placeholders.
+
 > Read this cold on the Mac to continue. Companion docs: `docs/catalog-seed-plan.md` (Chapter 2),
 > `docs/schema-erd.md` (current + planned schema, mermaid — SQL ERD *and* the GraphQL apparent
 > representation, side by side), `bio-discovery-scrape-handoff.md` (the scrape),

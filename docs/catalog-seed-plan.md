@@ -1,5 +1,16 @@
 # Chapter 2 — Catalog Seeding (plan & multi-machine handoff)
 
+> ⚠️ **HISTORICAL — parts of this are stale. See [`README.md`](README.md) in this folder.**
+>
+> Written before any real Bio Discovery experiment had run, so it plans to curate the catalog from
+> module READMEs — i.e. to guess what each module *might* emit. **That approach was inverted.** With
+> 9 real experiments loaded, the corpus is the source of truth for what exists
+> (`scripts/extract_score_keys.py` derives 138 metric identities from it) and the READMEs supply only
+> meaning. Anywhere below that says no experiment data exists is no longer true.
+>
+> Its **mechanics were followed and are still accurate**: JSON seed file, idempotent upserts on
+> natural keys, two-pass name→id FK resolution, provenance on metrics. The catalog was built this way.
+
 > Read this cold on the PC to continue. Authored on the Mac at the end of the data-layer chapter.
 
 ## Where we are
