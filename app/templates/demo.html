@@ -59,8 +59,8 @@
     /* --- provenance panel --- */
     .lineage { margin:0 0 1.5rem; }
     .lineage .fp { color:#8b949e; font-size:.8rem; margin:0 0 .4rem; }
-    tr.feat td { background:#132a13; }              /* the row that's also a 3D tab above */
-    tr.feat td:first-child { border-left:2px solid #3fb950; }
+    tr.viewable td { background:#132a13; }          /* this molecule has a structure you can open above */
+    tr.viewable td:first-child { border-left:2px solid #3fb950; }
   </style>
 </head>
 <body>
@@ -118,7 +118,7 @@
 
   {% if lineages %}
   <h2>One molecule, two experiments — follow the fingerprint</h2>
-  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. The featured 3D structure is the <span style="color:#3fb950">highlighted</span> row.<br />
+  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. Rows you can open in 3D above are <span style="color:#3fb950">highlighted</span>.<br />
   <strong>Check the <em>ipTM interface type</em> column before comparing ipTM down a lineage:</strong> a fold with no HER2 in it scores the antibody's own heavy&ndash;light pairing, not binding &mdash; same column, different physical meaning.</p>
   {% for hash, rows in lineages.items() %}
     <div class="lineage">
@@ -136,7 +136,7 @@
         </thead>
         <tbody>
         {% for r in rows %}
-          <tr class="{{ 'feat' if r.is_featured }}">
+          <tr class="{{ 'viewable' if r.has_structure }}">
             <td>{{ r.experiment }}</td>
             <td><code>{{ r.candidate }}</code></td>
             <td>{{ r.chains }}</td>
@@ -222,10 +222,22 @@
         const isFirst = firstViewer === null;
         if (isFirst) firstViewer = v;
         btn.className = "tab" + (isFirst ? " active" : "");
+        // Built structurally rather than with innerHTML. Everything on this button is DB-derived
+        // and currently harmless (an 8-hex id and a number), but the field sitting right next to
+        // them — v.experiment — is free text out of a CSV export. textContent keeps this safe by
+        // construction instead of safe by which field someone happened to choose.
+        btn.textContent = v.label;
+
         // ipTM on the button face so the three bands are legible before anything is clicked.
+        const iptm = document.createElement("span");
+        iptm.className = "iptm";
+        // toFixed(3) to match the table: Postgres rounds to 3 dp, but JSON turns Decimal("0.000")
+        // into the number 0, which would render as a bare "0" beside a table cell reading 0.000.
         // null (never folded) can't reach here — those rows have no structure file — but the
-        // guard keeps this honest if that ever changes.
-        btn.innerHTML = `${v.label}<span class="iptm">${v.iptm ?? "—"}</span>`;
+        // guard keeps this honest if that ever changes. `== null` catches null and undefined
+        // without swallowing a legitimate 0.
+        iptm.textContent = v.iptm == null ? "—" : Number(v.iptm).toFixed(3);
+        btn.appendChild(iptm);
         btn.onclick = () => {
           // Clear across ALL rows, not just this one — selection is global to the single viewer.
           document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));

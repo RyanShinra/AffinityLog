@@ -161,8 +161,9 @@ async def demo_page(request: Request, session: Annotated[AsyncSession, Depends(g
                 "interface_kind": c.interface_kind,
                 "iptm": c.iptm,
                 "humanness_oasis": c.humanness_oasis,
-                # Drives the highlight: this row is one you can click a tab for above.
-                "is_featured": c.candidate_id in renderable,
+                # Drives the row highlight: this molecule has a structure you can open above.
+                # (Named for what it means now — there is no "featured" list any more.)
+                "has_structure": c.candidate_id in renderable,
             }
         )
     # A fingerprint on a single row tells no cross-experiment story — drop the singletons.

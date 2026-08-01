@@ -29,7 +29,12 @@ EXPECTED_TABLES: set[str] = {
 
 
 def test_all_tables_register() -> None:
-    assert set(ModelBase.metadata.tables) == EXPECTED_TABLES
+    # Views map onto ModelBase too (CandidateSummary -> the candidate_summary VIEW), so they appear
+    # in this shared metadata the moment anything imports app.models.views — which importing the
+    # demo router does. Filtering on the same skip_autogenerate flag Alembic keys off keeps this an
+    # assertion about real TABLES, and keeps it independent of which tests ran first.
+    real_tables = {name for name, t in ModelBase.metadata.tables.items() if not t.info.get("skip_autogenerate")}
+    assert real_tables == EXPECTED_TABLES
 
 
 def test_metric_identity_is_nulls_not_distinct() -> None:
