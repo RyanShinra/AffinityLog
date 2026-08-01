@@ -108,6 +108,51 @@ Three layers, each solving a different problem.
 Values are stored as **text, uncoerced**. 200 distinct keys across the corpus; a new recipe with new
 columns needs no migration.
 
+<details>
+<summary><b>"JSONB bag, GIN-indexed" — what that actually means</b> (worth expanding if you haven't used Postgres this way)</summary>
+
+**JSONB** is a Postgres column type that stores a whole JSON document per row, parsed into a binary
+form rather than kept as text. So one `candidates` row holds one `scores` document containing however
+many key/value pairs that experiment happened to produce. "Bag" is just an informal name for the fact
+that it is an *unstructured* pile of pairs — no fixed set of keys, no schema, and two rows can hold
+completely different ones. That is the whole reason it's here: recipes emit different columns, so
+there is no correct fixed column list to migrate to.
+
+**GIN** stands for *Generalized Inverted Index*, and the important word is **inverted**.
+
+A normal B-tree index — the default, and what the `id` and `(experiment_id, sequence_id)` indexes
+above are — maps *one value per row* to that row. That works because a row has exactly one `id`. But
+a JSONB document holds *many* keys, so a B-tree over the `scores` column could only answer "find the
+row whose entire document equals this exact document," which is useless.
+
+An inverted index flips the direction. Instead of `row → its contents`, it stores
+`content → the rows containing it`, exactly like the index at the back of a book maps a word to the
+pages it appears on. Postgres walks every key (and value) inside every document and records which
+rows contain each one. In this corpus that's 200 distinct keys across 1,132 total key occurrences,
+all pointing back at 14 rows.
+
+That makes containment and existence questions fast — the ones written with JSONB's own operators:
+
+```sql
+SELECT * FROM candidates WHERE scores ? 'boltz2.protein_iptm';        -- has this key?
+SELECT * FROM candidates WHERE scores @> '{"temstapro.thermophilicity.H": "mesophilic"}';
+```
+
+**The catch worth knowing:** a GIN index does *not* help when you pull a value out and compare it,
+which is what the view does everywhere:
+
+```sql
+WHERE (scores->>'boltz2.protein_iptm')::numeric > 0.5     -- GIN index not used
+```
+
+`->>` extracts, casts, then compares — that's a computed expression, not a containment test, so
+Postgres scans. Making *that* fast needs a separate expression index on that specific key. At 14 rows
+it is entirely academic here; on a real corpus it is the difference between the index you have and
+the index you need. The trade-offs to weigh: GIN indexes are larger than B-trees and slower to
+update, since a single insert touches one entry per key in the document.
+
+</details>
+
 ### 2. The normalized parts — what the bag cannot answer
 
 `candidate_chains` holds 0..N chains per candidate (`HEAVY`, `LIGHT`, `TARGET`) with their sequences.
