@@ -17,7 +17,14 @@
     code { color:#79c0ff; }
 
     /* --- 3D viewer --- */
-    .tabs { display:flex; gap:.5rem; margin-bottom:.75rem; flex-wrap:wrap; }
+    /* Tabs are grouped by interface kind. The grouping is not decoration: the ipTM printed on each
+       button means a different physical quantity per group, so the headings are what stop a reader
+       comparing 0.95 (heavy-light pairing) against 0.79 (real HER2 binding). */
+    .tabs { margin-bottom:.75rem; }
+    .tab-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:.5rem; }
+    .tab-group-label { color:#8b949e; font-size:.75rem; min-width:13rem; text-transform:uppercase;
+                       letter-spacing:.03em; }
+    .tab .iptm { opacity:.75; font-variant-numeric:tabular-nums; margin-left:.4rem; }
     .tab { background:#161b22; color:#8b949e; border:1px solid #30363d; border-radius:6px;
            padding:.45rem .9rem; font-size:.85rem; cursor:pointer; font-family:inherit; }
     .tab:hover { border-color:#58a6ff; color:#c9d1d9; }
@@ -52,15 +59,16 @@
     /* --- provenance panel --- */
     .lineage { margin:0 0 1.5rem; }
     .lineage .fp { color:#8b949e; font-size:.8rem; margin:0 0 .4rem; }
-    tr.feat td { background:#132a13; }              /* the row that's also a 3D tab above */
-    tr.feat td:first-child { border-left:2px solid #3fb950; }
+    tr.viewable td { background:#132a13; }          /* this molecule has a structure you can open above */
+    tr.viewable td:first-child { border-left:2px solid #3fb950; }
   </style>
 </head>
 <body>
   <h1>AffinityLog — the flexible schema, in the flesh</h1>
-  <p class="sub">Featured antibody&ndash;HER2 complexes, pulled live from the <code>candidate_summary</code> view. Empty cells = a metric that recipe never emitted.</p>
+  <p class="sub">The whole corpus, pulled live from the <code>candidate_summary</code> view. Empty cells = a metric that recipe never emitted.</p>
 
-  <h2>Designed binders on HER2</h2>
+  <h2>Every structure in the corpus</h2>
+  <p class="sub">Grouped by what was actually folded, because <strong>ipTM measures a different thing in each group</strong> &mdash; and the numbers on the buttons show it: a lone antibody's heavy&ndash;light pairing scores ~0.95 because those two chains evolved to snap together, while genuinely predicting a binder onto HER2 lands between 0.20 and 0.79. Sorting the whole page by ipTM would put every target&ndash;free fold above every real complex.</p>
   <div class="tabs" id="tabs"></div>
   <div class="stage" id="stage"></div>
   <p class="caption" id="caption"></p>
@@ -72,6 +80,7 @@
   </div>
 
   <h2>The numbers behind the picture</h2>
+  <p class="sub">Every candidate in the database &mdash; not just the ones with a structure above. The rows with <em>no</em> ipTM are the ones that were never folded: they went down the humanization branch instead and carry a humanness score where the folded rows carry a structure. Those complementary gaps are the flexible schema doing its job, at corpus scale.</p>
   <table>
     <thead>
       <tr>
@@ -80,7 +89,7 @@
         <th data-tip="Which chains went into the fold. HEAVY and LIGHT are the antibody's own two chains; TARGET is the antigen it was folded against (HER2 here).">chains</th>
         <th data-tip="md5 of the heavy+light sequences, target excluded. Two rows sharing this value are the SAME antibody — it's how one molecule is traced across experiments.">fingerprint</th>
         <th data-tip="How many metrics this candidate's JSONB bag holds. It varies by recipe — absorbing that variation without a schema change is the whole point.">#scores</th>
-        <th data-tip="What the ipTM value actually measures, derived from which chains are present. Without a TARGET chain there is no binding to score.">interface</th>
+        <th data-tip="What the ipTM value actually measures, derived from which chains are present. Without a TARGET chain there is no binding to score.">ipTM interface type</th>
         <th data-tip="Interface predicted TM-score (0–1): the model's confidence in how the chains sit relative to each other. NOT an affinity. Only compare it between rows of the same interface kind.">ipTM</th>
         <th data-tip="Predicted Local Distance Difference Test (0–1): confidence in the fold's shape itself, averaged over the complex. Independent of whether it binds.">pLDDT</th>
         <th data-tip="BioPhi's OASis percentile: how often this antibody's short peptides actually occur in human antibody repertoires. Higher = more human-looking = lower predicted immunogenicity risk.">humanness</th>
@@ -109,8 +118,8 @@
 
   {% if lineages %}
   <h2>One molecule, two experiments — follow the fingerprint</h2>
-  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. The featured 3D structure is the <span style="color:#3fb950">highlighted</span> row.<br />
-  <strong>Check the <em>interface</em> column before comparing ipTM down a lineage:</strong> a fold with no HER2 in it scores the antibody's own heavy&ndash;light pairing, not binding &mdash; same column, different physical meaning.</p>
+  <p class="sub">Antibodies sharing an <code>antibody_hash</code> (heavy+light, target excluded) are the <em>same binder</em>. Bio Discovery emitted each molecule's scores across <em>different rows in different CSVs</em> — humanness when it was humanized, structure when it was folded against HER2. Same hash, mirror-image empty cells. Rows you can open in 3D above are <span style="color:#3fb950">highlighted</span>.<br />
+  <strong>Check the <em>ipTM interface type</em> column before comparing ipTM down a lineage:</strong> a fold with no HER2 in it scores the antibody's own heavy&ndash;light pairing, not binding &mdash; same column, different physical meaning.</p>
   {% for hash, rows in lineages.items() %}
     <div class="lineage">
       <p class="fp">antibody_hash <code>{{ hash }}</code></p>
@@ -120,14 +129,14 @@
             <th data-tip="The Bio Discovery run this row came from. The same molecule appearing under two runs is exactly what this panel is showing.">experiment</th>
             <th data-tip="Bio Discovery's candidate id, shortened to 8 characters.">candidate</th>
             <th data-tip="Which chains went into this fold. The chain list is what makes the two rows' scores differ.">chains</th>
-            <th data-tip="What this row's ipTM measures. Read it before comparing the numbers down the column — they are not always the same quantity.">interface</th>
+            <th data-tip="What this row's ipTM measures. Read it before comparing the numbers down the column — they are not always the same quantity.">ipTM interface type</th>
             <th class="tip-left" data-tip="Interface predicted TM-score (0–1). A fold with no HER2 in it scores the antibody's own heavy–light pairing, which runs much higher than real binding — so these are only comparable within one interface kind.">ipTM</th>
             <th class="tip-left" data-tip="BioPhi's OASis humanness percentile. It appears on the row where the molecule was humanized, not on the row where it was folded — that's the split this panel reunites.">humanness&nbsp;(OASis)</th>
           </tr>
         </thead>
         <tbody>
         {% for r in rows %}
-          <tr class="{{ 'feat' if r.is_featured }}">
+          <tr class="{{ 'viewable' if r.has_structure }}">
             <td>{{ r.experiment }}</td>
             <td><code>{{ r.candidate }}</code></td>
             <td>{{ r.chains }}</td>
@@ -146,7 +155,9 @@
 
   <script>
     // The server hands us exactly what the viewer needs — no logic in the template.
-    const VIEWERS = {{ viewers | tojson }};
+    // Shape: [{kind: "antibody-target complex", items: [{label, iptm, pdb_url, epitope, ...}, ...]}, ...]
+    // Already in display order, each group already sorted by ipTM descending.
+    const VIEWER_GROUPS = {{ viewer_groups | tojson }};
 
     const CHAIN_COLORS = { H: "#58a6ff", L: "#3fb950", T: "#8b949e" };
     const EPITOPE_COLOR = "#f85149";
@@ -186,20 +197,60 @@
       caption.textContent = `${v.label} · ${v.experiment} · chains ${v.chains} · ${epi}`;
     }
 
-    // Build the tab strip; first candidate shown on load.
+    // Build the grouped tab strip: one labelled row per interface kind, one button per structure.
+    //
+    // Deliberately ONE viewer shared by every tab, not a grid of them. Each 3Dmol viewer holds a
+    // WebGL context and browsers cap those (~16); nine live contexts each rendering a ~600-residue
+    // complex would be slow on the demo machine even where it didn't hit the cap. Clicking a tab
+    // re-points the single viewer instead.
     const tabs = document.getElementById("tabs");
-    VIEWERS.forEach((v, i) => {
-      const btn = document.createElement("button");
-      btn.className = "tab" + (i === 0 ? " active" : "");
-      btn.textContent = v.label;
-      btn.onclick = () => {
-        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-        btn.classList.add("active");
-        show(v);
-      };
-      tabs.appendChild(btn);
+    let firstViewer = null;
+
+    VIEWER_GROUPS.forEach((group) => {
+      const row = document.createElement("div");
+      row.className = "tab-row";
+
+      const label = document.createElement("span");
+      label.className = "tab-group-label";
+      label.textContent = group.kind;           // e.g. "antibody-target complex"
+      row.appendChild(label);
+
+      group.items.forEach((v) => {
+        const btn = document.createElement("button");
+        // The server hands groups in display order and each group pre-sorted by ipTM descending,
+        // so the very first button built is the strongest real binder — the right default.
+        const isFirst = firstViewer === null;
+        if (isFirst) firstViewer = v;
+        btn.className = "tab" + (isFirst ? " active" : "");
+        // Built structurally rather than with innerHTML. Everything on this button is DB-derived
+        // and currently harmless (an 8-hex id and a number), but the field sitting right next to
+        // them — v.experiment — is free text out of a CSV export. textContent keeps this safe by
+        // construction instead of safe by which field someone happened to choose.
+        btn.textContent = v.label;
+
+        // ipTM on the button face so the three bands are legible before anything is clicked.
+        const iptm = document.createElement("span");
+        iptm.className = "iptm";
+        // toFixed(3) to match the table: Postgres rounds to 3 dp, but JSON turns Decimal("0.000")
+        // into the number 0, which would render as a bare "0" beside a table cell reading 0.000.
+        // null (never folded) can't reach here — those rows have no structure file — but the
+        // guard keeps this honest if that ever changes. `== null` catches null and undefined
+        // without swallowing a legitimate 0.
+        iptm.textContent = v.iptm == null ? "—" : Number(v.iptm).toFixed(3);
+        btn.appendChild(iptm);
+        btn.onclick = () => {
+          // Clear across ALL rows, not just this one — selection is global to the single viewer.
+          document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+          btn.classList.add("active");
+          show(v);
+        };
+        row.appendChild(btn);
+      });
+
+      tabs.appendChild(row);
     });
-    if (VIEWERS.length) show(VIEWERS[0]);
+
+    if (firstViewer) show(firstViewer);
   </script>
 </body>
 </html>
