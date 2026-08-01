@@ -100,6 +100,16 @@ class VariantKind(enum.Enum):
     # variant="transformed" — the existing UniqueConstraint(module_id, column_key, variant_kind,
     # variant) already handles the identity correctly.
     TRANSFORM = "transform"
+    # Added in migration 005. The discriminator is NOT a property of the metric definition — it is
+    # the shape of the candidate the value was computed on, i.e. which chains went into the fold.
+    # `boltz2.protein_iptm` measures HER2 binding (0.196-0.793) on an antibody-target complex, the
+    # antibody's own heavy-light pairing (~0.95) with no antigen present, and nothing at all (0.000)
+    # on a lone chain — one column, three quantities. The variant carries the meaning; the CASE in
+    # the candidate_summary view decides which one a given row has.
+    # Only metrics whose value COLLAPSES TO 0.000 without an interface use this (iptm,
+    # protein_iptm, complex_ipde); complex_iplddt/complex_plddt/ptm stay meaningful for a single
+    # chain, so despite the "i" in ipLDDT they are not interface-dependent.
+    INTERFACE = "interface"
 
 
 class Provenance(enum.Enum):
@@ -232,6 +242,15 @@ class Metric(ModelBase):
     provenance: Mapped[Provenance] = mapped_column(
         SAEnum(Provenance), default=Provenance.INFERRED, server_default=text("'INFERRED'")
     )
+
+    # Curator's free text: the caveat a consumer needs BEFORE trusting the number. This is where the
+    # hard-won warnings live — "~0.95 observed, but NOT binding: no antigen was in the fold", "0-1 in
+    # Boltz2 but 0-100 in ColabFold", "assembly-wide, so 2-chain and 3-chain folds aren't comparable".
+    # display_name says what a metric is called; `notes` says how it misleads. Seeded from
+    # seed/catalog.json, which is why it is nullable — the ~112 uncurated metrics carry no note
+    # rather than an invented one.
+    notes: Mapped[str | None] = mapped_column(Text)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     module: Mapped["Module"] = relationship(back_populates="metrics")

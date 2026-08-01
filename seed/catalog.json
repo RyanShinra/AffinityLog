@@ -1,0 +1,424 @@
+{
+  "_about": [
+    "Curated catalog: the MEANING layer for the score keys the corpus actually contains.",
+    "",
+    "Existence is not guessed. scripts/extract_score_keys.py derives 138 (module, column_key,",
+    "variant) identities from the 200 distinct keys in candidates.scores. This file curates the ~20",
+    "of those that a UI will actually show — display name, unit, direction, concept. The remaining",
+    "~118 are real and stay queryable via the JSONB bag; they simply carry no curated meaning yet,",
+    "which is honest rather than inventing units for bookkeeping columns.",
+    "",
+    "provenance: 'inferred' = read off a module README (docs/../model-reference/MODULE_OUTPUTS.md).",
+    "'aws_confirmed' = stated by AWS. Only pseudo_perplexity and the SFvCSP transform qualify.",
+    "",
+    "Re-runnable: scripts/seed_catalog.py upserts on natural keys, so edit and re-run freely."
+  ],
+
+  "concepts": [
+    {
+      "name": "interface_confidence",
+      "label": "Interface confidence",
+      "description": "Is the predicted contact between two chains real? Scale and meaning vary by producing module, and for Boltz2 also by which chains were folded - see the INTERFACE variants."
+    },
+    {
+      "name": "fold_confidence",
+      "label": "Fold confidence",
+      "description": "Is the predicted 3D shape right? Independent of whether anything binds. 0-1 in Boltz2 but 0-100 in ColabFold/ESMFold, so never compare across modules."
+    },
+    {
+      "name": "epitope",
+      "label": "Epitope",
+      "description": "Which residues of the target the binder contacts."
+    },
+    {
+      "name": "humanness",
+      "label": "Humanness",
+      "description": "How closely a sequence resembles human antibody repertoires; a proxy for immunogenicity risk, not a measurement of it."
+    },
+    {
+      "name": "sequence_liability",
+      "label": "Sequence liability",
+      "description": "Motifs that degrade, modify or misbehave during manufacture and storage."
+    },
+    {
+      "name": "thermostability",
+      "label": "Thermostability",
+      "description": "Resistance to thermal denaturation."
+    },
+    {
+      "name": "sequence_naturalness",
+      "label": "Sequence naturalness",
+      "description": "How probable a sequence is under a protein language model. Different models disagree, so the model is part of the metric's identity."
+    },
+    {
+      "name": "paratope_physchem",
+      "label": "Paratope physicochemistry",
+      "description": "Charge and hydrophobicity properties of the binding loops."
+    }
+  ],
+
+  "modules": [
+    {
+      "name": "boltz2",
+      "module_type": "SCORE",
+      "functions": ["FOLDING_LIKELIHOOD", "BINDING_PREDICTION"],
+      "description": "Co-folding model: predicts the 3D structure of a complex and its confidence."
+    },
+    {
+      "name": "structure_analysis_boltz2",
+      "module_type": "SCORE",
+      "functions": ["BINDING_PREDICTION"],
+      "description": "Geometric analysis of a Boltz2 structure: epitope residues, interface distances, chain lengths."
+    },
+    {
+      "name": "biophi",
+      "module_type": "DESIGN_AND_SCORE",
+      "functions": ["IMMUNOGENICITY"],
+      "description": "Humanizes an antibody and scores humanness against the Observed Antibody Space (OAS) repertoires."
+    },
+    {
+      "name": "humatchclassify",
+      "module_type": "SCORE",
+      "functions": ["IMMUNOGENICITY"],
+      "description": "CNN humanness classifier; an independent second opinion alongside BioPhi's OASis."
+    },
+    {
+      "name": "liabilities",
+      "module_type": "SCORE",
+      "functions": ["DEVELOPABILITY"],
+      "description": "Counts sequence motifs known to cause manufacturing or storage problems."
+    },
+    {
+      "name": "temstapro",
+      "module_type": "SCORE",
+      "functions": ["STABILITY"],
+      "description": "Predicts thermostability from sequence using protein language model embeddings."
+    },
+    {
+      "name": "evoprotgrad",
+      "module_type": "DESIGN_AND_SCORE",
+      "functions": ["DIRECTED_EVOLUTION", "EVOLUTIONARY_LIKELIHOOD"],
+      "description": "Gradient-guided directed evolution over a protein language model."
+    },
+    {
+      "name": "esm2pseudo_log_likelihood",
+      "module_type": "SCORE",
+      "functions": ["EVOLUTIONARY_LIKELIHOOD"],
+      "description": "ESM2 pseudo-log-likelihood over a sequence."
+    },
+    {
+      "name": "fastdpe",
+      "module_type": "SCORE",
+      "functions": ["DEVELOPABILITY", "HYDROPHOBICITY"],
+      "description": "Fast developability profile estimation: paratope charge, hydrophobicity, CDR geometry."
+    }
+  ],
+
+  "metrics": [
+    {
+      "module": "boltz2",
+      "column_key": "protein_iptm",
+      "display_name": "HER2 binding confidence",
+      "value_type": "FLOAT",
+      "unit": null,
+      "direction": "HIGHER_IS_BETTER",
+      "variant_kind": "INTERFACE",
+      "variant": "antibody-target complex",
+      "concept": "interface_confidence",
+      "property_categories": ["binding"],
+      "provenance": "INFERRED",
+      "notes": "0.196-0.793 observed in this corpus. Assembly-wide, so a 2-chain H/T fold and a 3-chain H/L/T fold are not strictly comparable even within this variant."
+    },
+    {
+      "module": "boltz2",
+      "column_key": "protein_iptm",
+      "display_name": "Heavy-light pairing confidence",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "variant_kind": "INTERFACE",
+      "variant": "antibody only (H/L pairing)",
+      "concept": "interface_confidence",
+      "property_categories": ["structure"],
+      "provenance": "INFERRED",
+      "notes": "~0.95 observed. NOT binding: no antigen was in the fold. Runs higher than any genuine complex, so it tops a naive ipTM leaderboard."
+    },
+    {
+      "module": "boltz2",
+      "column_key": "protein_iptm",
+      "display_name": "ipTM (no interface)",
+      "value_type": "FLOAT",
+      "direction": "NEUTRAL",
+      "variant_kind": "INTERFACE",
+      "variant": "single chain (no interface)",
+      "concept": "interface_confidence",
+      "property_categories": ["structure"],
+      "provenance": "INFERRED",
+      "notes": "Always 0.000 - one chain has no interface. Direction NEUTRAL on purpose: a constant is not a quality signal and must not be sorted on."
+    },
+
+    {
+      "module": "boltz2",
+      "column_key": "iptm",
+      "display_name": "Interface confidence (overall)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "variant_kind": "INTERFACE",
+      "variant": "antibody-target complex",
+      "concept": "interface_confidence",
+      "property_categories": ["binding"],
+      "provenance": "INFERRED",
+      "notes": "Tracks protein_iptm exactly in this corpus; kept separate because Boltz2 emits both."
+    },
+    {
+      "module": "boltz2",
+      "column_key": "iptm",
+      "display_name": "Interface confidence (H/L pairing only)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "variant_kind": "INTERFACE",
+      "variant": "antibody only (H/L pairing)",
+      "concept": "interface_confidence",
+      "property_categories": ["structure"],
+      "provenance": "INFERRED"
+    },
+    {
+      "module": "boltz2",
+      "column_key": "iptm",
+      "display_name": "ipTM (no interface)",
+      "value_type": "FLOAT",
+      "direction": "NEUTRAL",
+      "variant_kind": "INTERFACE",
+      "variant": "single chain (no interface)",
+      "concept": "interface_confidence",
+      "property_categories": ["structure"],
+      "provenance": "INFERRED"
+    },
+
+    {
+      "module": "boltz2",
+      "column_key": "complex_ipde",
+      "display_name": "Interface distance error",
+      "value_type": "FLOAT",
+      "unit": "angstrom",
+      "direction": "LOWER_IS_BETTER",
+      "variant_kind": "INTERFACE",
+      "variant": "antibody-target complex",
+      "concept": "interface_confidence",
+      "property_categories": ["binding"],
+      "provenance": "INFERRED",
+      "notes": "9.52 A for real complexes vs 0.47 A for H/L pairing - the same trap as ipTM, inverted, because lower is better here. Unit spelled out rather than the Angstrom sign: this string reaches Windows consoles."
+    },
+    {
+      "module": "boltz2",
+      "column_key": "complex_plddt",
+      "display_name": "Fold confidence (pLDDT)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "concept": "fold_confidence",
+      "property_categories": ["structure"],
+      "provenance": "INFERRED",
+      "notes": "0-1 in Boltz2 but 0-100 in ColabFold/ESMFold/RoseTTAFold2. No INTERFACE variant: it stays meaningful (0.906) for a lone chain."
+    },
+
+    {
+      "module": "structure_analysis_boltz2",
+      "column_key": "num_epitope_residues",
+      "display_name": "Epitope residue count",
+      "value_type": "INT",
+      "direction": "NEUTRAL",
+      "concept": "epitope",
+      "property_categories": ["binding"],
+      "provenance": "INFERRED",
+      "notes": "Neutral: a bigger contact patch is not automatically better."
+    },
+    {
+      "module": "structure_analysis_boltz2",
+      "column_key": "epitope_residues",
+      "display_name": "Epitope residues",
+      "value_type": "CATEGORICAL",
+      "direction": "NEUTRAL",
+      "concept": "epitope",
+      "property_categories": ["binding"],
+      "provenance": "INFERRED",
+      "notes": "Semicolon-delimited residue numbers in the Boltz2 PDB's own numbering, which is why the 3D viewer can paint them without remapping. Typed CATEGORICAL because MetricValueType has no LIST/TEXT member - the least-wrong fit, worth revisiting."
+    },
+    {
+      "module": "structure_analysis_boltz2",
+      "column_key": "min_interface_dist",
+      "display_name": "Closest interface contact",
+      "value_type": "FLOAT",
+      "unit": "angstrom",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "interface_confidence",
+      "property_categories": ["binding"],
+      "provenance": "INFERRED"
+    },
+
+    {
+      "module": "biophi",
+      "column_key": "OASis Percentile_Before",
+      "display_name": "Humanness before humanization (OASis)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "concept": "humanness",
+      "property_categories": ["immunogenicity"],
+      "provenance": "INFERRED",
+      "notes": "The Before/After pair is the only place the humanization step's effect is visible as a number."
+    },
+    {
+      "module": "biophi",
+      "column_key": "OASis Percentile_After",
+      "display_name": "Humanness after humanization (OASis)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "concept": "humanness",
+      "property_categories": ["immunogenicity"],
+      "provenance": "INFERRED",
+      "notes": "Percentile against OAS repertoires. Our humanized line sits at 0.24 - honestly not very human yet."
+    },
+    {
+      "module": "biophi",
+      "column_key": "Non-human Peptides_After",
+      "display_name": "Non-human peptides",
+      "value_type": "INT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "humanness",
+      "property_categories": ["immunogenicity"],
+      "provenance": "INFERRED"
+    },
+    {
+      "module": "humatchclassify",
+      "column_key": "CNN_H",
+      "display_name": "Humanness (Humatch CNN, heavy chain)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "concept": "humanness",
+      "property_categories": ["immunogenicity"],
+      "provenance": "INFERRED",
+      "notes": "Independently trained from OASis, so the two can disagree - which is the point of running both."
+    },
+
+    {
+      "module": "liabilities",
+      "column_key": "critical_count",
+      "display_name": "Critical liabilities",
+      "value_type": "INT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "sequence_liability",
+      "property_categories": ["developability"],
+      "provenance": "INFERRED"
+    },
+    {
+      "module": "liabilities",
+      "column_key": "total_count",
+      "display_name": "Total liabilities",
+      "value_type": "INT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "sequence_liability",
+      "property_categories": ["developability"],
+      "provenance": "INFERRED"
+    },
+    {
+      "module": "liabilities",
+      "column_key": "n_glycosylation_cdr",
+      "display_name": "N-glycosylation site in CDR",
+      "value_type": "INT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "sequence_liability",
+      "property_categories": ["developability"],
+      "provenance": "INFERRED",
+      "notes": "The most serious of the set: a glycan attached inside a binding loop can abolish binding outright, unlike a framework site."
+    },
+    {
+      "module": "liabilities",
+      "column_key": "met_oxidation",
+      "display_name": "Methionine oxidation sites",
+      "value_type": "INT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "sequence_liability",
+      "property_categories": ["developability"],
+      "provenance": "INFERRED"
+    },
+    {
+      "module": "liabilities",
+      "column_key": "isomerization",
+      "display_name": "Isomerization sites",
+      "value_type": "INT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "sequence_liability",
+      "property_categories": ["developability"],
+      "provenance": "INFERRED"
+    },
+
+    {
+      "module": "temstapro",
+      "column_key": "thermophilicity",
+      "display_name": "Thermostability class",
+      "value_type": "CATEGORICAL",
+      "direction": "NEUTRAL",
+      "concept": "thermostability",
+      "property_categories": ["stability"],
+      "provenance": "INFERRED",
+      "notes": "mesophilic | thermophilic. Categorical, so no direction."
+    },
+    {
+      "module": "temstapro",
+      "column_key": "t50_raw",
+      "display_name": "Thermostability score (50 C threshold)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "concept": "thermostability",
+      "property_categories": ["stability"],
+      "provenance": "INFERRED",
+      "notes": "One representative cutoff. TemStaPro emits t40-t80 in raw and binary form - 22 columns sampling one concept at nine temperatures."
+    },
+
+    {
+      "module": "evoprotgrad",
+      "column_key": "pseudolikelihood_ratio",
+      "display_name": "Pseudolikelihood ratio (ESM)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "variant_kind": "PARAMETER",
+      "variant": "esm",
+      "concept": "sequence_naturalness",
+      "property_categories": ["design"],
+      "provenance": "INFERRED",
+      "notes": "EvoProtGrad names the column after the language model (esm_pseudolikelihood_ratio), so the model is recoverable from the data alone. Modelled as one metric with two PARAMETER variants rather than two metrics."
+    },
+    {
+      "module": "evoprotgrad",
+      "column_key": "pseudolikelihood_ratio",
+      "display_name": "Pseudolikelihood ratio (AMPLIFY)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "variant_kind": "PARAMETER",
+      "variant": "amplify",
+      "concept": "sequence_naturalness",
+      "property_categories": ["design"],
+      "provenance": "INFERRED"
+    },
+    {
+      "module": "esm2pseudo_log_likelihood",
+      "column_key": "pseudo_perplexity",
+      "display_name": "ESM2 pseudo-perplexity",
+      "value_type": "FLOAT",
+      "direction": "LOWER_IS_BETTER",
+      "concept": "sequence_naturalness",
+      "property_categories": ["design"],
+      "provenance": "AWS_CONFIRMED",
+      "notes": "One of only two AWS-confirmed entries in this catalog. Lower = the model finds the sequence more natural."
+    },
+    {
+      "module": "fastdpe",
+      "column_key": "SFvCSP",
+      "display_name": "SFvCSP (Fv charge symmetry)",
+      "value_type": "FLOAT",
+      "direction": "HIGHER_IS_BETTER",
+      "concept": "paratope_physchem",
+      "property_categories": ["developability"],
+      "provenance": "AWS_CONFIRMED",
+      "notes": "The Mahalanobis transform is AWS-confirmed. A raw and a '-transformed' form exist; when the transformed variant is seeded it uses VariantKind.TRANSFORM."
+    }
+  ]
+}
