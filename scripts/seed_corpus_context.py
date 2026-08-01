@@ -18,9 +18,10 @@ database instead of the filesystem.
 
 IDEMPOTENCE
 -----------
-projects/targets upsert on their natural key (name). `artifacts` has no unique constraint, so
-inserts are guarded with WHERE NOT EXISTS on the uri. A UNIQUE(uri) constraint would be the stronger
-fix and is worth a future migration; this keeps the script re-runnable without one.
+Everything here is look-then-insert rather than `ON CONFLICT`, because none of these three tables
+has a unique constraint to conflict on — see the note above `_get_or_create_target`. Adding
+UNIQUE(name) to targets/projects and UNIQUE(uri) to artifacts would let this use real upserts and
+would close the (harmless here, single-operator) race; it is worth a future migration.
 
 Experiment links are only filled in where they are NULL, so a hand-corrected row is never
 overwritten by a re-run.
@@ -69,15 +70,14 @@ PROJECT_NOTES: Final[str] = (
 # rather than a decision (these are the same sort of named reference entity), and a UNIQUE(name) on
 # both would be worth a future migration.
 #
-# Until then these are get-or-create: insert only if absent, then return whichever row exists. The
-# CTE does it in one statement — the INSERT ... WHERE NOT EXISTS runs first, and the outer SELECT
-# unions its result with a lookup so exactly one id comes back either way. Strictly this is racy
-# without the constraint (two concurrent runs could both insert), which is acceptable for a
-# single-operator seeder and is precisely what the missing constraint would fix.
-# Deliberately two statements rather than one clever CTE. A single INSERT ... WHERE NOT EXISTS ...
-# UNION ALL SELECT reuses :name in both an INSERT target-column position and a comparison, and
-# asyncpg refuses it: "inconsistent types deduced for parameter $1". Look-then-insert is legible and
-# has no type ambiguity; the extra round-trip is irrelevant for a handful of seed rows.
+# So these are get-or-create in two statements. The tidier single-statement version (INSERT ...
+# WHERE NOT EXISTS, UNION ALL a lookup, inside a CTE) does not survive asyncpg: reusing :name in
+# both an INSERT target-column position and a comparison makes it give up with "inconsistent types
+# deduced for parameter $1". Look-then-insert has no type ambiguity, reads plainly, and the extra
+# round-trip is irrelevant for a handful of seed rows.
+#
+# Strictly this is racy — two concurrent runs could both insert — which is exactly what the missing
+# UNIQUE(name) would prevent. Acceptable for a single-operator seeder.
 async def _get_or_create_target(session: AsyncSession) -> str:
     existing = await session.execute(text("SELECT id FROM targets WHERE name = :name"), {"name": TARGET_NAME})
     if (row := existing.first()) is not None:
