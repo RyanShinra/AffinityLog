@@ -15,6 +15,7 @@ against the running database before it was written.
 | [`demo-biology.md`](demo-biology.md) | The biology behind the `/demo` page, written for a software engineer with no biology background. Includes the humanization trade-off the featured structures illustrate, a glossary of the score names, and explicit caveats about what these numbers are not. |
 | [`recipe-topology-note.md`](recipe-topology-note.md) | Why recipe DAG *edges* are not stored yet, and what storing them would require. Still an open decision. |
 | [`published-data-goal.md`](published-data-goal.md) | The stretch goal: ingest published external antibody data to test whether the schema is genuinely general rather than fitted to one vendor's export. Not started. |
+| [`graphql-schema.md`](graphql-schema.md) | **The committed GraphQL spec.** The SDL, the four decisions behind its harder choices, and the measurements those rest on. Written before any resolver existed, so it was reviewed as a document rather than as already-typed code. Supersedes the SDL discussion in `graphql-schema-handoff.md`. |
 | [`schema-erd.md`](schema-erd.md) | Entity-relationship reference for the tables. Assumes some domain familiarity. |
 
 ## Historical — accurate about their moment, stale about now
@@ -25,7 +26,7 @@ state. Each carries a status banner at the top.
 | doc | why it is stale |
 |---|---|
 | [`catalog-seed-plan.md`](catalog-seed-plan.md) | Written before any real experiment ran, so it plans to curate the catalog from module READMEs — guessing what modules *might* emit. That approach was inverted once real data existed: the corpus is now the source of truth for what exists, and READMEs supply only meaning. Its *mechanics* (JSON seed file, idempotent upserts on natural keys, two-pass name→id resolution) were followed and are still accurate. |
-| [`graphql-schema-handoff.md`](graphql-schema-handoff.md) | The GraphQL layer was designed before the data landed. The type design and the "GraphQL is the apparent representation" principle still stand, but it describes a data model that predates migration 003 and states that no real candidate output exists. |
+| [`graphql-schema-handoff.md`](graphql-schema-handoff.md) | The GraphQL layer was designed before the data landed. The type design and the "GraphQL is the apparent representation" principle still stand, but it describes a data model that predates migration 003 and states that no real candidate output exists. Its SDL is now committed separately in [`graphql-schema.md`](graphql-schema.md) — read that for the contract, this for the reasoning. |
 | [`first-run-findings.md`](first-run-findings.md) | A deep analysis of the *first* real export (2026-07-04). Correct about that run; superseded in breadth by `schema-stress-log.md`, which covers all 11. |
 | [`aws-extension-letter.md`](aws-extension-letter.md) | Correspondence about extending the trial. Context only. |
 
