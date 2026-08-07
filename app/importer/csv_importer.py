@@ -45,7 +45,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.orm import Candidate, CandidateChain, Chain, Experiment
+from app.models.orm import Candidate, CandidateChain, ChainRole, Experiment
 
 # Columns that describe the row itself rather than a score a module emitted.
 # Everything NOT in here is a module output and belongs in the scores bag.
@@ -104,7 +104,7 @@ def parse_chains(row: dict[str, str]) -> list[CandidateChain]:
     seen: defaultdict[str, int] = defaultdict(int)
     chains: list[CandidateChain] = []
     for label, seq in zip(labels, parts, strict=True):
-        chains.append(CandidateChain(chain=Chain(label), sequence=seq, ordinal=seen[label]))
+        chains.append(CandidateChain(chain=ChainRole(label), sequence=seq, ordinal=seen[label]))
         seen[label] += 1
     return chains
 

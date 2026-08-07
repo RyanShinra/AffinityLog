@@ -493,8 +493,13 @@ class Candidate(ModelBase):
     artifacts: Mapped[list["Artifact"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
 
 
-class Chain(enum.Enum):
-    """Enum for chain types."""
+class ChainRole(enum.Enum):
+    """What part a chain plays in the assembly.
+    HEAVY and LIGHT are the antibody's own two chains;
+    TARGET is the antigen it was folded against
+      — a role, not a class of antibody chain,
+    which is why this is not ChainType.
+    """
 
     HEAVY = "H"
     LIGHT = "L"
@@ -509,7 +514,9 @@ class CandidateChain(ModelBase):
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"), index=True
     )
-    chain: Mapped[Chain] = mapped_column(SAEnum(Chain))
+    # TEMPORARY: name="chain" pins the Postgres type name so renaming the Python class needs no
+    # migration. Migration 007 renames the type to `chainrole`(inside the DB, the enums are all lowercase) and this pin comes out with it.
+    chain: Mapped[ChainRole] = mapped_column(SAEnum(ChainRole, name="chain"))
     sequence: Mapped[str] = mapped_column(Text)
     ordinal: Mapped[int] = mapped_column(INTEGER, default=0)  # disambiguates repeated labels (e.g. 2 target chains)
 

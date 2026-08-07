@@ -99,12 +99,12 @@ EXPERIMENT_LOADS = (
     selectinload(orm.Experiment.target),
 )
 
-# Wrap the ORM's Chain enum rather than declaring a parallel one. `strawberry.enum` registers the
-# existing class with the schema and returns it unchanged, so `orm.Chain` stays the single chain
+# Wrap the ORM's ChainRole enum rather than declaring a parallel one. `strawberry.enum` registers the
+# existing class with the schema and returns it unchanged, so `orm.ChainRole` stays the single chain
 # vocabulary — the same reasoning that keeps InterfaceKind in one place. The GraphQL enum exposes
 # the member NAMES (HEAVY/LIGHT/TARGET), not the values ("H"/"L"/"T"): that is the GraphQL
 # convention, and happens to be the more readable half of the pair.
-Chain = strawberry.enum(orm.Chain)
+ChainRole = strawberry.enum(orm.ChainRole)
 
 
 @strawberry.type
@@ -148,7 +148,7 @@ class Recipe:
 
 
 @strawberry.type
-class ChainSequence:
+class Chain:
     """One chain of a candidate.
 
     A candidate has 0..N of these, which is the point: nothing in the model assumes exactly one
@@ -156,13 +156,13 @@ class ChainSequence:
     `ordinal` disambiguates a repeated label — two TARGET chains, say.
     """
 
-    chain: orm.Chain
+    role: orm.ChainRole
     sequence: str
     ordinal: int
 
     @classmethod
-    def from_orm(cls, row: orm.CandidateChain) -> ChainSequence:
-        return cls(chain=row.chain, sequence=row.sequence, ordinal=row.ordinal)
+    def from_orm(cls, row: orm.CandidateChain) -> Chain:
+        return cls(role=row.chain, sequence=row.sequence, ordinal=row.ordinal)
 
 
 @strawberry.type
@@ -182,7 +182,7 @@ class Candidate:
     # `from_orm` raises MissingGreenlet if the caller forgot CANDIDATE_LOADS, because async
     # SQLAlchemy refuses to lazy-load from inside a running event loop. That failure is loud, which
     # is the reason to prefer it to a silent extra query per candidate.
-    chains: list[ChainSequence]
+    chains: list[Chain]
 
     # `strawberry.Private` keeps a field off the schema entirely: it exists on the Python object,
     # never appears in the SDL, and cannot be queried. The FK is needed by the resolver below, but
@@ -196,7 +196,7 @@ class Candidate:
             id=strawberry.ID(str(row.id)),
             sequence_id=row.sequence_id,
             annotation=row.annotation,
-            chains=[ChainSequence.from_orm(c) for c in row.chains],
+            chains=[Chain.from_orm(c) for c in row.chains],
             experiment_id=row.experiment_id,
         )
 

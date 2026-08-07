@@ -91,7 +91,7 @@ erDiagram
   CANDIDATE_CHAINS {
     uuid id PK "migration 003 (new)"
     uuid candidate_id FK
-    enum chain "H / L / T"
+    enum chain "H / L / T; migration 007 renames to role"
     text sequence
     int ordinal "disambiguates repeated labels"
   }
@@ -137,14 +137,14 @@ graph LR
   Q --> Mo[Module]
   Q --> Me[Metric]
 
-  C -->|chains| CC[ChainSequence]
+  C -->|chains| CC[Chain]
   C -.->|scores| SE[ScoreEntry - no table]
   C -->|experiment| E
   C -.->|target hoist| T[Target]
   C -->|artifacts| A[Artifact]
 
   SE -.->|metric, resolved| Me
-  SE --> CH{{Chain enum}}
+  SE --> CH{{ChainRole enum}}
   CC --> CH
 
   Me -->|module| Mo
@@ -165,7 +165,7 @@ graph LR
 |---|---|---|
 | `candidates.scores` — one JSONB column | `Candidate.scores: [ScoreEntry]` | Flexible blob stored; interpreted list projected. `ScoreEntry` has no table. |
 | `metrics` & `candidates` — no FK between them | `ScoreEntry.metric` resolves the link at query time | Resolver marries JSONB key ↔ catalog row; edge doesn't exist in SQL. |
-| `candidate_chains` rows (H/L/T) | `Candidate.chains: [ChainSequence]` | Roughly 1:1 — the one place they nearly match. |
+| `candidate_chains` rows (H/L/T) | `Candidate.chains: [Chain]` | Roughly 1:1 — the one place they nearly match. The column is `chain` and the field is `role` until migration 007 renames the column. |
 | candidate → experiment → target (2 FK hops) | `candidate.target` (1 hoisted field) | Apparent rep flattens the join into a convenience edge. |
 | `recipe_modules` M:N (+ wiring) | `recipe.modules` only; DAG hidden | Arbitrary graphical wiring is stored, not surfaced. |
 | every table full-CRUD | query-all + annotate-only mutation | Writes are REST (CSV import); GraphQL is reads + a sliver. |

@@ -50,7 +50,7 @@ is **not** a curation flag — 142 of 144 rows are `INFERRED`, including every h
 ## SDL
 
 ```graphql
-enum Chain { HEAVY LIGHT TARGET }
+enum ChainRole { HEAVY LIGHT TARGET }
 enum Direction { HIGHER_IS_BETTER LOWER_IS_BETTER NEUTRAL }
 enum MetricValueType { FLOAT INT BOOL CATEGORICAL }
 enum VariantKind { PARAMETER MODE SOURCE_MODEL COMPONENT TRANSFORM INTERFACE }
@@ -83,8 +83,8 @@ type Candidate {
   sequenceId: String!
   annotation: String
   interfaceKind: InterfaceKind!
-  chains: [ChainSequence!]!
-  scores(module: String, chain: Chain, concept: String): [ScoreEntry!]!
+  chains: [Chain!]!
+  scores(module: String, chain: ChainRole, concept: String): [ScoreEntry!]!
   experiment: Experiment!
   target: Target          # hoisted through experiment — two FK hops flattened to one field
   artifacts: [Artifact!]!
@@ -96,12 +96,12 @@ type ScoreEntry {
   key: String!            # the raw JSONB key, e.g. "boltz2.protein_iptm.H"
   value: String!          # raw text, exactly as stored — never coerced
   numericValue: Float     # null unless metric.valueType is FLOAT or INT
-  chain: Chain            # null for the 101 identities carrying no chain suffix
+  chain: ChainRole        # null for the 101 identities carrying no chain suffix
   metric: Metric          # nullable — see "Decisions" below
 }
 
-type ChainSequence {
-  chain: Chain!
+type Chain {
+  role: ChainRole!
   sequence: String!
   ordinal: Int!
 }
@@ -177,6 +177,25 @@ type BenchmarkResult {
 ---
 
 ## Decisions
+
+### `Chain` names the object; `ChainRole` names the enum
+
+Originally the enum was `Chain` and the object type was `ChainSequence`, which left `candidate.chains`
+returning a list of `ChainSequence` while `Chain` meant something else entirely — and in Python put
+`orm.Chain` beside a `chains` list of `CandidateChain` rows, close enough to read as SQL method
+chaining.
+
+`ChainRole` is the accurate name for the enum, and deliberately not `ChainType`: HEAVY and LIGHT are
+genuine structural classes of antibody chain, but TARGET is the antigen and not an antibody chain at
+all. The one word covering all three is the *part played* in the assembly. Renaming it also freed
+`Chain` for the object, which is what a chain actually is — a sequence with a role and an ordinal.
+
+**A rename is still pending underneath this.** The storage layer has the same problem in reverse:
+`candidate_chains.chain` holds the role while `candidate_chains.sequence` holds the actual chain. The
+column and Postgres type keep their current names for now — `SAEnum(ChainRole, name="chain")` pins the
+type so no migration was needed for the API rename. Migration 007 renames the column to `role` and the
+type to `chainrole`, and removes that pin. Until then the ORM attribute is `chain` while the GraphQL
+field is `role`, which is why `Chain.from_orm` maps `role=row.chain`.
 
 ### `interfaceKind` is an enum, and it has four members
 
