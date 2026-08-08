@@ -254,6 +254,37 @@ becomes a number forever.
 
 ---
 
+### Errors: deliberate ones speak for themselves, everything else is masked
+
+A resolver that raises does not fail the request. Strawberry catches it, puts `str(exception)` into
+the response's `errors` array, and nulls the field. No traceback is sent — but the *message* is, and
+that turned out to matter. Measured against the real database before anything was done about it:
+
+```
+broken statement   →  (asyncpg.ProgrammingError) column "nonexistent_column" does not exist
+                      [SQL: SELECT nonexistent_column FROM candidates]
+database down      →  [Errno 111] Connect call failed ('127.0.0.1', 5999)
+```
+
+The full statement text, and the internal host and port. (Credentials do not travel — checked
+specifically, with a password in the DSN.)
+
+The rule now is that **an error is shown iff it carries a deliberate `code` extension**. Anything
+raised on purpose sets one; nothing raised by SQLAlchemy, asyncpg, or an ordinary bug does. That
+convention needs no new exception hierarchy, and it is what Apollo uses.
+
+Two consequences worth knowing:
+
+- A malformed id and a well-formed id matching nothing are **different answers**. The first returns
+  `null` *and* an `errors` entry coded `BAD_USER_INPUT`; the second returns a plain `null`. Telling
+  someone who sent garbage that their record simply is not there would be the wrong answer.
+- Masking costs no diagnostics. The original error is logged to `strawberry.execution` before the
+  message is replaced, so the client loses the detail and the server keeps it.
+
+The policy lives in `app/graphql/errors.py`; `tests/test_error_masking.py` guards it, including an
+assertion that the served schema actually registers the extension — the failure mode here is silent,
+since masking that stops working breaks nothing and simply starts leaking again.
+
 ## The coupling nothing currently guards
 
 The three interface strings — `'antibody-target complex'`, `'antibody only (H/L pairing)'`,

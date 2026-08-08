@@ -71,10 +71,11 @@ are recorded so the decision is made against measurements rather than instinct.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import strawberry
-from sqlalchemy import select
+from sqlalchemy import Result, Select, select
 from sqlalchemy.orm import selectinload
 from strawberry.scalars import JSON
 
@@ -82,22 +83,6 @@ from app.models import orm as db
 
 if TYPE_CHECKING:
     from app.graphql.context import Context
-
-# What a Candidate needs loaded before `Candidate.from_row` can touch it, and what an Experiment
-# needs before `Experiment.from_row` can. Defined once, at module level, because there are several
-# call sites and the failure mode for getting it wrong is a MissingGreenlet at request time rather
-# than anything a type checker would catch. Both depend only on `db`, so they can sit up here.
-#
-# These are unconditional, which is their cost: EXPERIMENT_LOADS turns every experiment fetch into
-# four queries whether or not the client asked for a project, recipe or target. See the "MEASURED
-# COST" section of the module docstring — making them depend on `info.selected_fields` is the fix,
-# and it is a deliberate piece of work rather than a tweak.
-CANDIDATE_LOADS = selectinload(db.Candidate.chains)
-EXPERIMENT_LOADS = (
-    selectinload(db.Experiment.project),
-    selectinload(db.Experiment.recipe),
-    selectinload(db.Experiment.target),
-)
 
 # Wrap the ORM's ChainRole enum rather than declaring a parallel one. `strawberry.enum` registers the
 # existing class with the schema and returns it unchanged, so `db.ChainRole` stays the single chain
@@ -179,7 +164,7 @@ class Candidate:
     annotation: str | None
 
     # A plain field, not a resolver, so it costs nothing extra per candidate — but it does mean
-    # `from_row` raises MissingGreenlet if the caller forgot CANDIDATE_LOADS, because async
+    # `from_row` raises MissingGreenlet if the row did not come from `select_statement()`, because async
     # SQLAlchemy refuses to lazy-load from inside a running event loop. That failure is loud, which
     # is the reason to prefer it to a silent extra query per candidate.
     chains: list[Chain]
@@ -200,6 +185,11 @@ class Candidate:
             experiment_id=row.experiment_id,
         )
 
+    @staticmethod
+    def select_statement() -> Select[tuple[db.Candidate]]:
+        """Use when selecting candidate rows from the database."""
+        return select(db.Candidate).options(selectinload(db.Candidate.chains))
+
     @strawberry.field
     async def experiment(self, info: strawberry.Info[Context, None]) -> Experiment | None:
         """The run that produced this candidate.
@@ -211,14 +201,20 @@ class Candidate:
         This fires once per candidate that asks for it — N+1, and deliberate at this size. But note
         what it measured at rather than what it looks like: `candidates { experiment { name } }`
         costs **58** SELECTs, not 15, because each of the 14 experiment fetches also runs the three
-        EXPERIMENT_LOADS below it. The nested eager load is the larger half of that number.
+        eager loads inside `Experiment.select_statement()`. The nested eager load is the larger half
+        of that number.
 
         This is where a `strawberry.dataloader.DataLoader` goes — batching the ids into one
         `WHERE id = ANY(...)` would take the 14 down to 1, though it would not touch the ×4.
         """
-        stmt = select(db.Experiment).where(db.Experiment.id == self.experiment_id).options(*EXPERIMENT_LOADS)
-        row = (await info.context.session.execute(stmt)).scalar_one_or_none()
-        return Experiment.from_row(row) if row is not None else None
+        stmt: Select[tuple[db.Experiment]] = Experiment.select_statement().where(db.Experiment.id == self.experiment_id)
+        result: Result[tuple[db.Experiment]] = await info.context.session.execute(stmt)
+        # Filtered on the primary key, so at most one row. See the note in schema.py on why nothing
+        # here is wrapped in try/except, and why scalar_one_or_none is preferred to .first().
+        row: db.Experiment | None = result.scalar_one_or_none()
+        if row is None:
+            return None
+        return Experiment.from_row(row)
 
 
 @strawberry.type
@@ -240,7 +236,8 @@ class Experiment:
 
     @staticmethod
     def from_row(row: db.Experiment) -> Experiment:
-        """Map an ORM row whose project/recipe/target are already loaded (EXPERIMENT_LOADS)."""
+        """Map an ORM row whose project/recipe/target are already loaded — i.e. one that came from
+        `Experiment.select_statement()`."""
         return Experiment(
             id=strawberry.ID(str(row.id)),
             name=row.name,
@@ -256,19 +253,27 @@ class Experiment:
             target=Target.from_row(row.target) if row.target is not None else None,
         )
 
+    @staticmethod
+    def select_statement() -> Select[tuple[db.Experiment]]:
+        """Use when selecting experiment rows from the database."""
+        return select(db.Experiment).options(
+            selectinload(db.Experiment.project), selectinload(db.Experiment.recipe), selectinload(db.Experiment.target)
+        )
+
     @strawberry.field
     async def candidates(self, info: strawberry.Info[Context, None]) -> list[Candidate]:
         """The candidates this run produced — the other direction of the same N+1 trade-off.
 
-        Note the CANDIDATE_LOADS: without it, `Candidate.from_row` reaching for `row.chains` would
-        try to lazy-load inside the event loop and raise. Every path that builds a Candidate has to
-        satisfy that contract.
+        Starting from `Candidate.select_statement()` is not a style choice: without its selectinload,
+        `Candidate.from_row` reaching for `row.chains` would try to lazy-load inside the event loop
+        and raise. Every path that builds a Candidate has to satisfy that contract, which is why the
+        statement is only ever constructed there.
         """
-        stmt = (
-            select(db.Candidate)
+        stmt: Select[tuple[db.Candidate]] = (
+            Candidate.select_statement()
             .where(db.Candidate.experiment_id == uuid.UUID(self.id))
-            .options(CANDIDATE_LOADS)
             .order_by(db.Candidate.sequence_id)
         )
-        rows = (await info.context.session.execute(stmt)).scalars().all()
+        result: Result[tuple[db.Candidate]] = await info.context.session.execute(stmt)
+        rows: Sequence[db.Candidate] = result.scalars().all()
         return [Candidate.from_row(r) for r in rows]
