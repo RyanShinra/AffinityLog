@@ -162,9 +162,7 @@ class Chain:
 
     @classmethod
     def from_orm(cls, row: orm.CandidateChain) -> Chain:
-        # role=row.chain is intentional: the ORM attribute follows the column, which migration 007
-        # renames to `role`. Both sides say `role` after that.
-        return cls(role=row.chain, sequence=row.sequence, ordinal=row.ordinal)
+        return cls(role=row.role, sequence=row.sequence, ordinal=row.ordinal)
 
 
 @strawberry.type

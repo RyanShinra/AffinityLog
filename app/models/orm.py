@@ -514,9 +514,7 @@ class CandidateChain(ModelBase):
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"), index=True
     )
-    # TEMPORARY: name="chain" pins the Postgres type name so renaming the Python class needs no
-    # migration. Migration 007 renames the type to `chainrole`(inside the DB, the enums are all lowercase) and this pin comes out with it.
-    chain: Mapped[ChainRole] = mapped_column(SAEnum(ChainRole, name="chain"))
+    role: Mapped[ChainRole] = mapped_column(SAEnum(ChainRole))
     sequence: Mapped[str] = mapped_column(Text)
     ordinal: Mapped[int] = mapped_column(INTEGER, default=0)  # disambiguates repeated labels (e.g. 2 target chains)
 
