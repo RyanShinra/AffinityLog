@@ -34,30 +34,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import re
 from collections import defaultdict
-from typing import Final, NamedTuple
+from typing import NamedTuple
 
 from sqlalchemy import text
 
+# `decompose` used to live in this file, which is where it was born. It moved to app/ because the
+# GraphQL ScoreEntry resolver needs the SAME decomposition in the opposite direction — key in,
+# catalog row out — and two copies would drift silently. See app/catalog/keys.py for the full
+# reasoning and the key anatomy. This script is now one of its two callers, not its owner.
+from app.catalog.keys import decompose
 from app.database import AsyncSessionLocal
-
-# Trailing .H/.L/.T — the chain the value was measured on, not part of the metric's identity.
-_CHAIN_SUFFIX: Final[re.Pattern[str]] = re.compile(r"\.(H|L|T)$")
-
-# Columns whose name encodes a run PARAMETER rather than naming a distinct quantity. EvoProtGrad
-# reports the same statistic once per protein language model and distinguishes them by prefixing
-# the model name — so `esm_pseudolikelihood_ratio` and `amplify_pseudolikelihood_ratio` are ONE
-# metric with two variants, not two metrics. Splitting them here is what lets a consumer ask for
-# "pseudolikelihood ratio" and get both arms of the sweep.
-#
-# Format: module -> (regex with a `variant` and `column` group, VariantKind name)
-_VARIANT_RULES: Final[dict[str, tuple[re.Pattern[str], str]]] = {
-    "evoprotgrad": (
-        re.compile(r"^(?P<variant>esm|amplify)_(?P<column>pseudolikelihood_ratio)$"),
-        "PARAMETER",
-    ),
-}
 
 
 class MetricKey(NamedTuple):
@@ -69,34 +56,6 @@ class MetricKey(NamedTuple):
     variant: str | None
     chains: tuple[str, ...]  # which chain suffixes were seen for this metric (informational)
     raw_keys: tuple[str, ...]  # the literal JSONB keys that collapsed into this row
-
-
-# Two keys in the corpus ("tier", "recommendation") carry NO module prefix — they are run-level
-# verdicts the exporter attaches to the whole result, not a module's output. `recommendation` is
-# even a paragraph of AI-generated prose. Filing them under a synthetic module keeps them in the
-# skeleton (nothing silently lost) while flagging that they are not really module metrics.
-_NO_MODULE: Final[str] = "_export"
-
-
-def decompose(key: str) -> tuple[str, str, str | None, str | None, str | None]:
-    """Split one raw JSONB key into (module, column_key, variant_kind, variant, chain)."""
-    if "." not in key:
-        return _NO_MODULE, key, None, None, None
-    module, _, rest = key.partition(".")
-    chain_match = _CHAIN_SUFFIX.search(rest)
-    chain = chain_match.group(1) if chain_match else None
-    if chain_match:
-        rest = rest[: chain_match.start()]
-
-    variant_kind: str | None = None
-    variant: str | None = None
-    rule = _VARIANT_RULES.get(module)
-    if rule is not None:
-        pattern, kind = rule
-        if (m := pattern.match(rest)) is not None:
-            variant_kind, variant, rest = kind, m.group("variant"), m.group("column")
-
-    return module, rest, variant_kind, variant, chain
 
 
 async def collect() -> list[MetricKey]:
