@@ -289,6 +289,78 @@ The policy lives in `app/graphql/errors.py`; `tests/test_error_masking.py` guard
 assertion that the served schema actually registers the extension — the failure mode here is silent,
 since masking that stops working breaks nothing and simply starts leaking again.
 
+### `ScoreEntry` resolves against a catalog loaded once per request
+
+Sizing it first, because the numbers decide the design (measured 2026-08-09):
+
+| | |
+|---|---|
+| catalog rows | 144 (the `metrics` table is 152 KB in total) |
+| `ScoreEntry` objects for one `{ candidates { scores } }` | **1132** |
+| scores on a single candidate | 38 – 130 |
+
+A query per key would be 1132 round trips for one request. The whole catalog is smaller than a
+single candidate's score bag, so it is loaded **once per request** into a dict keyed by the same
+identity `decompose()` produces — `(module, column_key, variant_kind, variant)` — and each of the
+1132 lookups becomes a dict hit. Two queries total: one for the catalog, one for the interface kinds
+below.
+
+It is cached on the `Context` rather than at module level. The catalog only changes on a reseed, so a
+process-wide cache is tempting, but it buys a staleness window and an invalidation story in exchange
+for one query per request, which is not a trade worth making at this size.
+
+### Which catalog row a key means is a two-tier question
+
+197 of the 200 keys carry their whole identity. Three do not, and the difference is not a quirk — it
+is the ipTM finding reaching the API.
+
+`decompose("boltz2.protein_iptm")` yields the identity `(boltz2, protein_iptm, None, None)`. **No
+such catalog row exists.** The three rows that do exist all carry `variant_kind = INTERFACE` and
+differ by `variant`, which holds the candidate's interface kind. The key cannot name which one
+applies, because the discriminator is a property of the *candidate* — which chains went into the
+fold — and not of the key.
+
+So the lookup is explicitly two-tier, and **the catalog is asked which tier applies** rather than the
+resolver trying one and retrying on failure:
+
+    kinds = <the variant_kinds catalogued for (module, column_key)>
+    if INTERFACE in kinds:  identity += (INTERFACE, interface_kind_of_this_candidate)
+    else:                   identity is what decompose() returned
+
+The retry-on-miss shape — look up, and if it misses try again qualified by interface kind — is
+shorter and works today. It is not used, for two reasons. It reads as though interface-qualification
+were a general fallback when it is specific to one `VariantKind`, so the natural way to extend it is
+to stack more retries. And it is only correct while no `(module, column_key)` has both a variant-less
+row and an INTERFACE row: if one ever did, tier one would hit and the interface rows would never be
+consulted, silently returning the wrong meaning.
+
+That invariant holds — measured, only four keys have multiple rows and none has a variant-less
+sibling — but it is maintained by `scripts/seed_metric_skeleton.py` skipping on `(module,
+column_key)` rather than on full identity. It is a property of the seeder, not of the schema, so the
+resolver should not lean on it.
+
+### `numericValue` parses defensively, even though nothing currently fails
+
+Of the 995 values whose metric says FLOAT or INT, **995 parse.** That is not the reassurance it
+appears to be: `scripts/seed_metric_skeleton.py` *inferred* `value_type` from these very strings, so
+the agreement is an artifact of how the types were assigned, exactly like "197 of 200 keys resolve".
+
+Values that would not parse are already in the corpus — `"<40"`, `"-"` — currently sitting under
+CATEGORICAL metrics. Correcting one of those to FLOAT, or importing a run with a censored value in a
+numeric column, produces an unparseable value immediately.
+
+So `numericValue` is `float()` inside a try/except, `None` on failure, and populated only when the
+catalog says the metric is numeric. `value` always carries the raw string regardless, so nothing is
+lost when the coercion declines.
+
+### `benchmarkResults` and `transformOf` ship empty
+
+Both are in the schema so the shape is right, and both return nothing: the `benchmark_datasets` /
+`benchmark_results` tables were deliberately never populated. Populating them is a scrape of AWS's
+published module-evaluation pages — cleared on the terms-of-service review recorded in
+`graphql-schema-handoff.md`, and equivalent to a human doing click-and-copy at human speed. Worth
+revisiting only if their absence blocks something.
+
 ## The coupling nothing currently guards
 
 The three interface strings — `'antibody-target complex'`, `'antibody only (H/L pairing)'`,
