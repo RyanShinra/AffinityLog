@@ -12,6 +12,10 @@
 > and caveats) was built specifically to feed the `ScoreEntry` resolver described here.
 >
 > The resolvers remain unimplemented — `app/graphql/{types,schema}.py` are 115-byte placeholders.
+>
+> **The SDL this doc repeatedly says "only exists in that conversation" is now committed, in
+> [`graphql-schema.md`](graphql-schema.md).** That file is the spec; this one is how it was arrived
+> at. Where they disagree, that one wins.
 
 > Read this cold on the Mac to continue. Companion docs: `docs/catalog-seed-plan.md` (Chapter 2),
 > `docs/schema-erd.md` (current + planned schema, mermaid — SQL ERD *and* the GraphQL apparent

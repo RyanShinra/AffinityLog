@@ -150,11 +150,16 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 - The view is created by migration 004 and duplicated in `sql/candidate_summary.sql` (the
   iterate-in-TablePlus copy). `scripts/check_view_migration.py` runs in CI and fails the build if
   the two define different columns.
-- **Tombstoned (115-byte placeholders, not yet rebuilt):** `app/graphql/{types,schema}.py`,
-  `app/routers/experiments.py`, `app/importer/column_mapping.py`, `app/schemas/pydantic.py`.
-  The live HTTP surface is only `/health`, `/demo`, `/demo/pdb/{id}`, `/static`.
-- The GraphQL context is designed to pass the SQLAlchemy engine (not a session) so each resolver
-  opens its own — avoids session-lifetime issues with async resolvers. Not yet implemented.
+- **Tombstoned (115-byte placeholders, not yet rebuilt):** `app/routers/experiments.py`,
+  `app/importer/column_mapping.py`, `app/schemas/pydantic.py`, `tests/conftest.py`.
+  The live HTTP surface is `/health`, `/demo`, `/demo/pdb/{id}`, `/graphql`, `/static`.
+- **The GraphQL context passes one `AsyncSession` per HTTP request, shared by every resolver in the
+  query tree** — not an engine, and not a session per resolver. A GraphQL query is a tree, so one
+  request touches experiments, their candidates and those candidates' chains; separate sessions would
+  spread one logical read across several transactions. It also has to outlive the entry-point
+  resolver, because type resolvers run after that has already returned. `app/database.py`'s
+  `get_session` provides the shape; `app/graphql/context.py` wires it in.
+  (This entry previously said the opposite — engine-per-resolver — which the code never did.)
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - Tests use testcontainers (pulls `postgres:16-alpine` at runtime) or `TEST_DATABASE_URL`
