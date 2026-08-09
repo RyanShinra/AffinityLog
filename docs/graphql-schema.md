@@ -353,13 +353,33 @@ So `numericValue` is `float()` inside a try/except, `None` on failure, and popul
 catalog says the metric is numeric. `value` always carries the raw string regardless, so nothing is
 lost when the coercion declines.
 
-### `benchmarkResults` and `transformOf` ship empty
+### `benchmarkResults` and `transformOf` ship empty — for different reasons
 
-Both are in the schema so the shape is right, and both return nothing: the `benchmark_datasets` /
-`benchmark_results` tables were deliberately never populated. Populating them is a scrape of AWS's
-published module-evaluation pages — cleared on the terms-of-service review recorded in
-`graphql-schema-handoff.md`, and equivalent to a human doing click-and-copy at human speed. Worth
-revisiting only if their absence blocks something.
+Both are in the schema so the shape is right, and both return nothing. Neither blocks anything. But
+they are empty in quite different senses, which is worth being precise about (measured 2026-08-09:
+0 benchmark_results, 0 benchmark_datasets, 0 TRANSFORM metrics, 0 lineage links).
+
+**`benchmarkResults` — the data exists, the loader does not.** The scrape is already done and in the
+repo: `seed/raw/module_evaluation_details.json` holds 190 rows whose fields map essentially
+one-to-one onto `BenchmarkResult` (property, spearman, stars, auroc, auprc, precisionTop5, n,
+precisionTop5NullDist, strata), and `module_evaluation_catalog.json` holds 33 module entries with
+version, license and transform. Populating it is a seeder in the style of the others, not new
+collection — the terms-of-service review that cleared the scrape is recorded in
+`graphql-schema-handoff.md`.
+
+Worth doing eventually because it is the layer that says how much a metric is *worth*, not just what
+it means. The catalog currently tells a client that higher ipTM is better and attaches a caveat;
+benchmarks would add that a given metric's AUROC against titer is 0.647, which is the difference
+between "0.79 beats 0.40" and "treat this as weak evidence". Given that the project exists to stop a
+raw number misleading someone, that is a natural next layer.
+
+Known gap in the source: most catalog rows still carry `"transform": null` even where the UI showed a
+populated panel, so that axis is incomplete. The 190 benchmark rows are the solid part.
+
+**`transformOf` — there is nothing to load.** The raw vs `-transformed` distinction came from AWS's
+Module Evaluation *documentation*; none of the 200 keys in the actual run exports is a transformed
+sibling. Zero instances is a fact about this corpus rather than a loading gap, and it would only
+change if the catalog were seeded from the scrape *and* such a metric appeared in a run.
 
 ## The coupling nothing currently guards
 
