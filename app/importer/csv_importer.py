@@ -73,7 +73,8 @@ def build_scores(row: dict[str, str]) -> dict[str, str]:
     ...               "boltz2.ptm": "0.93", "biophi.OASis Percentile_After.H": ""})
     {'boltz2.ptm': '0.93'}
 
-    # YOUR TURN — ~5 lines. A dict comprehension over row.items() does it.
+    Each clause above is pinned by a test in ``tests/test_importer.py``. Note the doctest itself
+    is illustrative only — pytest does not collect doctests in this project's configuration.
     """
     result: dict[str, str] = {}
     for key, value in row.items():
