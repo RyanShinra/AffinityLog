@@ -190,12 +190,16 @@ genuine structural classes of antibody chain, but TARGET is the antigen and not 
 all. The one word covering all three is the *part played* in the assembly. Renaming it also freed
 `Chain` for the object, which is what a chain actually is — a sequence with a role and an ordinal.
 
-**A rename is still pending underneath this.** The storage layer has the same problem in reverse:
-`candidate_chains.chain` holds the role while `candidate_chains.sequence` holds the actual chain. The
-column and Postgres type keep their current names for now — `SAEnum(ChainRole, name="chain")` pins the
-type so no migration was needed for the API rename. Migration 007 renames the column to `role` and the
-type to `chainrole`, and removes that pin. Until then the ORM attribute is `chain` while the GraphQL
-field is `role`, which is why `Chain.from_orm` maps `role=row.chain`.
+**The storage layer had the same problem in reverse**, and migration 007 fixed it:
+`candidate_chains.chain` held the role while `candidate_chains.sequence` held the actual chain. The
+column is now `role` and the Postgres type `chainrole`, so `Chain.from_row` maps `role=row.role` and
+the two layers agree.
+
+The rename reached the API first, one commit ahead of the database. During that gap the Python class
+was renamed while the column was not, held together by `SAEnum(ChainRole, name="chain")` pinning the
+type name so the API rename needed no migration. That pin is gone. The technique is worth remembering
+— it decouples an application-layer rename from a schema change — but nothing in the tree depends on
+it now.
 
 ### `interfaceKind` is an enum, and it has four members
 

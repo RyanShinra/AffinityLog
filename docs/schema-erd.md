@@ -91,7 +91,7 @@ erDiagram
   CANDIDATE_CHAINS {
     uuid id PK "migration 003 (new)"
     uuid candidate_id FK
-    enum chain "H / L / T; migration 007 renames to role"
+    enum role "H / L / T; type chainrole, migration 007"
     text sequence
     int ordinal "disambiguates repeated labels"
   }
@@ -165,7 +165,7 @@ graph LR
 |---|---|---|
 | `candidates.scores` — one JSONB column | `Candidate.scores: [ScoreEntry]` | Flexible blob stored; interpreted list projected. `ScoreEntry` has no table. |
 | `metrics` & `candidates` — no FK between them | `ScoreEntry.metric` resolves the link at query time | Resolver marries JSONB key ↔ catalog row; edge doesn't exist in SQL. |
-| `candidate_chains` rows (H/L/T) | `Candidate.chains: [Chain]` | Roughly 1:1 — the one place they nearly match. The column is `chain` and the field is `role` until migration 007 renames the column. |
+| `candidate_chains` rows (H/L/T) | `Candidate.chains: [Chain]` | Roughly 1:1 — the one place they nearly match. Both sides call it `role` since migration 007. |
 | candidate → experiment → target (2 FK hops) | `candidate.target` (1 hoisted field) | Apparent rep flattens the join into a convenience edge. |
 | `recipe_modules` M:N (+ wiring) | `recipe.modules` only; DAG hidden | Arbitrary graphical wiring is stored, not surfaced. |
 | every table full-CRUD | query-all + annotate-only mutation | Writes are REST (CSV import); GraphQL is reads + a sliver. |

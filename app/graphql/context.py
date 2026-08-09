@@ -51,29 +51,22 @@ class Context(BaseContext):
         self.session = session
 
 
-# ---------------------------------------------------------------------------------------------
-# YOUR TURN — this is the seam between FastAPI and Strawberry, and it is four lines.
-#
-# `GraphQLRouter(schema, context_getter=...)` takes a callable, and — because GraphQLRouter is an
-# APIRouter subclass — FastAPI resolves that callable's parameters with the ordinary dependency
-# machinery. So a parameter annotated `Annotated[AsyncSession, Depends(get_session)]` is filled in
-# by FastAPI before Strawberry ever sees it. That is the whole trick: the context getter is just a
-# dependency-injected function that happens to return the object resolvers will read.
-#
-# Write:
-#
-#     async def get_context(session: Annotated[AsyncSession, Depends(get_session)]) -> Context:
-#         return Context(session=session)
-#
-# The alternative worth knowing you are rejecting: opening the session inside the function body
-# (`async with AsyncSessionLocal() as s: ...`) instead of taking it as a dependency. That works,
-# but nothing would then close it — `get_session` is an async *generator* dependency, so FastAPI
-# runs the teardown after the response is sent. Taking it via Depends is what ties the session's
-# lifetime to the request's.
-#
-# Both `Annotated` and `Depends` are already imported above.
-# ---------------------------------------------------------------------------------------------
-
-
 async def get_context(session: Annotated[AsyncSession, Depends(get_session)]) -> Context:
+    """The seam between FastAPI and Strawberry, and it is one line.
+
+    `GraphQLRouter(schema, context_getter=...)` takes a callable, and — because `GraphQLRouter` is an
+    `APIRouter` subclass — FastAPI resolves that callable's parameters with the ordinary dependency
+    machinery. So the `Annotated[AsyncSession, Depends(get_session)]` parameter is filled in before
+    Strawberry ever sees it. That is the whole trick: the context getter is just a
+    dependency-injected function that happens to return the object resolvers will read.
+
+    The alternative worth knowing this rejects: opening the session in the function body
+    (`async with AsyncSessionLocal() as s: ...`) rather than taking it as a dependency. That runs,
+    but nothing would close it — `get_session` is an async *generator* dependency, so FastAPI runs
+    the teardown after the response is sent. Taking it via `Depends` is what ties the session's
+    lifetime to the request's.
+
+    Note this runs for GET /graphql too, not only for queries: the playground will not render if it
+    raises.
+    """
     return Context(session=session)

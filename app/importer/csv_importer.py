@@ -104,7 +104,7 @@ def parse_chains(row: dict[str, str]) -> list[CandidateChain]:
     seen: defaultdict[str, int] = defaultdict(int)
     chains: list[CandidateChain] = []
     for label, seq in zip(labels, parts, strict=True):
-        chains.append(CandidateChain(chain=ChainRole(label), sequence=seq, ordinal=seen[label]))
+        chains.append(CandidateChain(role=ChainRole(label), sequence=seq, ordinal=seen[label]))
         seen[label] += 1
     return chains
 
