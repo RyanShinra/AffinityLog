@@ -30,18 +30,15 @@ anything wants a header or a cookie, and subclassing costs nothing today.
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Final
 
 from fastapi import Depends
-
-# TEMPORARY: these three are used only by the not-yet-written body of `Context.catalog()` below, so
-# ruff sees them as unused and the pre-commit hook would reject the commit. `unfixable = ["F401"]` in
-# pyproject stops ruff DELETING them, which is the behaviour that matters here. Drop the noqa the
-# moment `catalog()` has a body.
-from sqlalchemy import Select, select  # noqa: F401
+from sqlalchemy import Result, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload  # noqa: F401
+from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
 from app.database import get_session
@@ -55,6 +52,11 @@ from app.models import orm as db
 # This probably wants to live in `app/catalog/keys.py` beside `ScoreKey` once `ScoreKey.identity`
 # exists and returns one. Here for now so this file stands alone.
 MetricIdentity = tuple[str, str, str | None, str | None]
+
+
+def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
+    metric_variant_kind: Final[str | None] = metric.variant_kind.name if metric.variant_kind is not None else None
+    return (metric.module.name, metric.column_key, metric_variant_kind, metric.variant)
 
 
 @dataclass(frozen=True)
@@ -108,26 +110,104 @@ class Context(BaseContext):
         if self._catalog is not None:
             return self._catalog
 
-        # YOUR TURN. Roughly eight lines: build the statement, execute it, walk the rows once
-        # filling both dicts, assign to self._catalog, return it.
+        # WHAT `variant_kinds` IS
+        # -----------------------
+        # It is small. Measured against the seeded corpus, 144 metric rows produce exactly FOUR
+        # entries — it is not an index over the catalog, it is an exception list:
         #
-        # Three things to decide as you write it:
+        #     ('boltz2',      'complex_ipde')            -> {'INTERFACE'}
+        #     ('boltz2',      'iptm')                    -> {'INTERFACE'}
+        #     ('boltz2',      'protein_iptm')            -> {'INTERFACE'}
+        #     ('evoprotgrad', 'pseudolikelihood_ratio')  -> {'PARAMETER'}
         #
-        # 1. `row.variant_kind` is a `db.VariantKind` member (or None) and MetricIdentity wants a
-        #    string. `.name` gives "INTERFACE"; `.value` gives "interface" and would silently never
-        #    match anything `decompose()` produces. Verified against the database, not remembered.
+        # The other 140 rows have a NULL variant_kind, contribute nothing, and so their
+        # (module, column_key) is simply absent. A caller reads it as
+        # `variant_kinds.get(pair, frozenset())` and gets the empty set for almost everything.
         #
-        # 2. `row.module` is a relationship, so it lazy-loads — which under async SQLAlchemy is not
-        #    a slow path, it is a MissingGreenlet. Same for `.concept`. `selectinload` both.
+        # THE QUESTION IT ANSWERS
+        # -----------------------
+        # Not "what does this key mean" — that is `by_identity`. It is: *is decompose()'s answer
+        # COMPLETE, or is it missing a piece that only the candidate knows?* Three cases, all real:
         #
-        # 3. `.benchmark_results` and `.transform_of` are also relationships, and the SDL exposes
-        #    both. Both are empty today (0 rows), so eager-loading them costs two queries returning
-        #    nothing — but NOT eager-loading them means the field raises the moment a client selects
-        #    it. Cheap correctness now, or defer until there is data to load?
+        #   temstapro.clash.H
+        #     decompose -> (temstapro, clash, None, None); no entry here; that identity exists in
+        #     by_identity as-is. One lookup, done. This is 197 of the 200 corpus keys.
         #
-        # stmt: Select[tuple[db.Metric]] = select(db.Metric).options(...)
+        #   evoprotgrad.esm_pseudolikelihood_ratio.H
+        #     decompose -> (evoprotgrad, pseudolikelihood_ratio, PARAMETER, esm). It filled the
+        #     variant in ITSELF, because the `esm_` prefix is right there in the key string and
+        #     `_VARIANT_RULES` in app/catalog/keys.py recovers it. The PARAMETER entry above is
+        #     therefore informational; nothing branches on it.
+        #
+        #   boltz2.protein_iptm
+        #     decompose -> (boltz2, protein_iptm, None, None), and THAT IDENTITY DOES NOT EXIST.
+        #     The three rows that do exist carry variant_kind=INTERFACE and a `variant` naming one
+        #     of the three interface strings. The key cannot say which, because the discriminator
+        #     is which chains went into the fold — a property of the CANDIDATE, not of the key.
+        #
+        # So the asymmetry that makes INTERFACE the only kind worth branching on is this: a
+        # PARAMETER variant is encoded in the key and recoverable from the string alone; an
+        # INTERFACE variant is not in the key at all. Everything else the key already tells us.
+        #
+        # WHY NOT LOOK UP AND RETRY ON MISS
+        # ---------------------------------
+        # Shorter, and it works today — the bare identity missing is currently a reliable signal.
+        # But only by accident of the seeder: `scripts/seed_metric_skeleton.py` skips on
+        # (module, column_key) rather than on full identity, which is what stops a variant-less row
+        # existing beside the INTERFACE ones. That is a property of a script, not of the schema, so
+        # the resolver should not lean on it. Asking which tier applies cannot fail that way.
+        # Full reasoning: docs/graphql-schema.md, "Which catalog row a key means is a two-tier
+        # question".
+        #
+        # WHERE THIS STOPS BEING TRUE (it is not future-proof, and should not be read as such)
+        # -----------------------------------------------------------------------------------
+        #   * ONE VARIANT AXIS PER METRIC. `metrics` has a single (variant_kind, variant) pair, so
+        #     a column that varies along two axes at once — a PARAMETER sweep whose meaning ALSO
+        #     depends on the interface — cannot be represented at all, let alone resolved. That is
+        #     a schema limit, not a resolver limit.
+        #   * ONLY INTERFACE IS AUTO-QUALIFIED. A future VariantKind whose discriminator also lives
+        #     on the candidate would need its own arm in the lookup, and until it got one the key
+        #     would resolve to no metric — silently, like every other miss here.
+        #   * A VARIANT-LESS SIBLING BECOMES UNREACHABLE. If some (module, column_key) ever had both
+        #     a NULL-variant row and INTERFACE rows, this always qualifies, so the NULL-variant row
+        #     could never be returned. Different failure from retry-on-miss, not an absence of one.
+        #   * THE THREE INTERFACE STRINGS ARE UNGUARDED. They must match across the CASE in
+        #     sql/candidate_summary.sql, the nine INTERFACE rows in seed/catalog.json, and the
+        #     InterfaceKind enum. Nothing checks that; see "The coupling nothing currently guards".
+        by_identity_dict: dict[MetricIdentity, db.Metric] = dict()
+        variant_kinds_seen: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
 
-    # End Context class
+        stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
+            selectinload(db.Metric.module),
+            selectinload(db.Metric.concept),
+            selectinload(db.Metric.benchmark_results),
+            selectinload(db.Metric.transform_of),
+        )
+
+        result: Result[tuple[db.Metric]] = await self.session.execute(stmt)
+        rows: Sequence[db.Metric] = result.scalars().all()
+
+        for metric in rows:
+            metric_identity: MetricIdentity = metric_identity_from_db_metric(metric)
+            by_identity_dict[metric_identity] = metric
+
+            if metric.variant_kind is not None:
+                variant_kinds_seen[(metric.module.name, metric.column_key)].add(metric.variant_kind.name)
+
+        # Now we need to freeze the sets; recreating it is the easiest way
+        # (I'm specifically not doing the dict comprehension for future readability)
+        variant_kinds_dict: dict[tuple[str, str], frozenset[str]] = dict()
+
+        for variant_key, seen_kinds in variant_kinds_seen.items():
+            variant_kinds_dict[variant_key] = frozenset(seen_kinds)
+
+        self._catalog = MetricCatalog(by_identity=by_identity_dict, variant_kinds=variant_kinds_dict)
+        return self._catalog
+
+    # End def catalog
+
+
+# End Context class
 
 
 async def get_context(session: Annotated[AsyncSession, Depends(get_session)]) -> Context:
