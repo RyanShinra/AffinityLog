@@ -77,14 +77,27 @@ view, and stored in the catalog as `VariantKind.INTERFACE`. Full write-up in
 ## Current data status
 
 **REAL DATA.** 11 Bio Discovery experiments were run against HER2 during the free trial
-(2026-06 to 2026-07); 9 exported successfully and are loaded: 9 experiments, 14 candidates,
-26 chains, 11 predicted structures, 144 catalogued metrics. Raw CSVs and structures live in
-`experiment_results/`, archived HTML in `HTML Extracts/`.
+(2026-06 to 2026-07) and 9 exported successfully, but **7 CSVs are what load** — they produce
+9 experiment rows, because `load_csv` creates one Experiment per distinct `experimentId` and
+experiments 1 and 5 each span two sub-experiments. The loaded corpus is 9 experiments,
+14 candidates, 26 chains, 200 distinct score keys, 11 predicted structures, 144 catalogued
+metrics. Raw CSVs and structures live in `experiment_results/`, archived HTML in
+`HTML Extracts/`.
 
-Loading is by script, not by API — `scripts/load_experiment.py` for CSVs, then
+Experiments 9 and 10 (the ESM2 pair) exported fine but are deliberately **not** loaded: the
+ESM2 Only recipe folds nothing, so they have no predicted structures to pair with. Loading
+them would take the key count to 204. This is a "not yet" — see the docstring of
+`experiment_results/load_experiment_results.py`, which is the authoritative record of which
+files load and under what names.
+
+Loading is by script, not by API. To rebuild from empty:
+`experiment_results/load_experiment_results.py` (all 7 CSVs, one transaction), then
 `seed_catalog.py` → `seed_metric_skeleton.py` → `seed_corpus_context.py` → `seed_recipes.py`.
-All idempotent. `sample_data/her2_nanobody_sample.csv` is the old synthetic fixture and is no
-longer representative of the schema.
+The seeders are idempotent; the corpus loader skips CSVs already loaded by `source_filename`.
+`scripts/load_experiment.py` is the general single-CSV tool that the corpus loader wraps — use
+it for a new export, not for rebuilding this corpus.
+`sample_data/her2_nanobody_sample.csv` is the old synthetic fixture and is no longer
+representative of the schema.
 
 ---
 
@@ -141,7 +154,7 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 
 - `candidates.scores` stores every CSV column as `dict[str, str]` (raw strings, not coerced).
   `scripts/seed_metric_skeleton.py` infers each metric's `value_type` from those strings.
-- Migrations run 001–006. `alembic upgrade head` before starting the server (docker-compose does it).
+- Migrations run 001–007. `alembic upgrade head` before starting the server (docker-compose does it).
   **Use `alembic revision -m "..."` to scaffold** — `env.py` has a hook that numbers revisions
   sequentially, and `revision_environment = true` makes it fire for plain revisions too. Do not
   hand-write migration files.
