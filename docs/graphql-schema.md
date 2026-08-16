@@ -335,9 +335,17 @@ row and an INTERFACE row: if one ever did, tier one would hit and the interface 
 consulted, silently returning the wrong meaning.
 
 That invariant holds — measured, only four keys have multiple rows and none has a variant-less
-sibling — but it is maintained by `scripts/seed_metric_skeleton.py` skipping on `(module,
-column_key)` rather than on full identity. It is a property of the seeder, not of the schema, so the
-resolver should not lean on it.
+sibling — and it is now **checked** rather than merely true. `app/catalog/invariants.py` fails the
+seed if any heading carries two axes, or a variant-less row beside qualified ones; both seeders call
+it before committing. That is a stronger position than when this section was written, when the
+invariant rested entirely on `scripts/seed_metric_skeleton.py` skipping on `(module, column_key)`
+rather than on full identity.
+
+So the *correctness* case against retry-on-miss is largely answered, and what remains is the first
+reason plus a caveat: a write-time check is not a schema constraint, and it binds only rows the
+seeders write — a hand-written `INSERT` bypasses it. Asking which tier applies cannot go wrong that
+way at all. The structural version, which would make a two-axis heading unrepresentable, is written
+up in [`metric-heading-normalization.md`](metric-heading-normalization.md).
 
 ### `numericValue` parses defensively, even though nothing currently fails
 

@@ -68,12 +68,21 @@ class MetricCatalog:
       * `metric_by_identity` — "what does this exact identity mean?" The 1132 lookups a full
         `{ candidates { scores } }` performs are all dict hits against this.
 
-      * `variant_kinds_per_heading` — "is this (module, column_key) interface-qualified at all?"
-        This is the first tier of the two-tier lookup: 197 of 200 keys carry their whole identity,
-        and the 3 that do not need the candidate's interface kind folded in before
-        `metric_by_identity` can be consulted. Asking this first is what keeps
-        interface-qualification from reading as a general retry-on-miss — see
-        docs/graphql-schema.md, "Which catalog row a key means is a two-tier question".
+      * `variant_kinds_per_heading` — "along which axis, if any, do this heading's metrics vary?"
+        Tier one of the two-tier lookup. Measured on the corpus: 197 of 200 keys carry their whole
+        identity and hit `metric_by_identity` directly; 3 do not, and need the candidate's
+        interface kind folded in first.
+
+        The field holds EVERY axis, but only INTERFACE leaves a key incomplete — a PARAMETER
+        variant is encoded in the key string and `decompose()` recovers it unaided. So the branch
+        reading this asks only about INTERFACE while the field stays general.
+
+        Asked first rather than retried on miss, because a retry reads as a general fallback when
+        interface-qualification is specific to one axis. The correctness argument for asking first
+        — a bare row beside INTERFACE rows would make tier one hit and never consult them — is now
+        also covered by `app/catalog/invariants.py`, though that is a write-time check rather than
+        a schema constraint, so it binds only rows the seeders write. See docs/graphql-schema.md,
+        "Which catalog row a key means is a two-tier question".
 
     NAMING: both fields say what they are keyed BY, and the preposition carries meaning.
     `by` is a lookup handle — an identity tuple is a key you construct, not a thing that owns a
