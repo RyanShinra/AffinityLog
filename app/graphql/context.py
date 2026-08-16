@@ -171,9 +171,10 @@ class Context(BaseContext):
         #   * A VARIANT-LESS SIBLING BECOMES UNREACHABLE. If some (module, column_key) ever had both
         #     a NULL-variant row and INTERFACE rows, this always qualifies, so the NULL-variant row
         #     could never be returned. Different failure from retry-on-miss, not an absence of one.
-        #   * THE THREE INTERFACE STRINGS ARE UNGUARDED. They must match across the CASE in
-        #     sql/candidate_summary.sql, the nine INTERFACE rows in seed/catalog.json, and the
-        #     InterfaceKind enum. Nothing checks that; see "The coupling nothing currently guards".
+        #     (The three interface strings themselves ARE guarded — tests/test_interface_kind.py
+        #     checks the CASE arms in sql/candidate_summary.sql and migration 004 against the
+        #     InterfaceKind enum, and the INTERFACE variants in seed/catalog.json against it too,
+        #     all without a database. What is unguarded is the SHAPE above, not the spelling.)
         by_identity_dict: dict[MetricIdentity, db.Metric] = dict()
         variant_kinds_seen: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
 

@@ -381,7 +381,7 @@ Module Evaluation *documentation*; none of the 200 keys in the actual run export
 sibling. Zero instances is a fact about this corpus rather than a loading gap, and it would only
 change if the catalog were seeded from the scrape *and* such a metric appeared in a run.
 
-## The coupling nothing currently guards
+## The coupling, and the guard that now covers it
 
 The three interface strings — `'antibody-target complex'`, `'antibody only (H/L pairing)'`,
 `'single chain (no interface)'` — must match **exactly** in three places:
@@ -390,17 +390,27 @@ The three interface strings — `'antibody-target complex'`, `'antibody only (H/
 2. the `variant` values of the nine INTERFACE rows in `seed/catalog.json`
 3. this enum
 
-Nothing verifies this. Rewording a `CASE` arm would silently stop those three keys resolving, with no
-test failing and no error raised — the scores would simply lose their meaning.
+Rewording a `CASE` arm would otherwise stop those three keys resolving, with no exception raised —
+the scores would simply lose their meaning, which is the one thing the catalog exists to provide.
+`scripts/check_view_migration.py` does not cover it: that compares the view's output **column
+aliases**, so a reworded `THEN` literal passes it untouched.
 
-The guard, modelled on `scripts/check_view_migration.py`, is three assertions:
+**This is now guarded** by `tests/test_interface_kind.py`, written before the `ScoreEntry` resolver
+as this section originally asked. It asserts the `CASE` arms in the `.sql` file *and* in migration
+004 both equal the enum's values in order, and that every INTERFACE `variant` in `seed/catalog.json`
+is an enum member — covering the three real arms but not `NO_CHAINS_RECORDED`, which is a
+data-quality state the catalog should never carry. The parse anchors on `THEN`/`ELSE` results so the
+chain labels inside the conditions (`'TARGET'`, `'LIGHT'`) are not mistaken for interface kinds.
 
-1. the string literals in the view's `CASE` == the enum's values *(the one with teeth — it fails on
-   the edit, before any data proves it)*
-2. every distinct `interface_kind` in the live view is an enum member
-3. every INTERFACE metric's `variant` is an enum member (a subset — three of four)
+It needs no database, and that is deliberate rather than a limitation: every source is a file in the
+repo, and checking the `.sql` *and* the migration closes the chain end to end, since the migration is
+what actually creates the view in any given database. The originally-proposed third assertion —
+every distinct `interface_kind` in the *live* view is an enum member — was skipped on purpose: no
+candidate in the corpus reaches `no chains recorded`, so it could only ever prove three of the four
+arms, making it the weakest of the checks rather than the strongest.
 
-This should be written **before** the `ScoreEntry` resolver, not after.
+What remains uncovered is narrow: a view altered by hand in a running database, diverging from both
+files. Nothing in the workflow does that.
 
 ---
 
