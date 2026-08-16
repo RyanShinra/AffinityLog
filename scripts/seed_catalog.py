@@ -50,6 +50,7 @@ from typing import Any, Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.invariants import raise_on_heading_violations
 from app.database import AsyncSessionLocal
 
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[1]
@@ -195,6 +196,12 @@ async def seed(dry_run: bool = False) -> None:
         concept_ids = await _upsert_concepts(session, concepts)
         module_ids = await _upsert_modules(session, modules)
         n_metrics = await _upsert_metrics(session, metrics, module_ids, concept_ids)
+
+        # Before the commit, so a catalog that breaks (module, column_key) -> variant_kind rolls
+        # back rather than landing. The database cannot express that dependency; see
+        # app/catalog/invariants.py.
+        await raise_on_heading_violations(session, source="seed_catalog")
+
         await session.commit()
 
     print(f"seeded {len(concept_ids)} concepts, {len(module_ids)} modules, {n_metrics} metrics")

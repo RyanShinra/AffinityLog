@@ -65,19 +65,33 @@ class MetricCatalog:
 
     Both indexes come from ONE pass over ONE query. They answer different questions:
 
-      * `by_identity` — "what does this exact identity mean?" The 1132 lookups a full
+      * `metric_by_identity` — "what does this exact identity mean?" The 1132 lookups a full
         `{ candidates { scores } }` performs are all dict hits against this.
 
-      * `variant_kinds` — "is this (module, column_key) interface-qualified at all?" This is the
-        first tier of the two-tier lookup: 197 of 200 keys carry their whole identity, and the
-        3 that do not need the candidate's interface kind folded in before `by_identity` can be
-        consulted. Asking this first is what keeps interface-qualification from reading as a
-        general retry-on-miss — see docs/graphql-schema.md, "Which catalog row a key means is a
-        two-tier question".
+      * `variant_kinds_per_heading` — "is this (module, column_key) interface-qualified at all?"
+        This is the first tier of the two-tier lookup: 197 of 200 keys carry their whole identity,
+        and the 3 that do not need the candidate's interface kind folded in before
+        `metric_by_identity` can be consulted. Asking this first is what keeps
+        interface-qualification from reading as a general retry-on-miss — see
+        docs/graphql-schema.md, "Which catalog row a key means is a two-tier question".
+
+    NAMING: both fields say what they are keyed BY, and the preposition carries meaning.
+    `by` is a lookup handle — an identity tuple is a key you construct, not a thing that owns a
+    metric. `per` is one entry for each domain entity. (`of` was rejected: "kinds of column" and
+    "kind of candidate" both misparse — "kinds of X" is a stronger collocation in English than
+    the binding we mean.) Singular/plural then follows the real cardinality rather than the
+    number of keys: one metric per identity, several kinds possible per heading. The
+    candidate-side map that `Context.interface_kinds()` returns is the same idea and is best
+    bound as `interface_kind_per_candidate` at the point of use.
+
+    "Heading" rather than "column": `column_key` holds the raw CSV export header, and "column"
+    already means something else entirely in a database application. The pair
+    (module, column_key) names a metric BEFORE disambiguation — the several catalog rows sharing
+    a heading differ only by variant.
     """
 
-    by_identity: dict[MetricIdentity, db.Metric]
-    variant_kinds: dict[tuple[str, str], frozenset[str]]
+    metric_by_identity: dict[MetricIdentity, db.Metric]
+    variant_kinds_per_heading: dict[tuple[str, str], frozenset[str]]
     # End MetricCatalog Class
 
 
@@ -110,8 +124,8 @@ class Context(BaseContext):
         if self._catalog is not None:
             return self._catalog
 
-        # WHAT `variant_kinds` IS
-        # -----------------------
+        # WHAT `variant_kinds_per_heading` IS
+        # ----------------------------------
         # It is small. Measured against the seeded corpus, 144 metric rows produce exactly FOUR
         # entries — it is not an index over the catalog, it is an exception list:
         #
@@ -122,16 +136,17 @@ class Context(BaseContext):
         #
         # The other 140 rows have a NULL variant_kind, contribute nothing, and so their
         # (module, column_key) is simply absent. A caller reads it as
-        # `variant_kinds.get(pair, frozenset())` and gets the empty set for almost everything.
+        # `variant_kinds_per_heading.get(pair, frozenset())` and gets the empty set for almost
+        # everything.
         #
         # THE QUESTION IT ANSWERS
         # -----------------------
-        # Not "what does this key mean" — that is `by_identity`. It is: *is decompose()'s answer
+        # Not "what does this key mean" — that is `metric_by_identity`. It is: *is decompose()'s
         # COMPLETE, or is it missing a piece that only the candidate knows?* Three cases, all real:
         #
         #   temstapro.clash.H
         #     decompose -> (temstapro, clash, None, None); no entry here; that identity exists in
-        #     by_identity as-is. One lookup, done. This is 197 of the 200 corpus keys.
+        #     metric_by_identity as-is. One lookup, done. This is 197 of the 200 corpus keys.
         #
         #   evoprotgrad.esm_pseudolikelihood_ratio.H
         #     decompose -> (evoprotgrad, pseudolikelihood_ratio, PARAMETER, esm). It filled the
@@ -175,8 +190,8 @@ class Context(BaseContext):
         #     checks the CASE arms in sql/candidate_summary.sql and migration 004 against the
         #     InterfaceKind enum, and the INTERFACE variants in seed/catalog.json against it too,
         #     all without a database. What is unguarded is the SHAPE above, not the spelling.)
-        by_identity_dict: dict[MetricIdentity, db.Metric] = dict()
-        variant_kinds_seen: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
+        metric_by_identity: dict[MetricIdentity, db.Metric] = dict()
+        kinds_seen_per_heading: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
 
         stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
             selectinload(db.Metric.module),
@@ -190,19 +205,21 @@ class Context(BaseContext):
 
         for metric in rows:
             metric_identity: MetricIdentity = metric_identity_from_db_metric(metric)
-            by_identity_dict[metric_identity] = metric
+            metric_by_identity[metric_identity] = metric
 
             if metric.variant_kind is not None:
-                variant_kinds_seen[(metric.module.name, metric.column_key)].add(metric.variant_kind.name)
+                kinds_seen_per_heading[(metric.module.name, metric.column_key)].add(metric.variant_kind.name)
 
         # Now we need to freeze the sets; recreating it is the easiest way
         # (I'm specifically not doing the dict comprehension for future readability)
-        variant_kinds_dict: dict[tuple[str, str], frozenset[str]] = dict()
+        variant_kinds_per_heading: dict[tuple[str, str], frozenset[str]] = dict()
 
-        for variant_key, seen_kinds in variant_kinds_seen.items():
-            variant_kinds_dict[variant_key] = frozenset(seen_kinds)
+        for heading, seen_kinds in kinds_seen_per_heading.items():
+            variant_kinds_per_heading[heading] = frozenset(seen_kinds)
 
-        self._catalog = MetricCatalog(by_identity=by_identity_dict, variant_kinds=variant_kinds_dict)
+        self._catalog = MetricCatalog(
+            metric_by_identity=metric_by_identity, variant_kinds_per_heading=variant_kinds_per_heading
+        )
         return self._catalog
 
     # End def catalog

@@ -323,7 +323,7 @@ fold — and not of the key.
 So the lookup is explicitly two-tier, and **the catalog is asked which tier applies** rather than the
 resolver trying one and retrying on failure:
 
-    kinds = <the variant_kinds catalogued for (module, column_key)>
+    kinds = <variant_kinds_of_column[(module, column_key)], or the empty set>
     if INTERFACE in kinds:  identity += (INTERFACE, interface_kind_of_this_candidate)
     else:                   identity is what decompose() returned
 

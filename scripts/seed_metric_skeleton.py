@@ -51,6 +51,7 @@ from typing import Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.invariants import raise_on_heading_violations
 from app.database import AsyncSessionLocal
 
 # scripts/ is on sys.path when a script here is run directly, but not when this module is imported
@@ -210,6 +211,12 @@ async def seed(dry_run: bool = False) -> None:
         for metric in pending:
             if await _insert_skeleton_metric(session, module_ids[metric.module], metric, types[metric]):
                 inserted += 1
+
+        # Before the commit — see app/catalog/invariants.py. This seeder is the likelier of the two
+        # to trip it: it skips on (module, column_key) rather than on full identity, and that skip
+        # is the ONLY thing stopping a bare skeleton row landing beside curated INTERFACE rows.
+        await raise_on_heading_violations(session, source="seed_metric_skeleton")
+
         await session.commit()
 
     print(f"skeleton: {inserted} metrics registered, {len(pending) - inserted} already present")
