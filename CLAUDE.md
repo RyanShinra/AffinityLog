@@ -138,6 +138,11 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `CASE` classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score
   parsing. Scaffold around it, mark the spot, explain the trade-offs, and offer a "fill in the
   blanks" version rather than assuming he wants to type boilerplate.
+- **Never start, stop, or restart Docker — ask, or hand the command over.** Launching Docker
+  Desktop spins up a VM, mounts filesystems, and starts any container with a restart policy; on a
+  laptop that is a real battery and memory commitment, and it changes machine state well beyond the
+  task at hand. If a task needs the daemon, say so and give him the command. The same goes for
+  `docker compose down -v` and anything else that would destroy the `pg_data` volume.
 - **Consult the linter before saying "run it."** Editor diagnostics have caught errors that were then
   shipped anyway; treat ruff/mypy/black as a pre-run gate, and reason about the installed library's
   real signatures rather than the remembered ones.
@@ -175,8 +180,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   (This entry previously said the opposite — engine-per-resolver — which the code never did.)
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
-- Tests use testcontainers (pulls `postgres:16-alpine` at runtime) or `TEST_DATABASE_URL`
-  env var if you want to point at an existing Postgres.
+- **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image
+  `docker-compose.yml` pins, started once per pytest session and thrown away after. Docker must be
+  running; nothing else needs setting up, on either machine or in CI.
+  There is deliberately **no `TEST_DATABASE_URL` escape hatch**. It was considered and rejected: the
+  obvious thing to point it at is the dev database on `localhost:5432`, and the fixtures assert
+  absolute counts against an empty schema, so that would fail confusingly (149 metrics, not 5) while
+  also aiming `alembic upgrade head` at real data. A second database inside the compose container
+  was rejected for a different reason — CI has no compose stack, so it would reintroduce a
+  local-vs-CI split, which is the thing testcontainers exists to remove.
 
 ---
 

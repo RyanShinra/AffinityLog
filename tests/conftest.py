@@ -70,12 +70,35 @@ def _alembic_config() -> Config:
     return config
 
 
+def _docker_is_running() -> bool:
+    """Whether a Docker daemon is reachable, without raising if it is not.
+
+    Imported lazily: a run that touches no database should not pay for the docker SDK import.
+    """
+    try:
+        import docker
+    except ImportError:  # pragma: no cover - docker is a testcontainers dependency
+        return False
+    try:
+        docker.from_env().ping()
+    except Exception:
+        return False
+    return True
+
+
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
     """A migrated, empty Postgres for the whole run.
 
     MUST stay a plain `def`. See point 1 in the module docstring.
+
+    Skips rather than errors when Docker is down, so `pytest` with a stopped daemon still runs
+    every test that does not need a database instead of failing the whole run at collection.
+    `-ra` in pyproject's addopts makes the reason visible rather than a bare `s`.
     """
+    if not _docker_is_running():
+        pytest.skip("needs a database; Docker is not running — start Docker Desktop and re-run")
+
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as postgres:
         url = postgres.get_connection_url()
 
