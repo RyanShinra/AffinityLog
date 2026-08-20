@@ -82,11 +82,15 @@ Two things worth knowing before reading any number in this repo:
 
 **Not built yet — and the README will say so until it is**
 
-- **GraphQL** (`/graphql`). `app/graphql/{types,schema}.py` are 115-byte placeholders. The schema was
-  designed first (`docs/graphql-schema-handoff.md`) and the catalog was built to feed it; the
-  resolvers are the next chapter.
-- **REST ingestion** (`POST /experiments/…/import`). Also placeheld. CSVs are loaded today with
-  `scripts/load_experiment.py`, a deliberate stand-in.
+- **GraphQL** (`/graphql`). Live, and partial. `Query` answers `experiments`, `experiment(id)`,
+  `candidates` and `candidate(id)`, over `Experiment`, `Candidate`, `Chain`, `Project`, `Recipe`
+  and `Target`. Still to come, and declared in `docs/graphql-schema.md` rather than implemented:
+  `ScoreEntry`, `Metric`, `Module`, `Concept`, `Query.metrics`, `Query.modules`, and `Mutation`
+  entirely. The schema was designed first (`docs/graphql-schema-handoff.md`) and the catalog was
+  built to feed it.
+- **REST ingestion** (`POST /experiments/…/import`). Still placeheld. CSVs are loaded by script:
+  `experiment_results/load_experiment_results.py` rebuilds this corpus, and
+  `scripts/load_experiment.py` is the general single-CSV tool it wraps.
 
 The live HTTP surface is exactly: `GET /health`, `GET /demo`, `GET /demo/pdb/{candidate_id}`, and
 `/static`. Nothing else responds.
@@ -206,8 +210,8 @@ That gives you a schema at head and an **empty database** — the corpus is not 
 loaded explicitly:
 
 ```bash
-# 1. the experiment CSVs (one per export)
-python scripts/load_experiment.py "experiment_results/experiment_1/<results>.csv" --name "HER2 Round 1"
+# 1. the experiment CSVs — all seven, one transaction, idempotent
+python experiment_results/load_experiment_results.py
 
 # 2. the catalog: curated meanings, then every remaining key as uncurated
 python scripts/seed_catalog.py
@@ -246,8 +250,10 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-Postgres comes from [testcontainers](https://testcontainers.com/) automatically; set
-`TEST_DATABASE_URL` to point at an existing instance instead.
+Postgres comes from [testcontainers](https://testcontainers.com/) automatically — the same
+`postgres:16-alpine` image `docker-compose.yml` pins, started once per session and thrown away.
+Docker must be running; if it is not, the database tests skip with a reason and the rest still run.
+There is deliberately no `TEST_DATABASE_URL` escape hatch — see CLAUDE.md for why.
 
 ---
 
@@ -259,7 +265,7 @@ Postgres comes from [testcontainers](https://testcontainers.com/) automatically;
 | `app/models/views.py` | read-only model over `candidate_summary` (deliberately excluded from Alembic autogenerate) |
 | `app/routers/demo.py` | the demo page and the path-validated structure endpoint |
 | `sql/candidate_summary.sql` | the view, annotated — the iterate-in-a-GUI copy |
-| `migrations/versions/` | 001–006 |
+| `migrations/versions/` | 001–007 |
 | `seed/catalog.json` | the curated meaning layer |
 | `scripts/` | loaders, the score-key extractor, and the HTML provenance scrapers |
 | `docs/schema-stress-log.md` | **the most interesting file in the repo** — a running log of what each experiment revealed about the schema, including the ipTM finding |

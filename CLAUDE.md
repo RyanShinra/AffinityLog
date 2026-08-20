@@ -169,7 +169,8 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   iterate-in-TablePlus copy). `scripts/check_view_migration.py` runs in CI and fails the build if
   the two define different columns.
 - **Tombstoned (115-byte placeholders, not yet rebuilt):** `app/routers/experiments.py`,
-  `app/importer/column_mapping.py`, `app/schemas/pydantic.py`, `tests/conftest.py`.
+  `app/importer/column_mapping.py`, `app/schemas/pydantic.py`. (`tests/conftest.py` was on this
+  list until the database fixtures were rebuilt — verify with `wc -c` before believing any entry.)
   The live HTTP surface is `/health`, `/demo`, `/demo/pdb/{id}`, `/graphql`, `/static`.
 - **The GraphQL context passes one `AsyncSession` per HTTP request, shared by every resolver in the
   query tree** — not an engine, and not a session per resolver. A GraphQL query is a tree, so one
@@ -185,7 +186,7 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   running; nothing else needs setting up, on either machine or in CI.
   There is deliberately **no `TEST_DATABASE_URL` escape hatch**. It was considered and rejected: the
   obvious thing to point it at is the dev database on `localhost:5432`, and the fixtures assert
-  absolute counts against an empty schema, so that would fail confusingly (149 metrics, not 5) while
+  absolute counts against an empty schema, so that would fail confusingly (144 metrics, not 6) while
   also aiming `alembic upgrade head` at real data. A second database inside the compose container
   was rejected for a different reason — CI has no compose stack, so it would reintroduce a
   local-vs-CI split, which is the thing testcontainers exists to remove.

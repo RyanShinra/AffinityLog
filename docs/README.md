@@ -30,6 +30,7 @@ state. Each carries a status banner at the top.
 | [`graphql-schema-handoff.md`](graphql-schema-handoff.md) | The GraphQL layer was designed before the data landed. The type design and the "GraphQL is the apparent representation" principle still stand, but it describes a data model that predates migration 003 and states that no real candidate output exists. Its SDL is now committed separately in [`graphql-schema.md`](graphql-schema.md) — read that for the contract, this for the reasoning. |
 | [`first-run-findings.md`](first-run-findings.md) | A deep analysis of the *first* real export (2026-07-04). Correct about that run; superseded in breadth by `schema-stress-log.md`, which covers all 11. |
 | [`aws-extension-letter.md`](aws-extension-letter.md) | Correspondence about extending the trial. Context only. |
+| [`handoff-081026.md`](handoff-081026.md) | A raw session transcript from the PC → Mac handoff mid-`Context.catalog()`. Every instruction in it is superseded by later commits on the same branch; kept for the record of how the two-machine workflow actually went. Carries a do-not-follow banner. |
 
 ## Not documentation
 
@@ -39,5 +40,5 @@ state. Each carries a status banner at the top.
 ## If you are an AI assistant starting a session here
 
 Read `../CLAUDE.md` (conventions, and how the owner prefers to work), then `../README.md`, then the
-stress log. Be aware that the two stale docs above will contradict the README — the README wins.
+stress log. Be aware that everything under **Historical** will contradict the README — the README wins.
 Verify claims against the running database rather than against any document, including this one.

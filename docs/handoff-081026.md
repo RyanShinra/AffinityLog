@@ -1,3 +1,19 @@
+# PC → Mac handoff, 2026-08-10
+
+> **HISTORICAL — do not follow the instructions in this file.** A raw session transcript from the
+> moment work moved from the PC to the Mac, mid-way through `Context.catalog()`. Kept because it
+> records how the two-machine handoff actually went, not because any of it is still true.
+>
+> Superseded on three counts, all by later commits on the same branch:
+> its rebuild steps invoke `scripts/load_experiment.py` per export, which double-counts
+> experiment 1 — use `experiment_results/load_experiment_results.py`; the `catalog()` body it
+> describes as an unwritten `YOUR TURN` block has since been written; and the deliberate
+> `# noqa: F401` and `Missing return statement` markers it mentions were both removed.
+>
+> The authoritative handoff for that moment is the commit message of `dd2e376`.
+
+---
+
 He's mid-write — the `catalog()` body is still the `YOUR TURN` block. Let me check two things before I commit that, because both could bite you.
 
 Both concerns resolved by your own past config, with one wrinkle:
