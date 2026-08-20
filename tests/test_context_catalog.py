@@ -13,10 +13,14 @@ the two-tier lookup carries it.
 
 from __future__ import annotations
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.catalog.keys import decompose
+from app.database import AsyncSessionLocal
 from app.graphql.context import Context, MetricIdentity
+from app.graphql.schema import schema
 from app.models import orm as db
 
 
@@ -146,3 +150,44 @@ class TestTheViewSuppliesTierTwo:
             "pairing-cand": "antibody only (H/L pairing)",
             "lone-cand": "single chain (no interface)",
         }
+
+
+class TestTheSessionIsNotUsedConcurrently:
+    """Regression tests for the concurrency bug the max-effort review found.
+
+    graphql-core executes sibling fields and list items with `gather`, so several resolvers reach
+    the one per-request session in the same tick. Both of these failed before `Context` grew
+    `_session_lock`; neither would have been caught by any other test in the suite.
+    """
+
+    async def test_the_memo_survives_concurrent_callers(self, seeded_catalog: AsyncSession) -> None:
+        """Fourteen concurrent callers, one catalog.
+
+        Fourteen is not arbitrary: it is the corpus's candidate count, and `{ candidates { scores } }`
+        gathers the `scores` resolver across that list. Before the lock this produced 14 distinct
+        MetricCatalog objects and 14 queries — the memo's entire purpose, silently void.
+        """
+        context = Context(session=seeded_catalog)
+
+        catalogs = await asyncio.gather(*(context.catalog() for _ in range(14)))
+
+        assert len({id(c) for c in catalogs}) == 1, "every caller must get the same catalog object"
+
+    async def test_two_root_fields_do_not_break_a_virgin_session(self, engine: AsyncEngine) -> None:
+        """The narrowest query that reproduced the original crash.
+
+        Two root fields are gathered onto a session that has not yet checked out a connection.
+        `AsyncSessionLocal` — rather than the `session` fixture — because the fixture's session is
+        already warm, and warm is exactly the state where this does NOT reproduce.
+
+        Before the lock: `IllegalStateChangeError: Method 'close()' can't be called here` raised out
+        of the session's own `__aexit__`, so the request 500s with a poisoned session rather than
+        returning a GraphQL error.
+        """
+        async with AsyncSessionLocal() as virgin_session:
+            result = await schema.execute(
+                "{ candidates { sequenceId } experiments { name } }",
+                context_value=Context(session=virgin_session),
+            )
+
+        assert result.errors is None, f"expected no errors, got {result.errors}"

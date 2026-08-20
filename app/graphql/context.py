@@ -30,10 +30,11 @@ anything wants a header or a cookie, and subclassing costs nothing today.
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Annotated, Final
+from typing import Annotated, Any, Final, TypeVar
 
 from fastapi import Depends
 from sqlalchemy import Result, Select, select
@@ -43,6 +44,10 @@ from strawberry.fastapi import BaseContext
 
 from app.database import get_session
 from app.models import orm as db
+
+# `Select[tuple[X]]` -> `Result[tuple[X]]`, matching SQLAlchemy's own `Select(Generic[_TP])`.
+# Named for the row tuple so `Context.execute` is as precise as the bare `session.execute` it replaces.
+_RowTuple = TypeVar("_RowTuple", bound=tuple[Any, ...])
 
 # The catalog's natural key: (module_name, column_key, variant_kind, variant). Matches `metrics`'
 # UNIQUE constraint and the first four fields of `ScoreKey`. Note `variant_kind` is the member NAME
@@ -107,18 +112,58 @@ class MetricCatalog:
 class Context(BaseContext):
     """Per-request state handed to every resolver as ``info.context``.
 
-    Deliberately a thin holder. Anything that queries belongs in a resolver, not in here — the
-    context exists to carry the session, not to become a service layer.
+    Still a thin holder: it carries the session and serialises access to it, and it caches the one
+    thing every ScoreEntry needs. Anything that answers a domain question belongs in a resolver.
+
+    WHY THIS OWNS A LOCK
+    --------------------
+    One session per request (see the module docstring) is right for read consistency and wrong
+    about concurrency, and nothing reconciled the two until now. graphql-core executes sibling
+    fields and list items with ``gather``, so several resolvers reach the session in the same tick.
+    An ``AsyncSession`` is explicitly not safe for that. Measured against a real database:
+
+        virgin session, 4 concurrent execute()  ->  3 raise InvalidRequestError
+                                                    "this session is provisioning a new connection;
+                                                     concurrent operations are not permitted"
+        warm session,   4 concurrent execute()  ->  0 raise
+
+    So the failure is not theoretical and not rare — it is *the first concurrent touch of a
+    request*. `{ candidates { sequenceId } experiments { name } }` is two root fields, which
+    graphql-core gathers onto a session that has not yet checked out a connection, and it raises
+    ``IllegalStateChangeError`` out of the session's own ``__aexit__`` — an unhandled 500 with a
+    poisoned session, not a masked GraphQL error.
+
+    ``execute()`` therefore holds ``_session_lock`` for the duration of the statement, and every
+    resolver goes through it rather than touching ``session.execute`` directly. The queries were
+    already serial — one session is one connection — so this costs nothing but honesty.
     """
 
     def __init__(self, session: AsyncSession) -> None:
         super().__init__()  # BaseContext populates request/response/background_tasks
         self.session: AsyncSession = session
 
+        # Guards every statement this request runs. Constructed here rather than lazily because
+        # asyncio.Lock no longer binds to a loop at construction (3.10+), so there is no reason to
+        # defer it and every reason not to race on creating it.
+        self._session_lock = asyncio.Lock()
+
         # `None` rather than an empty MetricCatalog: an empty catalog is a legitimate state (an
         # unseeded database), so the sentinel has to be distinguishable from the real thing or a
         # fresh install would query once per ScoreEntry forever.
         self._catalog: MetricCatalog | None = None
+
+    async def execute(self, statement: Select[_RowTuple]) -> Result[_RowTuple]:
+        """Run one statement against this request's session, serialised against every other.
+
+        Resolvers call this, never `info.context.session.execute(...)` — the lock is only worth
+        anything if it is the single door. See the class docstring for what goes wrong otherwise.
+        """
+        async with self._session_lock:
+            # Annotated rather than returned inline: `AsyncSession.execute` is declared
+            # `-> Result[Any]`, so mypy strict rejects handing that straight back as
+            # `Result[_RowTuple]`. Every call site in this app already binds the same way.
+            result: Result[_RowTuple] = await self.session.execute(statement)
+            return result
 
     async def catalog(self) -> MetricCatalog:
         """The whole metric catalog, loaded once per request.
@@ -133,6 +178,26 @@ class Context(BaseContext):
         if self._catalog is not None:
             return self._catalog
 
+        async with self._session_lock:
+            # Checked again inside the lock. Without this the lock would serialise the queries but
+            # still run one per caller: measured, 14 concurrent callers (one per candidate in
+            # `{ candidates { scores } }`, which graphql-core gathers across the list) produced 14
+            # distinct MetricCatalog objects and 14 queries. The memo only works if the winner is
+            # decided while the losers are waiting.
+            if self._catalog is not None:
+                return self._catalog
+            self._catalog = await self._load_catalog()
+
+        return self._catalog
+
+    # End def catalog
+
+    async def _load_catalog(self) -> MetricCatalog:
+        """Build the catalog. Call only from `catalog()`, holding `_session_lock`.
+
+        Split out so `catalog()` is nothing but cache policy — the double-check, the lock, the
+        memo — and this is nothing but how the two indexes get built.
+        """
         # WHAT `variant_kinds_per_heading` IS
         # ----------------------------------
         # It is small. Measured against the seeded corpus, 144 metric rows produce exactly FOUR
@@ -209,6 +274,8 @@ class Context(BaseContext):
             selectinload(db.Metric.transform_of),
         )
 
+        # `self.session.execute`, not `self.execute`: the caller already holds `_session_lock`
+        # and asyncio.Lock is not reentrant, so going through the wrapper would deadlock.
         result: Result[tuple[db.Metric]] = await self.session.execute(stmt)
         rows: Sequence[db.Metric] = result.scalars().all()
 
@@ -226,10 +293,7 @@ class Context(BaseContext):
         for heading, seen_kinds in kinds_seen_per_heading.items():
             variant_kinds_per_heading[heading] = frozenset(seen_kinds)
 
-        self._catalog = MetricCatalog(
-            metric_by_identity=metric_by_identity, variant_kinds_per_heading=variant_kinds_per_heading
-        )
-        return self._catalog
+        return MetricCatalog(metric_by_identity=metric_by_identity, variant_kinds_per_heading=variant_kinds_per_heading)
 
     # End def catalog
 

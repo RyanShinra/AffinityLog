@@ -208,7 +208,7 @@ class Candidate:
         `WHERE id = ANY(...)` would take the 14 down to 1, though it would not touch the ×4.
         """
         stmt: Select[tuple[db.Experiment]] = Experiment.select_statement().where(db.Experiment.id == self.experiment_id)
-        result: Result[tuple[db.Experiment]] = await info.context.session.execute(stmt)
+        result: Result[tuple[db.Experiment]] = await info.context.execute(stmt)
         # Filtered on the primary key, so at most one row. See the note in schema.py on why nothing
         # here is wrapped in try/except, and why scalar_one_or_none is preferred to .first().
         row: db.Experiment | None = result.scalar_one_or_none()
@@ -274,6 +274,6 @@ class Experiment:
             .where(db.Candidate.experiment_id == uuid.UUID(self.id))
             .order_by(db.Candidate.sequence_id)
         )
-        result: Result[tuple[db.Candidate]] = await info.context.session.execute(stmt)
+        result: Result[tuple[db.Candidate]] = await info.context.execute(stmt)
         rows: Sequence[db.Candidate] = result.scalars().all()
         return [Candidate.from_row(r) for r in rows]
