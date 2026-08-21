@@ -74,6 +74,7 @@ Modules and saw 1 rather than 0.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
@@ -109,16 +110,23 @@ def _alembic_config() -> Config:
 
 
 def _docker_is_running() -> bool:
-    """Whether a Docker daemon is reachable, without raising if it is not.
+    """Whether the daemon `PostgresContainer` would use is reachable. Never raises.
 
-    Imported lazily: a run that touches no database should not pay for the docker SDK import.
+    Uses testcontainers' own `DockerClient` rather than `docker.from_env()`, and the difference is
+    not cosmetic. `from_env()` reads `DOCKER_HOST` only; `DockerClient.__init__` calls
+    `get_docker_host()`, which consults `tc.host` in ~/.testcontainers.properties FIRST. On a
+    machine running Colima, Rancher Desktop or rootless Docker — where the socket is configured
+    through `tc.host` and `DOCKER_HOST` is unset — `from_env()` reports no daemon while the
+    container on the next line would have started fine.
+
+    That mattered more once the CI guard below turned "no daemon" into a hard failure: a probe that
+    can be wrong about a working daemon must not be the thing that fails a build. Probing through
+    the same resolution the container uses is what makes the two agree by construction.
     """
     try:
-        import docker
-    except ImportError:  # pragma: no cover - docker is a testcontainers dependency
-        return False
-    try:
-        docker.from_env().ping()
+        from testcontainers.core.docker_client import DockerClient
+
+        DockerClient().client.ping()
     except Exception:
         return False
     return True
@@ -130,11 +138,26 @@ def database_url() -> Iterator[str]:
 
     MUST stay a plain `def`. See point 1 in the module docstring.
 
-    Skips rather than errors when Docker is down, so `pytest` with a stopped daemon still runs
-    every test that does not need a database instead of failing the whole run at collection.
+    Skips rather than errors when Docker is down LOCALLY, so `pytest` with a stopped daemon still
+    runs every test that does not need a database instead of failing the whole run at collection.
     `-ra` in pyproject's addopts makes the reason visible rather than a bare `s`.
+
+    IN CI IT FAILS INSTEAD. That asymmetry is the whole point. The workflow runs bare `pytest` with
+    no floor on how many tests it collects, and `build` only `needs: [lint, test]` — so a runner
+    whose Docker socket is unavailable, or an image pull that gets rate-limited, would skip every
+    database test, exit 0, and ship a green build. That includes
+    `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM
+    finding this whole schema exists for. A skip is the right ergonomic on a laptop and a blind
+    spot in a pipeline; `CI` is set by GitHub Actions and by every other runner worth naming.
     """
     if not _docker_is_running():
+        if os.environ.get("CI"):
+            pytest.fail(
+                "Docker is not reachable, so the database tests cannot run. Failing rather than "
+                "skipping because CI is set: a green build with no database coverage is worse than "
+                "a red one. Locally this is a skip.",
+                pytrace=False,
+            )
         pytest.skip("needs a database; Docker is not running — start Docker Desktop and re-run")
 
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as postgres:
