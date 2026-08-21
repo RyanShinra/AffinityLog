@@ -303,6 +303,94 @@ write. It is flagged in the file and belongs with the planned test-review PR.
 `Query.modules`, `Query.metrics`, `Candidate.target`, `Candidate.artifacts` and `Mutation` entirely
 — all declared in the SDL, none implemented.
 
-**And an open question about this PR itself:** at 2,168 lines it is large enough that the review
-found nine real bugs in the first 1,480. Whether that argues for a second pass before merge, or for
-closing it and moving the remaining work to a fresh branch, is the next decision.
+---
+
+## Act VI — the second pass, which answered the open question
+
+The diary originally ended on a choice: second pass before merge, or close the PR and move on. We
+ran the second pass. It found **fifteen more findings, and they were concentrated in the fixes** —
+the ~700 lines written *in response to* the first review, which had never themselves been reviewed.
+
+That is the most useful thing this branch taught, and it is worth stating plainly: **fix code
+written under review pressure gets less scrutiny than the code it fixes.** The first pass found nine
+real bugs across 1,480 lines. The second found a comparable density in 700 lines of remediation, and
+three of them are ironic in a way that is hard to argue with.
+
+### The three that sting
+
+**The satisfiability check has a false negative in exactly the shape it was written to catch.**
+`DECOMPOSABLE_VARIANT_KINDS` flattens `_VARIANT_RULES` to `{'PARAMETER'}`. But those rules are keyed
+by *module* and their regex pins the *column* — so PARAMETER is only recoverable for
+`evoprotgrad.pseudolikelihood_ratio`. Measured:
+
+```
+decompose('evoprotgrad.esm_entropy')          -> (evoprotgrad, esm_entropy, None, None)
+decompose('boltz2.esm_pseudolikelihood_ratio') -> (boltz2, esm_pseudolikelihood_ratio, None, None)
+
+Heading('evoprotgrad', 'entropy', ('PARAMETER',), 0).problems()  ->  CLEAN
+```
+
+A heading of PARAMETER rows under any other column passes the check while nothing can resolve it.
+The fix needs a rule lookup keyed by `(module, column_key)`, not a set of kind names.
+
+**The "trustworthy" Docker probe added a new way to be wrong about a working daemon — on the same
+commit that made being wrong fatal.** `DockerClient.__init__` performs a *registry login* when
+`DOCKER_AUTH_CONFIG` is set. So a rate-limited Docker Hub now fails the build with "Docker is not
+reachable". That commit's own message argues a probe which can be wrong must not be the thing that
+fails a build. It then made the probe wronger.
+
+**The leak regression test fails open.** `test_a_commits_through_the_apps_own_sessionmaker` has no
+assertion at all, so `pytest -k test_b_sees_none_of_it` or `pytest --lf` runs B alone against an
+empty schema and passes vacuously. The verification that the pair catches the bug was real — but
+only for the one ordering that happened to be run.
+
+### The rest, as a work list
+
+Roughly in severity order. This is the **first thing to do in the next branch**, before any new
+resolver work:
+
+| # | where | what |
+|---|---|---|
+| 1 | `app/catalog/keys.py` | `DECOMPOSABLE_VARIANT_KINDS` needs `(module, column_key)`, not a kind set |
+| 2 | `app/catalog/invariants.py` | a row with NULL `variant_kind` but non-NULL `variant` counts as bare and suppresses all three branches |
+| 3 | `tests/conftest.py` | Docker probe does a registry login; use `docker.DockerClient(base_url=get_docker_host())` |
+| 4 | `tests/test_context_catalog.py` | make the leak test self-contained — commit, then read from a *second* connection in the same test |
+| 5 | `tests/conftest.py` | `os.environ.get("CI")` is a presence test; `CI=false` fails the run |
+| 6 | `app/catalog/invariants.py` | INTERFACE coverage is never checked *per heading* — a heading with one of three variants passes clean |
+| 7 | `scripts/seed_catalog.py` | dry-run catches `OSError` only; an unmigrated database gives `ProgrammingError` |
+| 8 | `tests/conftest.py` | `configure()` merges, so `join_transaction_mode` is welded on permanently and cannot be reset |
+| 9 | `tests/conftest.py` | the flagged block states a guarantee five `test_importer.py` tests already break |
+| 10 | `tests/conftest.py` | says "eight modules" (it is ten); and `app.database.engine` is a second unguarded path to the corpus |
+| 11 | `tests/test_context_catalog.py` | the virgin-session test reopens the second door from the test side |
+| 12 | `scripts/seed_catalog.py` | `--dry-run` still documented as "touch nothing"; it now upserts |
+| 13 | `tests/conftest.py` | the probe rewrites `DOCKER_HOST` and leaks an unclosed client |
+| 14 | `tests/test_catalog_invariants.py` | docstring cites a `HAVING` that no longer exists |
+| 15 | `app/graphql/context.py` | nothing *enforces* that code holding `_session_lock` avoids `self.execute()` — a comment is the only guard against a silent deadlock when `interface_kinds()` is written |
+
+Note the shape of the list: **ten of fifteen are in test and tooling code**, and five are documentation
+claims that were false the moment they were written. The application code came out comparatively
+well, which is the opposite of where attention naturally goes.
+
+### What that decided
+
+Fixing these in-branch would produce a *third* generation of fix code with the same problem, inside
+a PR already at 2,168 lines. So: **merge, and open a dedicated branch for them.** The remediation
+gets to be its own reviewable unit rather than an appendix to a feature branch — which is exactly
+what the second pass demonstrated it needs.
+
+---
+
+## What comes next
+
+1. **"Spring cleaning in summer"** — the fifteen above, as their own branch and their own review.
+2. **The rest of the GraphQL** — `Context.interface_kinds()`, `ScoreKey.identity`, the
+   `Metric`/`Module`/`Concept`/`ScoreEntry` types, `Candidate.scores` with its filters. Then
+   `Query.modules`, `Query.metrics`, `Candidate.target`, `Candidate.artifacts`, `Mutation`.
+3. **The test-review pass** already planned, which is where `_identity_for` finally stops being a
+   copy of the lookup and starts calling it.
+
+One thing to carry forward into all three: every fix in this branch that survived scrutiny was one
+where the failure had been *reproduced first* — the memo race, the fixture leak, the eager-load test.
+Every fix that did not survive was one written from a description of the problem rather than a
+demonstration of it. That is a sharper rule than "write tests", and this branch is the evidence for
+it.
