@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import asyncio
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.catalog.keys import decompose
 from app.database import AsyncSessionLocal
@@ -177,17 +178,50 @@ class TestTheSessionIsNotUsedConcurrently:
         """The narrowest query that reproduced the original crash.
 
         Two root fields are gathered onto a session that has not yet checked out a connection.
-        `AsyncSessionLocal` — rather than the `session` fixture — because the fixture's session is
-        already warm, and warm is exactly the state where this does NOT reproduce.
+
+        The session is built from the engine here rather than taken from the `session` fixture,
+        because that fixture's session is already warm — and warm is exactly the state where this
+        does NOT reproduce. It deliberately does not use `AsyncSessionLocal` either: that is
+        unbound outside a `session`-requesting test, and binding it would defeat the point. What
+        this needs is simply a session that has not connected yet, which is what production's
+        `get_session` hands every request.
+
+        Read-only, so nothing here needs the rollback the `session` fixture would provide.
 
         Before the lock: `IllegalStateChangeError: Method 'close()' can't be called here` raised out
         of the session's own `__aexit__`, so the request 500s with a poisoned session rather than
         returning a GraphQL error.
         """
-        async with AsyncSessionLocal() as virgin_session:
+        virgin_maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+        async with virgin_maker() as virgin_session:
             result = await schema.execute(
                 "{ candidates { sequenceId } experiments { name } }",
                 context_value=Context(session=virgin_session),
             )
 
         assert result.errors is None, f"expected no errors, got {result.errors}"
+
+
+class TestTheFixtureContainsWhatATestWrites:
+    """Regression test for the leak the max-effort review found.
+
+    FLAGGED FOR THE TEST-REVIEW PR: these two are ORDER COUPLED on purpose, which is a fragility
+    worth a deliberate decision rather than inheritance. See the flagged block in conftest.py for
+    what a sessionmaker is and why this fixture is subtle.
+
+    They run in file order and are meaningfully coupled: the first writes through the app's
+    own sessionmaker, the second checks the write did not survive. Before the fix the `engine`
+    fixture bound `AsyncSessionLocal` to the ENGINE, so it opened its own connection and its
+    commit landed outside the `session` fixture's transaction — test B saw 1 Module, not 0.
+    """
+
+    async def test_a_commits_through_the_apps_own_sessionmaker(self, session: AsyncSession) -> None:
+        """Exactly what a seeder does. All four use AsyncSessionLocal and commit."""
+        async with AsyncSessionLocal() as app_session:
+            app_session.add(db.Module(name="leak-probe", module_type=db.ModuleType.SCORE, functions=[]))
+            await app_session.commit()
+
+    async def test_b_sees_none_of_it(self, session: AsyncSession) -> None:
+        modules = await session.scalar(select(func.count()).select_from(db.Module))
+
+        assert modules == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"

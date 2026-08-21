@@ -32,6 +32,43 @@ THE THREE THINGS THAT MAKE THIS WORK
 3. `session` joins an outer transaction that is always rolled back. Nothing a test writes survives
    it, even if the code under test commits: `join_transaction_mode="create_savepoint"` turns an
    inner `commit()` into a SAVEPOINT release, and only the fixture can end the outer transaction.
+
+!!! FLAGGED FOR THE TEST-REVIEW PR — READ THIS BEFORE CHANGING ANYTHING BELOW !!!
+--------------------------------------------------------------------------------
+The `session` fixture is the subtlest thing in this repo's test setup, and it turns on a concept
+that appears nowhere else in the project. Do not skim it.
+
+WHAT A SESSIONMAKER IS. `AsyncSessionLocal` is not a session. It is a *factory* that produces
+sessions — one module-level object, built once in `app/database.py` when that module is first
+imported, and shared by everything that imported it. `AsyncSessionLocal()` calls the factory;
+`AsyncSessionLocal.configure(...)` reconfigures the factory itself, in place.
+
+WHY IN PLACE MATTERS. Eight modules do `from app.database import AsyncSessionLocal`, which binds
+the *object* into their namespace, not the name. Reassigning `app.database.AsyncSessionLocal`
+would therefore reach none of them. `.configure()` mutates the one object they all hold, which is
+the only reason the fixture can redirect the seeders at all.
+
+WHAT TO SCRUTINISE, specifically:
+
+  * The bind is lifted ONLY inside a test that requested `session`, and restored to `None` in a
+    `finally`. A test that uses `AsyncSessionLocal` without requesting `session` raises
+    UnboundExecutionError. That is deliberate — it already caught one of our own tests reaching
+    for the app's sessionmaker when what it actually wanted was an unconnected session — but it is
+    a sharp edge and a reader deserves to be told rather than to discover it.
+  * Whether `create_savepoint` is the right join mode, and whether it leaking past the `bind=None`
+    reset is genuinely inert or merely harmless today.
+  * This assumes ONE test process. pytest-xdist is not installed; if it ever is, every worker
+    mutates its own copy of the factory, which happens to be fine — but nobody has checked that
+    the container-per-worker cost is acceptable.
+  * The two `TestTheFixtureContainsWhatATestWrites` tests in test_context_catalog.py are ORDER
+    COUPLED on purpose: A writes, B checks the write did not survive. If they are ever reordered,
+    split across files, or run in isolation, they stop testing anything. That is a real fragility,
+    not a style choice, and it deserves a decision rather than an inheritance.
+
+History: this shape came out of the max-effort review on PR #13, which found that binding the
+factory to the ENGINE (the previous version) gave it its own connection, so a `commit()` through
+it escaped the rollback entirely. Reproduced at the time: test A committed a Module, test B counted
+Modules and saw 1 rather than 0.
 """
 
 from __future__ import annotations
@@ -39,6 +76,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -119,13 +157,10 @@ def _unbind_the_app_sessionmaker() -> Iterator[None]:
     which points at the compose Postgres holding the corpus. A test that reached for the app's own
     sessionmaker instead of the `session` fixture would write to real data.
 
-    Unbinding is therefore the DEFAULT state: such a test raises UnboundExecutionError immediately,
-    offline, instead of quietly succeeding against the corpus. `engine` rebinds it to the throwaway
-    container for tests that genuinely need a database, and wins because autouse session fixtures
-    are set up before the non-autouse ones a test requests.
-
-    Doing this here rather than inside `engine` is what keeps the guarantee unconditional — an
-    `engine`-only rebind protects nothing until some test happens to ask for a database.
+    Unbinding is therefore the DEFAULT state, and it is the state BETWEEN tests as well as before
+    the first one: such a test raises UnboundExecutionError immediately, offline, instead of
+    quietly succeeding against the corpus. Only `session` lifts it, only for the duration of one
+    test, and only onto its own transaction.
     """
     AsyncSessionLocal.configure(bind=None)
     yield
@@ -133,31 +168,57 @@ def _unbind_the_app_sessionmaker() -> Iterator[None]:
 
 @pytest.fixture(scope="session")
 def engine(database_url: str) -> Iterator[AsyncEngine]:
-    """One engine, and the quarantine of the app's own sessionmaker.
+    """One engine for the run.
 
     `NullPool` matters: asyncpg connections belong to the event loop that opened them, and
     pytest-asyncio gives each test a fresh loop. A pooled connection handed to a later test would
     be attached to a loop that no longer exists.
+
+    Deliberately does NOT bind `AsyncSessionLocal`. It used to, and that was a hole: binding to the
+    ENGINE hands the app's sessionmaker its own connection, so a `commit()` through it lands in a
+    container nothing truncates — outside the rollback in `session`, which owns a different
+    connection entirely. Being session-scoped, one database test would then leave that door open
+    for every later test. The bind belongs on the connection, per test; see `session`.
     """
     test_engine = create_async_engine(database_url, poolclass=NullPool)
-    AsyncSessionLocal.configure(bind=test_engine)  # see point 2 in the module docstring
     yield test_engine
     asyncio.run(test_engine.dispose())
 
 
 @pytest.fixture
 async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    """A session whose writes are always discarded. See point 3 in the module docstring."""
+    """A session whose writes are always discarded. See point 3 in the module docstring.
+
+    `AsyncSessionLocal` is bound to the SAME connection for the duration of the test, so code that
+    reaches for the app's own sessionmaker — every seeder does — joins this transaction instead of
+    opening its own. Its `commit()` becomes a SAVEPOINT release, and the rollback below covers it.
+
+    Reproduced before this was fixed: test A committed a Module through `AsyncSessionLocal`, test B
+    counted Modules through the fixture and saw 1 rather than 0. Nothing wrote that way yet, so it
+    was a trap rather than a break — the first test of a seeder would have sprung it, and the
+    resulting failures would have depended on collection order.
+
+    Unbound again at teardown, so the quarantine is the resting state rather than a starting one.
+    The consequence is deliberate: `AsyncSessionLocal` only works inside a test that requested this
+    fixture. A test writing through it with no transaction to contain it is the bug.
+    """
     async with engine.connect() as connection:
         transaction = await connection.begin()
-        maker = async_sessionmaker(
-            bind=connection,
-            expire_on_commit=False,
-            join_transaction_mode="create_savepoint",
-        )
-        async with maker() as test_session:
-            yield test_session
-        await transaction.rollback()
+        joins_this_transaction: dict[str, Any] = {
+            "bind": connection,
+            "expire_on_commit": False,
+            "join_transaction_mode": "create_savepoint",
+        }
+        maker = async_sessionmaker(**joins_this_transaction)
+        AsyncSessionLocal.configure(**joins_this_transaction)
+        try:
+            async with maker() as test_session:
+                yield test_session
+        finally:
+            # `bind=None` alone restores the quarantine; the leftover join_transaction_mode is
+            # inert on a sessionmaker that cannot reach a database.
+            AsyncSessionLocal.configure(bind=None)
+            await transaction.rollback()
 
 
 @pytest.fixture
