@@ -30,6 +30,7 @@ state. Each carries a status banner at the top.
 | [`graphql-schema-handoff.md`](graphql-schema-handoff.md) | The GraphQL layer was designed before the data landed. The type design and the "GraphQL is the apparent representation" principle still stand, but it describes a data model that predates migration 003 and states that no real candidate output exists. Its SDL is now committed separately in [`graphql-schema.md`](graphql-schema.md) — read that for the contract, this for the reasoning. |
 | [`first-run-findings.md`](first-run-findings.md) | A deep analysis of the *first* real export (2026-07-04). Correct about that run; superseded in breadth by `schema-stress-log.md`, which covers all 11. |
 | [`aws-extension-letter.md`](aws-extension-letter.md) | Correspondence about extending the trial. Context only. |
+| [`pr-13-diary.md`](pr-13-diary.md) | A narrative of PR #13 — what the metric-catalog chapter set out to be, the naming and layering conversations that reshaped it, and the max-effort review that found nine real bugs including one that predates the branch. Written as a record of *why the work kept moving*, where the commit messages record what changed. Primary source for the development blog. |
 | [`handoff-081026.md`](handoff-081026.md) | A raw session transcript from the PC → Mac handoff mid-`Context.catalog()`. Every instruction in it is superseded by later commits on the same branch; kept for the record of how the two-machine workflow actually went. Carries a do-not-follow banner. |
 
 ## Not documentation
