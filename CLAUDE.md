@@ -179,6 +179,34 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   resolver, because type resolvers run after that has already returned. `app/database.py`'s
   `get_session` provides the shape; `app/graphql/context.py` wires it in.
   (This entry previously said the opposite — engine-per-resolver — which the code never did.)
+- **Resolvers call `info.context.execute(stmt)`, NEVER `info.context.session.execute(stmt)`.** One
+  session shared across a tree is unsafe under concurrency — graphql-core gathers sibling fields and
+  list items, and an `AsyncSession` is explicitly not safe for that. `Context.execute` holds
+  `_session_lock` for the statement; the lock is only worth anything if it is the single door.
+  Measured before the lock existed: `{ candidates { sequenceId } experiments { name } }` — two root
+  fields on a session that has not yet checked out a connection — raised `IllegalStateChangeError`
+  out of the session's own `__aexit__`, a 500 with a poisoned session that `MaskInternalErrors`
+  never sees. Nothing enforces this but the convention; `grep -n 'session.execute' app/graphql/` is
+  the check.
+  Corollary: `asyncio.Lock` is not reentrant, so code that already holds the lock (today only
+  `Context._load_catalog`) must call `self.session.execute` directly. Calling `self.execute` from
+  under the lock hangs the request with no traceback.
+- **A new seeder must call `raise_on_heading_violations(session, source=...)` before `commit()`.**
+  `app/catalog/invariants.py` enforces `(module_id, column_key) -> variant_kind`, a functional
+  dependency the schema cannot express and the ScoreEntry lookup depends on. Breaking it makes score
+  resolution wrong *silently*. Both catalog seeders call it, and their `--dry-run` paths now apply
+  their writes and check without committing so the preview can predict the abort.
+- **`AsyncSessionLocal` works in a test ONLY inside one that requested the `session` fixture.**
+  `tests/conftest.py` unbinds it by default so nothing can reach the dev corpus, and binds it to the
+  test's own connection for the duration, so a seeder's `commit()` becomes a SAVEPOINT release inside
+  the rollback. Outside that, using it raises `UnboundExecutionError` — except where the code under
+  test never executes a statement, which is why `tests/test_importer.py` gets away with it today.
+  That file's module docstring carries a block flagged for the planned test-review PR; read it before
+  changing any fixture.
+- **Before starting new feature work, read `docs/pr-13-diary.md`'s Act VI.** It is a fifteen-item
+  list of defects the second review pass found in PR #13's own fixes — two of which (the
+  `DECOMPOSABLE_VARIANT_KINDS` false negative and a half-populated `variant` row) let bad catalog
+  data through silently. That cleanup is the intended next branch.
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image
