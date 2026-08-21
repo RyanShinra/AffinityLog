@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -176,8 +177,8 @@ class TestTheSessionIsNotUsedConcurrently:
     """Regression tests for the concurrency bug the max-effort review found.
 
     graphql-core executes sibling fields and list items with `gather`, so several resolvers reach
-    the one per-request session in the same tick. Both of these failed before `Context` grew
-    `_session_lock`; neither would have been caught by any other test in the suite.
+    the one per-request session in the same tick. Both of these failed before the session grew a
+    lock; neither would have been caught by any other test in the suite.
     """
 
     async def test_the_memo_survives_concurrent_callers(self, seeded_catalog: AsyncSession) -> None:
@@ -244,3 +245,44 @@ class TestTheFixtureContainsWhatATestWrites:
         modules = await session.scalar(select(func.count()).select_from(db.Module))
 
         assert modules == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"
+
+
+class TestTheTwoLocksAreSeparate:
+    """The memo lock and the session lock must be different objects.
+
+    `catalog()` holds `_catalog_lock` across the whole of `_load_catalog()`, and `_load_catalog()`
+    issues a statement through `execute_statement()`, which takes the session's lock. That is only
+    safe while the two are distinct. Collapse them into one and the task waits on a lock it already
+    holds — `asyncio.Lock` is not reentrant — so the request hangs forever with no exception and no
+    traceback, while every other request on the loop is served normally.
+
+    These are timeout-bounded on purpose. A deadlock does not fail a test, it *hangs* one, and a
+    hung suite reads as CI being slow rather than as a bug.
+    """
+
+    async def test_the_memo_lock_is_not_the_sessions_lock(self, seeded_catalog: AsyncSession) -> None:
+        context = Context(session=seeded_catalog)
+
+        assert context._catalog_lock is not context._session._lock
+
+    async def test_the_catalog_builds_through_the_ordinary_front_door(self, seeded_catalog: AsyncSession) -> None:
+        """`_load_catalog` calls `execute_statement()` like every resolver does, holding the memo lock."""
+        context = Context(session=seeded_catalog)
+
+        catalog = await asyncio.wait_for(context.catalog(), timeout=10.0)
+
+        assert catalog.metric_by_identity, "the seeded catalog is not empty"
+
+    async def test_collapsing_them_into_one_lock_deadlocks(self, seeded_catalog: AsyncSession) -> None:
+        """Break the fix on purpose, and watch it hang.
+
+        This is the pre-cleanup design in one line: point the memo lock at the session's lock, so
+        both invariants are served by one object again. Without it, nothing in the suite would
+        notice if the two locks were quietly merged back together — every other test would still
+        pass, because they pass under both designs.
+        """
+        context = Context(session=seeded_catalog)
+        context._catalog_lock = context._session._lock
+
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(context.catalog(), timeout=1.0)

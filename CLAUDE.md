@@ -179,18 +179,27 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   resolver, because type resolvers run after that has already returned. `app/database.py`'s
   `get_session` provides the shape; `app/graphql/context.py` wires it in.
   (This entry previously said the opposite — engine-per-resolver — which the code never did.)
-- **Resolvers call `info.context.execute(stmt)`, NEVER `info.context.session.execute(stmt)`.** One
-  session shared across a tree is unsafe under concurrency — graphql-core gathers sibling fields and
-  list items, and an `AsyncSession` is explicitly not safe for that. `Context.execute` holds
-  `_session_lock` for the statement; the lock is only worth anything if it is the single door.
-  Measured before the lock existed: `{ candidates { sequenceId } experiments { name } }` — two root
-  fields on a session that has not yet checked out a connection — raised `IllegalStateChangeError`
-  out of the session's own `__aexit__`, a 500 with a poisoned session that `MaskInternalErrors`
-  never sees. Nothing enforces this but the convention; `grep -n 'session.execute' app/graphql/` is
-  the check.
-  Corollary: `asyncio.Lock` is not reentrant, so code that already holds the lock (today only
-  `Context._load_catalog`) must call `self.session.execute` directly. Calling `self.execute` from
-  under the lock hangs the request with no traceback.
+- **Resolvers call `info.context.execute_statement(stmt)`.** There is no other door: `Context` holds
+  a `TaskSafeSession` (`app/database.py`) privately, so there is no `info.context.session` to reach
+  through. That class owns the session's lock and is the only thing that can acquire it. One session
+  shared across a tree is unsafe under concurrency — graphql-core gathers sibling fields and list
+  items, and SQLAlchemy's own docstring says an `AsyncSession` is "not safe for use in concurrent
+  tasks". Measured before the lock existed: `{ candidates { sequenceId } experiments { name } }` —
+  two root fields on a session that has not yet checked out a connection — raised
+  `IllegalStateChangeError` out of the session's own `__aexit__`, a 500 with a poisoned session that
+  `MaskInternalErrors` never sees.
+  The long name is deliberate: Strawberry's `Schema.execute()` runs a GraphQL *document*, and this
+  repo calls it (`tests/test_context_catalog.py:217`), so a bare `execute` would mean SQL in one
+  file and GraphQL in another.
+- **A method that needs a critical section of its own takes its OWN lock, never the session's.**
+  `Context.catalog()` holds `_catalog_lock` across the whole of `_load_catalog()`, which issues its
+  statement through `execute_statement()` — safe only because that takes a *different* lock. One
+  lock serving both invariants is the version that deadlocks: `asyncio.Lock` is not reentrant, so
+  the task waits on itself forever, with no exception, no traceback and no timeout, while every
+  other request on the loop is served normally. `interface_kinds()` wants exactly this shape — give
+  it `_interface_kinds_lock`, not the session's.
+  `tests/test_context_catalog.py::TestTheTwoLocksAreSeparate` guards it, including a test that
+  collapses the two locks back into one and asserts the hang.
 - **A new seeder must call `raise_on_heading_violations(session, source=...)` before `commit()`.**
   `app/catalog/invariants.py` enforces `(module_id, column_key) -> variant_kind`, a functional
   dependency the schema cannot express and the ScoreEntry lookup depends on. Breaking it makes score
