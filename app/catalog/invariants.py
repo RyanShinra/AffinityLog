@@ -39,9 +39,23 @@ Both are silent, and only the first is about "more than one kind":
     because a metric row carries a single (variant_kind, variant) pair; the cross product has
     nowhere to live.
 
-  * ORPHANED BARE ROW — a heading with both a NULL-variant_kind row and qualified rows. Tier one
-    sees the qualified kind and ALWAYS qualifies, so the bare row can never be returned. It is
-    dead data that looks live.
+  * ORPHANED BARE ROW — a heading with both a NULL-variant_kind row and INTERFACE rows. Tier one
+    qualifies, so the bare row can never be returned. It is dead data that looks live.
+
+    INTERFACE specifically, and this was wrong here until measured. An earlier version of this
+    file flagged a bare row beside ANY qualified kind, on the reasoning that tier one "always
+    qualifies". It does not: it qualifies only when INTERFACE is among the heading's kinds, because
+    that is the only axis whose variant is absent from the key string. With any other kind the
+    resolver uses what `decompose()` returned, and the bare row resolves correctly.
+
+    The over-broad version rejected a shape this project has already written down as its next
+    catalog addition. `seed/catalog.json` says of `fastdpe.SFvCSP`: "A raw and a '-transformed'
+    form exist; when the transformed variant is seeded it uses VariantKind.TRANSFORM" — a bare row
+    beside a TRANSFORM row, one heading. Built and measured: the old check flagged it
+    ("has 1 variant-less row(s) beside ['TRANSFORM'], which can never be reached") while the lookup
+    resolved `fastdpe.SFvCSP` to the raw row without difficulty. A write-time check that refuses a
+    legitimate, documented shape is worse than no check, because it blocks the work rather than the
+    error.
 """
 
 from __future__ import annotations
@@ -50,6 +64,8 @@ from typing import NamedTuple
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import orm as db
 
 
 class HeadingViolation(NamedTuple):
@@ -61,16 +77,28 @@ class HeadingViolation(NamedTuple):
     bare_rows: int  # rows with variant_kind IS NULL under the same heading
 
     def describe(self) -> str:
+        """Every reason this heading was flagged, not just the first.
+
+        The two HAVING arms are independent, so one heading can trip both. Reporting only the
+        axes would send the operator round twice: fix the axes, re-run, fail again on the orphan
+        that was in the tuple the whole time.
+        """
+        reasons: list[str] = []
         if len(self.variant_kinds) > 1:
-            reason = f"catalogued along {len(self.variant_kinds)} axes {list(self.variant_kinds)}"
-        else:
-            reason = f"has {self.bare_rows} variant-less row(s) beside {list(self.variant_kinds)}, which can never be reached"
-        return f"{self.module}.{self.column_key}: {reason}"
+            reasons.append(f"catalogued along {len(self.variant_kinds)} axes {list(self.variant_kinds)}")
+        if self.bare_rows and db.VariantKind.INTERFACE.name in self.variant_kinds:
+            reasons.append(f"has {self.bare_rows} variant-less row(s) beside INTERFACE rows, which can never be reached")
+        return f"{self.module}.{self.column_key}: {' and '.join(reasons)}"
 
 
 # `count(DISTINCT variant_kind)` ignores NULLs, which is why the bare-row case needs its own
 # FILTER clause rather than falling out of the same count. Grouping is on module_id + column_key —
 # the heading — because that is the granularity the resolver's tier one asks about.
+#
+# The second arm tests for INTERFACE specifically, not for "any qualified kind". See the docstring:
+# only INTERFACE makes tier one qualify, so only INTERFACE can strand a bare row. `:interface_kind`
+# is bound from `VariantKind.INTERFACE.name` rather than written as a literal, so a rename of the
+# enum member cannot leave this SQL silently testing for a value that no longer exists.
 _VIOLATIONS_SQL = text("""
     SELECT  mo.name                                                       AS module,
             me.column_key                                                 AS column_key,
@@ -81,8 +109,8 @@ _VIOLATIONS_SQL = text("""
     JOIN        modules mo ON mo.id = me.module_id
     GROUP BY    mo.name, me.column_key
     HAVING      count(DISTINCT me.variant_kind) > 1
-        OR (    count(*) FILTER (WHERE me.variant_kind IS NULL)     > 0
-            AND count(*) FILTER (WHERE me.variant_kind IS NOT NULL) > 0 )
+        OR (    count(*) FILTER (WHERE me.variant_kind IS NULL)                     > 0
+            AND count(*) FILTER (WHERE me.variant_kind::text = :interface_kind)     > 0 )
     ORDER BY    mo.name, me.column_key
     """)
 
@@ -94,7 +122,7 @@ async def find_heading_violations(session: AsyncSession) -> list[HeadingViolatio
     their own transaction, so raising on a non-empty result rolls the bad seed back instead of
     reporting it after the fact.
     """
-    result = await session.execute(_VIOLATIONS_SQL)
+    result = await session.execute(_VIOLATIONS_SQL, {"interface_kind": db.VariantKind.INTERFACE.name})
     return [
         HeadingViolation(
             module=row.module,
@@ -114,8 +142,11 @@ async def raise_on_heading_violations(session: AsyncSession, *, source: str) -> 
 
     detail = "\n".join(f"  - {v.describe()}" for v in violations)
     raise ValueError(
-        f"{source}: the catalog would break (module, column_key) -> variant_kind, which the "
-        f"ScoreEntry lookup depends on and the schema does not enforce.\n"
+        f"{source} refused to commit: the catalog breaks (module, column_key) -> variant_kind, "
+        f"which the ScoreEntry lookup depends on and the schema does not enforce.\n"
         f"{detail}\n"
-        f"Nothing was committed. See app/catalog/invariants.py for why this is checked here."
+        f"This run's own writes were rolled back. The offending rows may PREDATE it — the check "
+        f"reads the whole `metrics` table, not just what {source} wrote — so look at the headings "
+        f"named above before assuming this run introduced them.\n"
+        f"See app/catalog/invariants.py for why this is checked at write time."
     )

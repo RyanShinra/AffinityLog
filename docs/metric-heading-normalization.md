@@ -77,8 +77,11 @@ aggregate built in Python — `variant_kinds_per_heading` would collapse to a pl
 ## What the check does NOT cover
 
 - Rows written by anything other than the two seeders — a manual `INSERT` in TablePlus, say.
-- The second violation it also detects (a variant-less row orphaned beside qualified ones) is a
-  *reachability* bug rather than a coherence one: the bare row is dead data that looks live. The
+- The second violation it also detects (a variant-less row orphaned beside **INTERFACE** rows) is a
+  *reachability* bug rather than a coherence one: the bare row is dead data that looks live.
+  INTERFACE specifically — only that axis makes tier one qualify, so only that axis can strand a
+  bare row. A bare row beside a TRANSFORM row, which is the shape `seed/catalog.json` names as the
+  next catalog addition, resolves perfectly well and is not a violation. The
   normalization above does not fix that on its own; it would need `variant` itself to be
   `NOT NULL` whenever the heading declares an axis.
 

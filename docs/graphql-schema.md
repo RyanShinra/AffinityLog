@@ -336,7 +336,7 @@ consulted, silently returning the wrong meaning.
 
 That invariant holds — measured, only four keys have multiple rows and none has a variant-less
 sibling — and it is now **checked** rather than merely true. `app/catalog/invariants.py` fails the
-seed if any heading carries two axes, or a variant-less row beside qualified ones; both seeders call
+seed if any heading carries two axes, or a variant-less row beside INTERFACE rows; both seeders call
 it before committing. That is a stronger position than when this section was written, when the
 invariant rested entirely on `scripts/seed_metric_skeleton.py` skipping on `(module, column_key)`
 rather than on full identity.
