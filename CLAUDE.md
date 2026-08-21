@@ -77,14 +77,27 @@ view, and stored in the catalog as `VariantKind.INTERFACE`. Full write-up in
 ## Current data status
 
 **REAL DATA.** 11 Bio Discovery experiments were run against HER2 during the free trial
-(2026-06 to 2026-07); 9 exported successfully and are loaded: 9 experiments, 14 candidates,
-26 chains, 11 predicted structures, 144 catalogued metrics. Raw CSVs and structures live in
-`experiment_results/`, archived HTML in `HTML Extracts/`.
+(2026-06 to 2026-07) and 9 exported successfully, but **7 CSVs are what load** — they produce
+9 experiment rows, because `load_csv` creates one Experiment per distinct `experimentId` and
+experiments 1 and 5 each span two sub-experiments. The loaded corpus is 9 experiments,
+14 candidates, 26 chains, 200 distinct score keys, 11 predicted structures, 144 catalogued
+metrics. Raw CSVs and structures live in `experiment_results/`, archived HTML in
+`HTML Extracts/`.
 
-Loading is by script, not by API — `scripts/load_experiment.py` for CSVs, then
+Experiments 9 and 10 (the ESM2 pair) exported fine but are deliberately **not** loaded: the
+ESM2 Only recipe folds nothing, so they have no predicted structures to pair with. Loading
+them would take the key count to 204. This is a "not yet" — see the docstring of
+`experiment_results/load_experiment_results.py`, which is the authoritative record of which
+files load and under what names.
+
+Loading is by script, not by API. To rebuild from empty:
+`experiment_results/load_experiment_results.py` (all 7 CSVs, one transaction), then
 `seed_catalog.py` → `seed_metric_skeleton.py` → `seed_corpus_context.py` → `seed_recipes.py`.
-All idempotent. `sample_data/her2_nanobody_sample.csv` is the old synthetic fixture and is no
-longer representative of the schema.
+The seeders are idempotent; the corpus loader skips CSVs already loaded by `source_filename`.
+`scripts/load_experiment.py` is the general single-CSV tool that the corpus loader wraps — use
+it for a new export, not for rebuilding this corpus.
+`sample_data/her2_nanobody_sample.csv` is the old synthetic fixture and is no longer
+representative of the schema.
 
 ---
 
@@ -125,6 +138,11 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `CASE` classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score
   parsing. Scaffold around it, mark the spot, explain the trade-offs, and offer a "fill in the
   blanks" version rather than assuming he wants to type boilerplate.
+- **Never start, stop, or restart Docker — ask, or hand the command over.** Launching Docker
+  Desktop spins up a VM, mounts filesystems, and starts any container with a restart policy; on a
+  laptop that is a real battery and memory commitment, and it changes machine state well beyond the
+  task at hand. If a task needs the daemon, say so and give him the command. The same goes for
+  `docker compose down -v` and anything else that would destroy the `pg_data` volume.
 - **Consult the linter before saying "run it."** Editor diagnostics have caught errors that were then
   shipped anyway; treat ruff/mypy/black as a pre-run gate, and reason about the installed library's
   real signatures rather than the remembered ones.
@@ -141,7 +159,7 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 
 - `candidates.scores` stores every CSV column as `dict[str, str]` (raw strings, not coerced).
   `scripts/seed_metric_skeleton.py` infers each metric's `value_type` from those strings.
-- Migrations run 001–006. `alembic upgrade head` before starting the server (docker-compose does it).
+- Migrations run 001–007. `alembic upgrade head` before starting the server (docker-compose does it).
   **Use `alembic revision -m "..."` to scaffold** — `env.py` has a hook that numbers revisions
   sequentially, and `revision_environment = true` makes it fire for plain revisions too. Do not
   hand-write migration files.
@@ -151,7 +169,8 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   iterate-in-TablePlus copy). `scripts/check_view_migration.py` runs in CI and fails the build if
   the two define different columns.
 - **Tombstoned (115-byte placeholders, not yet rebuilt):** `app/routers/experiments.py`,
-  `app/importer/column_mapping.py`, `app/schemas/pydantic.py`, `tests/conftest.py`.
+  `app/importer/column_mapping.py`, `app/schemas/pydantic.py`. (`tests/conftest.py` was on this
+  list until the database fixtures were rebuilt — verify with `wc -c` before believing any entry.)
   The live HTTP surface is `/health`, `/demo`, `/demo/pdb/{id}`, `/graphql`, `/static`.
 - **The GraphQL context passes one `AsyncSession` per HTTP request, shared by every resolver in the
   query tree** — not an engine, and not a session per resolver. A GraphQL query is a tree, so one
@@ -162,8 +181,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   (This entry previously said the opposite — engine-per-resolver — which the code never did.)
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
-- Tests use testcontainers (pulls `postgres:16-alpine` at runtime) or `TEST_DATABASE_URL`
-  env var if you want to point at an existing Postgres.
+- **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image
+  `docker-compose.yml` pins, started once per pytest session and thrown away after. Docker must be
+  running; nothing else needs setting up, on either machine or in CI.
+  There is deliberately **no `TEST_DATABASE_URL` escape hatch**. It was considered and rejected: the
+  obvious thing to point it at is the dev database on `localhost:5432`, and the fixtures assert
+  absolute counts against an empty schema, so that would fail confusingly (144 metrics, not 6) while
+  also aiming `alembic upgrade head` at real data. A second database inside the compose container
+  was rejected for a different reason — CI has no compose stack, so it would reintroduce a
+  local-vs-CI split, which is the thing testcontainers exists to remove.
 
 ---
 

@@ -51,6 +51,7 @@ from typing import Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.invariants import find_heading_violations, raise_on_heading_violations
 from app.database import AsyncSessionLocal
 
 # scripts/ is on sys.path when a script here is run directly, but not when this module is imported
@@ -193,6 +194,16 @@ async def seed(dry_run: bool = False) -> None:
         # it — e.g. temstapro.clash.H/.L/.T are one metric, so all three chains' values vote.
         types = {m: infer_value_type([v for key in m.raw_keys for v in corpus_values.get(key, [])]) for m in pending}
 
+        async def apply_inserts() -> int:
+            """Register the pending modules and metrics. Shared by the dry run and the real one."""
+            for name in new_modules:
+                module_ids[name] = await _register_module(session, name)
+            registered = 0
+            for metric in pending:
+                if await _insert_skeleton_metric(session, module_ids[metric.module], metric, types[metric]):
+                    registered += 1
+            return registered
+
         if dry_run:
             print(f"{len(metrics)} identities in the corpus, {len(metrics) - len(pending)} already curated")
             print(f"would register {len(pending)} skeleton metrics")
@@ -201,15 +212,28 @@ async def seed(dry_run: bool = False) -> None:
             for value_type in types.values():
                 tally[value_type] = tally.get(value_type, 0) + 1
             print("inferred types: " + ", ".join(f"{t}={n}" for t, n in sorted(tally.items())))
+
+            # The dry run APPLIES the inserts and then does not commit. Reporting on the database
+            # as it stands would answer a question nobody asked — what matters is whether the real
+            # run would abort, and that depends on the rows this run would add. The session closes
+            # without commit(), so the writes are discarded either way.
+            await apply_inserts()
+            violations = await find_heading_violations(session)
+            for violation in violations:
+                print(f"  ERROR: {violation.describe()}")
+            print(
+                f"heading invariant: {'would ABORT the real run' if violations else 'clean'} "
+                f"({len(violations)} violation(s)); nothing written"
+            )
             return
 
-        for name in new_modules:
-            module_ids[name] = await _register_module(session, name)
+        inserted = await apply_inserts()
 
-        inserted = 0
-        for metric in pending:
-            if await _insert_skeleton_metric(session, module_ids[metric.module], metric, types[metric]):
-                inserted += 1
+        # Before the commit — see app/catalog/invariants.py. This seeder is the likelier of the two
+        # to trip it: it skips on (module, column_key) rather than on full identity, and that skip
+        # is the ONLY thing stopping a bare skeleton row landing beside curated INTERFACE rows.
+        await raise_on_heading_violations(session, source="seed_metric_skeleton")
+
         await session.commit()
 
     print(f"skeleton: {inserted} metrics registered, {len(pending) - inserted} already present")

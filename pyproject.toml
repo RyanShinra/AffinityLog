@@ -62,4 +62,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# -ra: print the reason for every non-passing outcome, so a skipped database test says WHY
+# (Docker not running) instead of showing up as a bare `s`.
+addopts = "-ra"
 filterwarnings = ["ignore::DeprecationWarning"]

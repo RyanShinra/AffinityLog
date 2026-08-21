@@ -8,7 +8,11 @@ real data before the API layer is rebuilt.
 
     python scripts/load_experiment.py \\
         "experiment_results/experiment_5/results 5 - Heavy and light.csv" \\
-        --name "HER2 Round 5 - trastuzumab H/L sweep"
+        --name "Experiment 5 - Light and Heavy"
+
+To rebuild THIS project's corpus, don't invoke this per file — use
+``experiment_results/load_experiment_results.py``, which loads the seven CSVs in one
+transaction under their console names.
 
 Reads the DB URL from ``app.config.settings`` (defaults to the local Docker Postgres
 on ``localhost:5432``), so make sure ``docker compose up`` is running and migrations

@@ -289,7 +289,107 @@ The policy lives in `app/graphql/errors.py`; `tests/test_error_masking.py` guard
 assertion that the served schema actually registers the extension — the failure mode here is silent,
 since masking that stops working breaks nothing and simply starts leaking again.
 
-## The coupling nothing currently guards
+### `ScoreEntry` resolves against a catalog loaded once per request
+
+Sizing it first, because the numbers decide the design (measured 2026-08-09):
+
+| | |
+|---|---|
+| catalog rows | 144 (the `metrics` table is 152 KB in total) |
+| `ScoreEntry` objects for one `{ candidates { scores } }` | **1132** |
+| scores on a single candidate | 38 – 130 |
+
+A query per key would be 1132 round trips for one request. The whole catalog is smaller than a
+single candidate's score bag, so it is loaded **once per request** into a dict keyed by the same
+identity `decompose()` produces — `(module, column_key, variant_kind, variant)` — and each of the
+1132 lookups becomes a dict hit. Two queries total: one for the catalog, one for the interface kinds
+below.
+
+It is cached on the `Context` rather than at module level. The catalog only changes on a reseed, so a
+process-wide cache is tempting, but it buys a staleness window and an invalidation story in exchange
+for one query per request, which is not a trade worth making at this size.
+
+### Which catalog row a key means is a two-tier question
+
+197 of the 200 keys carry their whole identity. Three do not, and the difference is not a quirk — it
+is the ipTM finding reaching the API.
+
+`decompose("boltz2.protein_iptm")` yields the identity `(boltz2, protein_iptm, None, None)`. **No
+such catalog row exists.** The three rows that do exist all carry `variant_kind = INTERFACE` and
+differ by `variant`, which holds the candidate's interface kind. The key cannot name which one
+applies, because the discriminator is a property of the *candidate* — which chains went into the
+fold — and not of the key.
+
+So the lookup is explicitly two-tier, and **the catalog is asked which tier applies** rather than the
+resolver trying one and retrying on failure:
+
+    kinds = <variant_kinds_of_column[(module, column_key)], or the empty set>
+    if INTERFACE in kinds:  identity += (INTERFACE, interface_kind_of_this_candidate)
+    else:                   identity is what decompose() returned
+
+The retry-on-miss shape — look up, and if it misses try again qualified by interface kind — is
+shorter and works today. It is not used, for two reasons. It reads as though interface-qualification
+were a general fallback when it is specific to one `VariantKind`, so the natural way to extend it is
+to stack more retries. And it is only correct while no `(module, column_key)` has both a variant-less
+row and an INTERFACE row: if one ever did, tier one would hit and the interface rows would never be
+consulted, silently returning the wrong meaning.
+
+That invariant holds — measured, only four keys have multiple rows and none has a variant-less
+sibling — and it is now **checked** rather than merely true. `app/catalog/invariants.py` fails the
+seed if any heading carries two axes, or a variant-less row beside INTERFACE rows; both seeders call
+it before committing. That is a stronger position than when this section was written, when the
+invariant rested entirely on `scripts/seed_metric_skeleton.py` skipping on `(module, column_key)`
+rather than on full identity.
+
+So the *correctness* case against retry-on-miss is largely answered, and what remains is the first
+reason plus a caveat: a write-time check is not a schema constraint, and it binds only rows the
+seeders write — a hand-written `INSERT` bypasses it. Asking which tier applies cannot go wrong that
+way at all. The structural version, which would make a two-axis heading unrepresentable, is written
+up in [`metric-heading-normalization.md`](metric-heading-normalization.md).
+
+### `numericValue` parses defensively, even though nothing currently fails
+
+Of the 995 values whose metric says FLOAT or INT, **995 parse.** That is not the reassurance it
+appears to be: `scripts/seed_metric_skeleton.py` *inferred* `value_type` from these very strings, so
+the agreement is an artifact of how the types were assigned, exactly like "197 of 200 keys resolve".
+
+Values that would not parse are already in the corpus — `"<40"`, `"-"` — currently sitting under
+CATEGORICAL metrics. Correcting one of those to FLOAT, or importing a run with a censored value in a
+numeric column, produces an unparseable value immediately.
+
+So `numericValue` is `float()` inside a try/except, `None` on failure, and populated only when the
+catalog says the metric is numeric. `value` always carries the raw string regardless, so nothing is
+lost when the coercion declines.
+
+### `benchmarkResults` and `transformOf` ship empty — for different reasons
+
+Both are in the schema so the shape is right, and both return nothing. Neither blocks anything. But
+they are empty in quite different senses, which is worth being precise about (measured 2026-08-09:
+0 benchmark_results, 0 benchmark_datasets, 0 TRANSFORM metrics, 0 lineage links).
+
+**`benchmarkResults` — the data exists, the loader does not.** The scrape is already done and in the
+repo: `seed/raw/module_evaluation_details.json` holds 190 rows whose fields map essentially
+one-to-one onto `BenchmarkResult` (property, spearman, stars, auroc, auprc, precisionTop5, n,
+precisionTop5NullDist, strata), and `module_evaluation_catalog.json` holds 33 module entries with
+version, license and transform. Populating it is a seeder in the style of the others, not new
+collection — the terms-of-service review that cleared the scrape is recorded in
+`graphql-schema-handoff.md`.
+
+Worth doing eventually because it is the layer that says how much a metric is *worth*, not just what
+it means. The catalog currently tells a client that higher ipTM is better and attaches a caveat;
+benchmarks would add that a given metric's AUROC against titer is 0.647, which is the difference
+between "0.79 beats 0.40" and "treat this as weak evidence". Given that the project exists to stop a
+raw number misleading someone, that is a natural next layer.
+
+Known gap in the source: most catalog rows still carry `"transform": null` even where the UI showed a
+populated panel, so that axis is incomplete. The 190 benchmark rows are the solid part.
+
+**`transformOf` — there is nothing to load.** The raw vs `-transformed` distinction came from AWS's
+Module Evaluation *documentation*; none of the 200 keys in the actual run exports is a transformed
+sibling. Zero instances is a fact about this corpus rather than a loading gap, and it would only
+change if the catalog were seeded from the scrape *and* such a metric appeared in a run.
+
+## The coupling, and the guard that now covers it
 
 The three interface strings — `'antibody-target complex'`, `'antibody only (H/L pairing)'`,
 `'single chain (no interface)'` — must match **exactly** in three places:
@@ -298,17 +398,27 @@ The three interface strings — `'antibody-target complex'`, `'antibody only (H/
 2. the `variant` values of the nine INTERFACE rows in `seed/catalog.json`
 3. this enum
 
-Nothing verifies this. Rewording a `CASE` arm would silently stop those three keys resolving, with no
-test failing and no error raised — the scores would simply lose their meaning.
+Rewording a `CASE` arm would otherwise stop those three keys resolving, with no exception raised —
+the scores would simply lose their meaning, which is the one thing the catalog exists to provide.
+`scripts/check_view_migration.py` does not cover it: that compares the view's output **column
+aliases**, so a reworded `THEN` literal passes it untouched.
 
-The guard, modelled on `scripts/check_view_migration.py`, is three assertions:
+**This is now guarded** by `tests/test_interface_kind.py`, written before the `ScoreEntry` resolver
+as this section originally asked. It asserts the `CASE` arms in the `.sql` file *and* in migration
+004 both equal the enum's values in order, and that every INTERFACE `variant` in `seed/catalog.json`
+is an enum member — covering the three real arms but not `NO_CHAINS_RECORDED`, which is a
+data-quality state the catalog should never carry. The parse anchors on `THEN`/`ELSE` results so the
+chain labels inside the conditions (`'TARGET'`, `'LIGHT'`) are not mistaken for interface kinds.
 
-1. the string literals in the view's `CASE` == the enum's values *(the one with teeth — it fails on
-   the edit, before any data proves it)*
-2. every distinct `interface_kind` in the live view is an enum member
-3. every INTERFACE metric's `variant` is an enum member (a subset — three of four)
+It needs no database, and that is deliberate rather than a limitation: every source is a file in the
+repo, and checking the `.sql` *and* the migration closes the chain end to end, since the migration is
+what actually creates the view in any given database. The originally-proposed third assertion —
+every distinct `interface_kind` in the *live* view is an enum member — was skipped on purpose: no
+candidate in the corpus reaches `no chains recorded`, so it could only ever prove three of the four
+arms, making it the weakest of the checks rather than the strongest.
 
-This should be written **before** the `ScoreEntry` resolver, not after.
+What remains uncovered is narrow: a view altered by hand in a running database, diverging from both
+files. Nothing in the workflow does that.
 
 ---
 
