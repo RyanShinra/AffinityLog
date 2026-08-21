@@ -32,8 +32,9 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Annotated, Any, Final, TypeVar
 
 from fastapi import Depends
@@ -64,7 +65,7 @@ def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
     return (metric.module.name, metric.column_key, metric_variant_kind, metric.variant)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class MetricCatalog:
     """Every catalogued metric, indexed the two ways the ScoreEntry resolver needs to ask.
 
@@ -102,10 +103,24 @@ class MetricCatalog:
     already means something else entirely in a database application. The pair
     (module, column_key) names a metric BEFORE disambiguation — the several catalog rows sharing
     a heading differ only by variant.
+
+    IMMUTABILITY: `frozen=True` alone would be a promise this class cannot keep. It stops
+    `catalog.metric_by_identity = {}` and nothing else — `catalog.metric_by_identity[k] = x`,
+    `.clear()`, and mutating the values all still work, so any resolver could corrupt the memo for
+    every later resolver in the same request, silently. Worse, the values are live `db.Metric`
+    instances still attached to the request's session, so assigning to one would be written to
+    Postgres by the next autoflush. `MappingProxyType` is what actually closes that: a read-only
+    view, so the mutating call raises instead of succeeding.
+
+    `eq=False` goes with it. `frozen=True` with the default `eq=True` synthesises a `__hash__` over
+    the field tuple, so `hash(catalog)` or putting one in a set raised
+    `TypeError: unhashable type: 'dict'` — an error the word "frozen" invites you to expect not to
+    get. Nothing compares or hashes catalogs, and identity is the right semantics for a per-request
+    memo anyway: `await ctx.catalog() is await ctx.catalog()` is what the memo test asserts.
     """
 
-    metric_by_identity: dict[MetricIdentity, db.Metric]
-    variant_kinds_per_heading: dict[tuple[str, str], frozenset[str]]
+    metric_by_identity: Mapping[MetricIdentity, db.Metric]
+    variant_kinds_per_heading: Mapping[tuple[str, str], frozenset[str]]
     # End MetricCatalog Class
 
 
@@ -293,7 +308,12 @@ class Context(BaseContext):
         for heading, seen_kinds in kinds_seen_per_heading.items():
             variant_kinds_per_heading[heading] = frozenset(seen_kinds)
 
-        return MetricCatalog(metric_by_identity=metric_by_identity, variant_kinds_per_heading=variant_kinds_per_heading)
+        # Wrapped on the way out. The dicts above are mutable because building them requires it;
+        # the catalog handed to 1132 resolvers must not be.
+        return MetricCatalog(
+            metric_by_identity=MappingProxyType(metric_by_identity),
+            variant_kinds_per_heading=MappingProxyType(variant_kinds_per_heading),
+        )
 
     # End def catalog
 

@@ -46,7 +46,15 @@ RE-RUNNING
 Idempotent by ``source_filename``: any CSV whose basename already has experiment rows is skipped.
 That is deliberately a *filename* check, not a content hash — ``results (3).csv`` is not a
 distinctive name, and this would not notice a file edited in place or a different file renamed to
-match. Fine for a fixed corpus that will not be re-run; revisit if new exports ever arrive.
+match.
+
+The reachable version of that is a BASENAME COLLISION, and it is guarded rather than documented.
+``experiment_1/results.csv`` is already loaded as ``results.csv``; a fresh export dropped in as
+``experiment_12/results.csv`` — an overwhelmingly likely name, which is exactly why experiment 1
+already has one — would be skipped as "already loaded" and silently never imported.
+``_refuse_ambiguous_basenames`` therefore refuses to run at all if two CORPUS entries share a
+basename, so the failure is a startup error naming both paths rather than a missing experiment
+nobody notices. Renaming the incoming file is the fix; the loader will not guess.
 
 All seven load in ONE transaction and commit once, so a failure partway leaves the database
 untouched rather than half-populated.
@@ -91,7 +99,33 @@ CORPUS: list[tuple[str, str]] = [
 ]
 
 
+def _refuse_ambiguous_basenames() -> None:
+    """Refuse to run if two CORPUS entries share a basename.
+
+    `source_filename` holds `csv_path.name`, so the skip check cannot tell two `results.csv` apart.
+    Rather than skip the wrong one silently, stop and say so.
+    """
+    seen: dict[str, str] = {}
+    collisions: list[str] = []
+    for relative_path, _ in CORPUS:
+        basename = Path(relative_path).name
+        if basename in seen:
+            collisions.append(f"  - {basename!r}: {seen[basename]} and {relative_path}")
+        seen[basename] = relative_path
+
+    if collisions:
+        detail = "\n".join(collisions)
+        raise ValueError(
+            "CORPUS has entries sharing a basename, and `source_filename` records only the "
+            "basename — so the already-loaded check cannot tell them apart and would skip one of "
+            f"each pair without loading it:\n{detail}\n"
+            "Rename the incoming file so its basename is distinct."
+        )
+
+
 async def run(*, dry_run: bool) -> None:
+    _refuse_ambiguous_basenames()
+
     async with AsyncSessionLocal() as session:
         # One round trip for the whole skip set, rather than an EXISTS per file.
         loaded_already: set[str] = {
@@ -109,7 +143,7 @@ async def run(*, dry_run: bool) -> None:
                 raise FileNotFoundError(f"{csv_path} is listed in CORPUS but not on disk")
 
             if csv_path.name in loaded_already:
-                print(f"  skip  {relative_path}  (already loaded)")
+                print(f"  skip  {relative_path}  (source_filename {csv_path.name!r} already loaded)")
                 skipped += 1
                 continue
 

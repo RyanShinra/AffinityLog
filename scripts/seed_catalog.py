@@ -50,7 +50,7 @@ from typing import Any, Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog.invariants import raise_on_heading_violations
+from app.catalog.invariants import find_heading_violations, raise_on_heading_violations
 from app.database import AsyncSessionLocal
 
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[1]
@@ -188,6 +188,28 @@ async def seed(dry_run: bool = False) -> None:
                 print(f"  ERROR: metric {m['module']}.{m['column_key']} names an unlisted module")
             if (c := m.get("concept")) and c not in named_concepts:
                 print(f"  ERROR: metric {m['module']}.{m['column_key']} names an unlisted concept '{c}'")
+
+        # The heading invariant cannot be answered from the JSON alone: the violation that actually
+        # bites is a curated INTERFACE row landing beside a BARE row that `seed_metric_skeleton`
+        # already committed, and that row exists only in the database. So the dry run applies the
+        # upserts, asks, and returns without committing. It stays useful offline — the checks above
+        # ran, and an unreachable database is reported rather than fatal — because editing
+        # catalog.json on a machine with no Postgres is a real thing to want to do.
+        try:
+            async with AsyncSessionLocal() as session:
+                concept_ids = await _upsert_concepts(session, concepts)
+                module_ids = await _upsert_modules(session, modules)
+                await _upsert_metrics(session, metrics, module_ids, concept_ids)
+                violations = await find_heading_violations(session)
+                for violation in violations:
+                    print(f"  ERROR: {violation.describe()}")
+                print(
+                    f"  heading invariant: {'would ABORT the real run' if violations else 'clean'} "
+                    f"({len(violations)} violation(s))"
+                )
+        except OSError as unreachable:
+            print(f"  heading invariant: NOT CHECKED — no database ({type(unreachable).__name__})")
+        print("(dry run — nothing written)")
         return
 
     # One transaction for the whole seed: a half-applied catalog (modules without their metrics)

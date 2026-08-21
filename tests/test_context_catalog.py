@@ -34,7 +34,12 @@ def _identity_for(key: str, catalog_kinds: frozenset[str], interface_kind: str |
     """
     score_key = decompose(key)
     if db.VariantKind.INTERFACE.name in catalog_kinds:
-        assert interface_kind is not None, "an interface-qualified key needs the candidate's kind"
+        if interface_kind is None:
+            # Not an `assert`: `python -O` strips those, and the identity this would build
+            # instead — (module, column, 'INTERFACE', None) — is in no catalog, so the key would
+            # resolve to nothing silently. That is the precise failure the two-tier design exists
+            # to prevent, so it must not be removable by an interpreter flag.
+            raise ValueError(f"{key!r} is interface-qualified; resolving it needs the candidate's interface kind")
         return (score_key.module, score_key.column_key, db.VariantKind.INTERFACE.name, interface_kind)
     return (score_key.module, score_key.column_key, score_key.variant_kind, score_key.variant)
 
@@ -64,7 +69,21 @@ class TestCatalogIsBuiltFromTheDatabase:
         assert len([i for i in catalog.metric_by_identity if i[:2] == ("evoprotgrad", "pseudolikelihood_ratio")]) == 2
 
     async def test_relationships_are_eager_loaded(self, seeded_catalog: AsyncSession) -> None:
-        """Touching these after the query must not raise MissingGreenlet."""
+        """Touching these after the query must not raise MissingGreenlet.
+
+        `expunge_all()` is what gives this test teeth, and without it the test was worthless.
+        The fixture creates the Modules and Concepts in this same session, so they sit in its
+        identity map — and a lazy load that can be answered from the identity map short-circuits
+        with no IO and no greenlet. Measured: with `selectinload(module)` and `selectinload(concept)`
+        deleted from `_load_catalog`, the whole file still passed.
+
+        Expunging models what a real request looks like. `get_session` hands each request a fresh
+        session with nothing cached, so `metric.module.name` is a genuine round trip — which is
+        exactly the round trip that cannot happen outside the greenlet. With the expunge in place,
+        removing either eager load raises MissingGreenlet here.
+        """
+        seeded_catalog.expunge_all()
+
         catalog = await Context(session=seeded_catalog).catalog()
         metric = catalog.metric_by_identity[("boltz2", "protein_iptm", "INTERFACE", "antibody-target complex")]
 

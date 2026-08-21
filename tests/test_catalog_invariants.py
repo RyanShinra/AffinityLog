@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog.invariants import find_heading_violations, raise_on_heading_violations
+from app.catalog.invariants import Heading, find_heading_violations, raise_on_heading_violations
 from app.catalog.keys import decompose
 from app.graphql.context import Context
 from app.models import orm as db
@@ -153,3 +153,73 @@ class TestShapesItMustRefuse:
         message = str(caught.value)
         assert "seed_catalog refused to commit" in message
         assert "may PREDATE it" in message
+
+
+class TestAnAxisNothingCanSupply:
+    """The third way a heading breaks the lookup, and the quietest.
+
+    `decompose()` recovers exactly one axis from a key string — PARAMETER, from the single
+    evoprotgrad rule. Tier two supplies exactly one more — INTERFACE. A heading qualified along any
+    of the other four (MODE, SOURCE_MODEL, COMPONENT, TRANSFORM) with no variant-less row to fall
+    back to therefore resolves to NOTHING, for every candidate, with no exception and no log.
+
+    This is classified in Python rather than in the query's HAVING because it needs
+    `DECOMPOSABLE_VARIANT_KINDS`, which is derived from the rules in app/catalog/keys.py so the two
+    cannot drift apart.
+    """
+
+    async def test_a_heading_qualified_only_by_transform_is_refused(self, session: AsyncSession) -> None:
+        fastdpe = await _module(session, "fastdpe")
+        session.add_all(
+            [
+                _metric(fastdpe, "SFvCSP", variant_kind=db.VariantKind.TRANSFORM, variant="raw"),
+                _metric(fastdpe, "SFvCSP", variant_kind=db.VariantKind.TRANSFORM, variant="transformed"),
+            ]
+        )
+        await session.flush()
+
+        violations = await find_heading_violations(session)
+
+        assert len(violations) == 1
+        assert "nothing can supply" in violations[0].describe()
+
+    async def test_the_same_axis_is_fine_with_a_bare_row_to_fall_back_to(self, session: AsyncSession) -> None:
+        """Which is exactly the shape seed/catalog.json plans, and why the check is not simply
+        'refuse TRANSFORM'."""
+        fastdpe = await _module(session, "fastdpe")
+        session.add_all(
+            [
+                _metric(fastdpe, "SFvCSP"),
+                _metric(fastdpe, "SFvCSP", variant_kind=db.VariantKind.TRANSFORM, variant="transformed"),
+            ]
+        )
+        await session.flush()
+
+        assert await find_heading_violations(session) == []
+
+    async def test_parameter_is_satisfiable_because_the_key_string_carries_it(self, session: AsyncSession) -> None:
+        """No bare row, no INTERFACE — and still fine, because decompose() reads `esm_` off the key."""
+        evoprotgrad = await _module(session, "evoprotgrad")
+        session.add_all(
+            [
+                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+            ]
+        )
+        await session.flush()
+
+        assert await find_heading_violations(session) == []
+
+
+class TestProblemsNeedsNoDatabase:
+    """`Heading.problems()` is a pure function, so the classification is testable on its own."""
+
+    def test_a_clean_heading_has_no_problems(self) -> None:
+        assert Heading("boltz2", "ptm", (), 1).problems() == ()
+
+    def test_every_applicable_reason_is_reported(self) -> None:
+        both = Heading("boltz2", "iptm", ("INTERFACE", "PARAMETER"), 2).problems()
+
+        assert len(both) == 2
+        assert any("2 axes" in reason for reason in both)
+        assert any("can never be reached" in reason for reason in both)

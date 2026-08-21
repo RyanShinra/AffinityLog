@@ -65,6 +65,13 @@ _VARIANT_RULES: Final[dict[str, tuple[re.Pattern[str], str]]] = {
     ),
 }
 
+# The variant kinds `decompose()` can recover from a key STRING, derived from the rules above so the
+# two cannot drift. Everything else — INTERFACE, and any kind a future curator invents — has to come
+# from somewhere other than the key. `app/catalog/invariants.py` uses this to refuse a catalog whose
+# heading is qualified along an axis nothing can supply, which would otherwise resolve to no metric
+# silently for every candidate.
+DECOMPOSABLE_VARIANT_KINDS: Final[frozenset[str]] = frozenset(kind for _, kind in _VARIANT_RULES.values())
+
 # Two keys in the corpus ("tier", "recommendation") carry NO module prefix — they are run-level
 # verdicts the exporter attaches to the whole result, not a module's output. `recommendation` is
 # even a paragraph of AI-generated prose. Filing them under a synthetic module keeps them in the

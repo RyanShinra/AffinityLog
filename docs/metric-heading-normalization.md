@@ -84,6 +84,11 @@ aggregate built in Python — `variant_kinds_per_heading` would collapse to a pl
   next catalog addition, resolves perfectly well and is not a violation. The
   normalization above does not fix that on its own; it would need `variant` itself to be
   `NOT NULL` whenever the heading declares an axis.
+- A third check now also refuses a heading qualified along an axis nothing can supply — no bare row,
+  no INTERFACE, and a kind `decompose()` cannot read from the key string. That one is not about the
+  functional dependency at all; it guards the *other* half, that the axis a heading declares is one
+  the lookup can actually satisfy. The normalization would not fix it either: `metric_headings`
+  would still happily declare `TRANSFORM` for a heading no key can resolve.
 
 ## Related
 
