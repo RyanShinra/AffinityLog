@@ -131,19 +131,32 @@ def decomposable_kinds_for(module: str, column_key: str) -> frozenset[str]:
     return frozenset({rule.variant_kind}) if rule is not None else frozenset()
 
 
-def declared_variants_for(module: str, column_key: str) -> frozenset[str]:
-    """Every variant this heading's key strings may carry, or empty if no rule covers it.
+def declared_variants_for(module: str, column_key: str, variant_kind: str) -> frozenset[str]:
+    """Every variant this heading's key strings may carry ALONG THIS AXIS, or empty if none do.
 
-    The companion to `decomposable_kinds_for`: that one says WHICH AXIS the key encodes, this says
-    WHICH VALUES of it exist. `app/catalog/invariants.py` uses it to refuse a heading catalogued
+    The companion to `decomposable_kinds_for`: that one says which axis the key encodes, this says
+    which VALUES of it exist. `app/catalog/invariants.py` uses it to refuse a heading catalogued
     along a declared axis without a row for every value — seed `esm` but not `amplify` and every
     `evoprotgrad.amplify_pseudolikelihood_ratio` key resolves to nothing.
 
-    Only askable because the rules table carries `variants` as data. While the regex was the source
-    of truth, the values were capture groups and this function could not have been written.
+    THE AXIS IS A REQUIRED ARGUMENT, not a convenience. This took only (module, column_key) at
+    first, and returned the rule's variants whatever axis the caller was asking about — so
+    `evoprotgrad.pseudolikelihood_ratio` catalogued along TRANSFORM was measured against
+    {esm, amplify} and refused for "having no row for" variants belonging to a different axis
+    entirely, while `fastdpe.SFvCSP` with the identical shape passed. Whether a heading happens to
+    carry a rule for some OTHER axis cannot be what decides it.
+
+    That is the same defect as the one `decomposable_kinds_for` exists to fix, one axis over: a
+    lookup keyed on less than the question needs will answer a question nobody asked. Taking the
+    axis makes the wrong call unspellable rather than merely wrong.
+
+    Only askable at all because the rules table carries `variants` as data. While the regex was the
+    source of truth, the values were capture groups and this function could not have been written.
     """
     rule = _VARIANT_RULES.get((module, column_key))
-    return rule.variants if rule is not None else frozenset()
+    if rule is None or rule.variant_kind != variant_kind:
+        return frozenset()
+    return rule.variants
 
 
 # Two keys in the corpus ("tier", "recommendation") carry NO module prefix — they are run-level

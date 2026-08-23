@@ -69,6 +69,30 @@ class TestShapesItMustAccept:
         resolved = catalog.metric_by_identity[(key.module, key.column_key, key.variant_kind, key.variant)]
         assert resolved.display_name == "SFvCSP (Fv charge symmetry)"
 
+    async def test_a_bare_row_beside_a_transform_row_on_a_heading_that_has_a_variant_rule(self, session: AsyncSession) -> None:
+        """The same legitimate shape as above, on a heading that happens to appear in _VARIANT_RULES.
+
+        `evoprotgrad.pseudolikelihood_ratio` has a PARAMETER rule. That says what its key strings
+        encode along the PARAMETER axis, and nothing whatsoever about TRANSFORM. A TRANSFORM row
+        beside a bare row is exactly the shape `fastdpe.SFvCSP` is allowed above — whether the
+        heading also has a rule for an unrelated axis cannot be what decides it.
+        """
+        evoprotgrad = await _module(session, "evoprotgrad")
+        session.add_all(
+            [
+                _metric(evoprotgrad, "pseudolikelihood_ratio"),
+                _metric(
+                    evoprotgrad,
+                    "pseudolikelihood_ratio",
+                    variant_kind=db.VariantKind.TRANSFORM,
+                    variant="transformed",
+                ),
+            ]
+        )
+        await session.flush()
+
+        assert await find_heading_violations(session) == []
+
     async def test_one_axis_with_several_variants(self, session: AsyncSession) -> None:
         """The evoprotgrad shape already in the corpus: two PARAMETER rows, no bare row."""
         evoprotgrad = await _module(session, "evoprotgrad")

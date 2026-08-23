@@ -97,8 +97,12 @@ All four are silent, and only the first is about "more than one kind":
     total one, and all three kinds occur in the real corpus (6 / 4 / 4 of the 14 candidates).
 
     The expected set comes from `InterfaceKind.scoreable()` for INTERFACE and from
-    `declared_variants_for()` for everything else — the latter only askable since the rules table
-    began carrying its variants as data rather than as regex capture groups.
+    `declared_variants_for(module, column_key, kind)` for everything else — the latter only askable
+    since the rules table began carrying its variants as data rather than as regex capture groups.
+    It takes the AXIS as well as the heading, and must: without it, a heading carrying a rule for
+    one axis was measured against that rule's variants while catalogued along a different one, so
+    `evoprotgrad.pseudolikelihood_ratio` with a TRANSFORM row beside a bare row was refused while
+    `fastdpe.SFvCSP` in the identical shape passed.
 
     `NO_CHAINS_RECORDED` is excluded, which is not a new judgment: the enum docstring, the CASE
     comment in sql/candidate_summary.sql, and tests/conftest.py all already say the catalog carries
@@ -168,7 +172,9 @@ class Heading(NamedTuple):
         # not the same as being covered: that case is the third branch's to refuse, not this one's.
         if len(self.variant_kinds) == 1:
             (kind,) = self.variant_kinds
-            expected = InterfaceKind.scoreable() if kind == interface else declared_variants_for(self.module, self.column_key)
+            expected = (
+                InterfaceKind.scoreable() if kind == interface else declared_variants_for(self.module, self.column_key, kind)
+            )
             missing = sorted(expected - set(self.variants))
             if missing:
                 reasons.append(
