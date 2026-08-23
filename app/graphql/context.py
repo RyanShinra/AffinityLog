@@ -175,8 +175,10 @@ class Context(BaseContext):
         Spelled longer than the `execute()` it delegates to because `Context` is a grab-bag — it
         also carries a `request`, a `response` and `background_tasks` — and because Strawberry's own
         `Schema.execute()` runs a GraphQL DOCUMENT, not a statement. This repo calls that one too
-        (tests/test_context_catalog.py:217), so a bare `execute` would mean SQL in one file and
-        GraphQL in another.
+        (`test_two_root_fields_do_not_break_a_virgin_session`, in tests/test_context_catalog.py), so
+        a bare `execute` would mean SQL in one file and GraphQL in another. Named rather than cited
+        by line: this said `:217` and pointed six lines off within a week, because a line number in
+        another file rots on any edit above it and nothing checks it.
         """
         return await self._session.execute(statement)
 

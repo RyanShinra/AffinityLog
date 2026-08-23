@@ -25,7 +25,7 @@ The same shape recurs across the subsystem:
 | `context.py` | `MetricIdentity = tuple[str, str, str \| None, str \| None]` | 4, positional |
 | `context.py` | `variant_kinds_per_heading: Mapping[tuple[str, str], frozenset[str]]` | 3 kinds of string in one type |
 | `keys.py` | `ScoreKey(module, column_key, variant_kind, variant, chain)` | 5 |
-| `invariants.py` | `Heading(module, column_key, variant_kinds, bare_rows)` | 3 |
+| `invariants.py` | `Heading(module, column_key, variant_kinds, variants, bare_rows)` | 4 |
 
 `tuple[str, str]` as a heading key is the sharpest case: both elements are strings, both are
 free-form, and nothing distinguishes `(module, column)` from `(column, module)`.
@@ -53,9 +53,10 @@ exactly the boundaries where a mistake would otherwise be invisible.
 stores member *names* only because Postgres enums and `decompose()` both speak strings. Likewise a
 `variant` on an INTERFACE row is an `InterfaceKind` value, not free text.
 
-This is the more valuable half and the more invasive one. It would make `DECOMPOSABLE_VARIANT_KINDS`
-a `frozenset[db.VariantKind]`, and it would make several currently-writable mistakes unwritable —
-including a mis-spelled kind name, which today typechecks and silently matches nothing.
+This is the more valuable half and the more invasive one. It would make `decomposable_kinds_for()`
+and `_Rule.variant_kind` speak `db.VariantKind` rather than its member name, and it would make
+several currently-writable mistakes unwritable — including a mis-spelled kind name, which today
+typechecks and silently matches nothing.
 
 ## Open questions
 
@@ -68,14 +69,18 @@ including a mis-spelled kind name, which today typechecks and silently matches n
    `ScoreKey`), but `context.py`'s `MetricIdentity` would then import from it — which the
    `MetricIdentity` comment already anticipates as the eventual move.
 
-## Why this is sequenced after the correctness items
+## Why this was sequenced after the correctness items
 
-Items 1, 2 and 6 of the PR #13 cleanup list all touch the same declarations this would retype —
-item 1 changes `DECOMPOSABLE_VARIANT_KINDS`'s shape outright. Doing both at once means the retyping
-lands on code that is about to change, and it repeats the pattern PR #13's second review pass
-punished: remediation folded into other work gets less scrutiny than the work it accompanies.
+Items 1, 2 and 6 of the PR #13 cleanup list all touched the same declarations this would retype,
+and all three shipped on `spring-cleaning-in-summer`: item 1 replaced the flat
+`DECOMPOSABLE_VARIANT_KINDS` set with `decomposable_kinds_for(module, column_key)` and inverted the
+rules table so the data is primary; item 6 added `variants` to `Heading`. Retyping alongside them
+would have landed on code that was about to change, and would have repeated the pattern PR #13's
+second review pass punished: remediation folded into other work gets less scrutiny than the work it
+accompanies.
 
-Fix the logic first, then retype the settled shapes.
+Those shapes are settled now, so this is unblocked — which is the only thing that has changed about
+it. Nothing here has been started.
 
 ## What it would have caught
 

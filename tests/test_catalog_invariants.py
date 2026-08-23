@@ -387,24 +387,32 @@ class TestTheDatabaseRefusesHalfPopulatedRows:
 
     async def test_a_variant_without_a_kind_is_rejected(self, session: AsyncSession) -> None:
         temstapro = await _module(session, "temstapro")
-        session.begin_nested()
-        session.add(_metric(temstapro, "clash", variant="esm"))
-
+        # `pytest.raises` OUTSIDE the savepoint, deliberately. `AsyncSession.begin_nested()` is a
+        # plain `def` returning an AsyncSessionTransaction, so calling it bare — as this did —
+        # constructs the handle and discards it without ever issuing a SAVEPOINT; the failing
+        # statement then poisons the FIXTURE's savepoint instead. Entering it with `async with`
+        # issues the real one, and letting the error escape the block lets __aexit__ roll it back.
+        # Catching inside would exit the block normally and try to RELEASE a savepoint Postgres has
+        # already aborted.
         with pytest.raises(IntegrityError, match="ck_metric_variant_pair"):
-            await session.flush()
-
-        await session.rollback()
+            async with session.begin_nested():
+                session.add(_metric(temstapro, "clash", variant="esm"))
+                await session.flush()
 
     async def test_a_kind_without_a_variant_is_rejected(self, session: AsyncSession) -> None:
         """The mirror case, which the symmetric expression catches for free."""
         temstapro = await _module(session, "temstapro")
-        session.begin_nested()
-        session.add(_metric(temstapro, "clash", variant_kind=db.VariantKind.PARAMETER))
-
+        # `pytest.raises` OUTSIDE the savepoint, deliberately. `AsyncSession.begin_nested()` is a
+        # plain `def` returning an AsyncSessionTransaction, so calling it bare — as this did —
+        # constructs the handle and discards it without ever issuing a SAVEPOINT; the failing
+        # statement then poisons the FIXTURE's savepoint instead. Entering it with `async with`
+        # issues the real one, and letting the error escape the block lets __aexit__ roll it back.
+        # Catching inside would exit the block normally and try to RELEASE a savepoint Postgres has
+        # already aborted.
         with pytest.raises(IntegrityError, match="ck_metric_variant_pair"):
-            await session.flush()
-
-        await session.rollback()
+            async with session.begin_nested():
+                session.add(_metric(temstapro, "clash", variant_kind=db.VariantKind.PARAMETER))
+                await session.flush()
 
     async def test_both_clean_shapes_are_still_accepted(self, session: AsyncSession) -> None:
         """The check that keeps the constraint from being over-broad.

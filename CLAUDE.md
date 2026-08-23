@@ -189,8 +189,8 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `IllegalStateChangeError` out of the session's own `__aexit__`, a 500 with a poisoned session that
   `MaskInternalErrors` never sees.
   The long name is deliberate: Strawberry's `Schema.execute()` runs a GraphQL *document*, and this
-  repo calls it (`tests/test_context_catalog.py:217`), so a bare `execute` would mean SQL in one
-  file and GraphQL in another.
+  repo calls it (`test_two_root_fields_do_not_break_a_virgin_session`), so a bare `execute` would
+  mean SQL in one file and GraphQL in another.
 - **A method that needs a critical section of its own takes its OWN lock, never the session's.**
   `Context.catalog()` holds `_catalog_lock` across the whole of `_load_catalog()`, which issues its
   statement through `execute_statement()` — safe only because that takes a *different* lock. One
@@ -206,7 +206,7 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   Consider the alternatives first — inject the dependency, use a real object, test at a boundary, or
   run a subprocess when the thing genuinely is process-start state.
   When you do patch, patch **where the value is read, not where it is set**, and prove it by
-  reverting the fix and watching the test go red. Two live examples from `tests/test_docker_probe.py`,
+  reverting the fix and watching the test go red. Two live examples from `tests/test_fixture_guards.py`,
   both of which passed against the bug on the first attempt:
   `monkeypatch.setenv("DOCKER_AUTH_CONFIG", ...)` does nothing, because
   `testcontainers.core.config` reads it through a dataclass `default_factory` evaluated once when
@@ -224,10 +224,11 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   test never executes a statement, which is why `tests/test_importer.py` gets away with it today.
   That file's module docstring carries a block flagged for the planned test-review PR; read it before
   changing any fixture.
-- **Before starting new feature work, read `docs/pr-13-diary.md`'s Act VI.** It is a fifteen-item
-  list of defects the second review pass found in PR #13's own fixes — two of which (the
-  `DECOMPOSABLE_VARIANT_KINDS` false negative and a half-populated `variant` row) let bad catalog
-  data through silently. That cleanup is the intended next branch.
+- **The PR #13 cleanup list is closed.** `docs/pr-13-diary.md`'s Act VI listed fifteen defects the
+  second review pass found in PR #13's own fixes; all fifteen shipped on `spring-cleaning-in-summer`
+  and `docs/pr-14-diary.md` records what each became. Read Act VI for the history, not as a work
+  list — three of its items turned into design changes rather than the one-line fixes it described,
+  so the entries no longer describe the code.
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image

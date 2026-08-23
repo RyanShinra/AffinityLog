@@ -94,6 +94,62 @@ class TestAgainstARealDatabase:
         """Only the catalog is wrong — the database is fine — so 1 cannot be blamed on the database."""
         assert _dry_run(database_url, catalog=_catalog_naming_an_unlisted_module(tmp_path)) == 1
 
+    def test_a_row_the_schema_refuses_is_a_catalog_problem(self, database_url: str, tmp_path: Path) -> None:
+        """A CHECK violation is the JSON being wrong, not the database being unavailable.
+
+        `variant_kind` without `variant` passes the referential pre-check — the module exists — and
+        is refused by migration 008's `ck_metric_variant_pair` at INSERT time. Before the schema
+        probe this returned 3, blaming a database that was working perfectly.
+        """
+        catalog = tmp_path / "catalog.json"
+        catalog.write_text(
+            json.dumps(
+                {
+                    "concepts": [],
+                    "modules": [{"name": "probe_module", "module_type": "SCORE", "functions": []}],
+                    "metrics": [
+                        {
+                            "module": "probe_module",
+                            "column_key": "probe_col",
+                            "display_name": "P",
+                            "value_type": "FLOAT",
+                            "variant_kind": "PARAMETER",  # and no `variant` — the CHECK refuses this
+                        }
+                    ],
+                }
+            )
+        )
+
+        assert _dry_run(database_url, catalog=catalog) == 1
+
+    def test_a_driver_error_with_no_dbapi_category_is_still_a_catalog_problem(self, database_url: str, tmp_path: Path) -> None:
+        """The case a list of exception types would have missed.
+
+        A bad enum value surfaces as bare `DBAPIError`, not `DataError`: asyncpg's
+        InvalidTextRepresentationError has no DBAPI category to map onto. Classifying on type would
+        have caught the CHECK violation above and silently misfiled this one, which is why the split
+        is positional — the tables were confirmed present, so the server is refusing our DATA.
+        """
+        catalog = tmp_path / "catalog.json"
+        catalog.write_text(
+            json.dumps(
+                {
+                    "concepts": [],
+                    "modules": [{"name": "probe_module", "module_type": "SCORE", "functions": []}],
+                    "metrics": [
+                        {
+                            "module": "probe_module",
+                            "column_key": "probe_col",
+                            "display_name": "P",
+                            "value_type": "NOT_A_REAL_TYPE",  # not a metricvaluetype member
+                        }
+                    ],
+                }
+            )
+        )
+
+        assert _dry_run(database_url, catalog=catalog) == 1
+
     def test_the_real_catalog_against_a_migrated_database_is_clean(self, database_url: str) -> None:
         """The only state that needs a database, run against the suite's own empty container.
 

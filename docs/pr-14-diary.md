@@ -145,8 +145,9 @@ SQLAlchemy's own vocabulary.
 
 Then the method. `Context.execute()` became `execute_statement()`, on the owner's argument that a
 `Context` could plausibly execute other things — "a HTTP request or the like? A jump to warp?" The
-supporting evidence was already in the repo: `tests/test_context_catalog.py:217` calls
-`schema.execute(...)`, which is **Strawberry's** `Schema.execute()` and runs a GraphQL *document*.
+supporting evidence was already in the repo: `test_two_root_fields_do_not_break_a_virgin_session`
+calls `schema.execute(...)`, which is **Strawberry's** `Schema.execute()` and runs a GraphQL
+*document*.
 So a bare `execute` would have meant SQL in six resolver call sites and GraphQL in the test suite.
 
 (The first version of this paragraph, and of the docstring it describes, claimed both spellings

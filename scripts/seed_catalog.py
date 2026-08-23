@@ -211,6 +211,33 @@ async def _upsert_metrics(
     return len(rows)
 
 
+async def _catalog_tables_exist(session: AsyncSession) -> bool:
+    """Whether the three tables the upserts write to are present.
+
+    Asked so the dry run can tell an ENVIRONMENT problem from a CATALOG one without enumerating
+    exception types. Everything the upserts can raise arrives from the same place — the server,
+    refusing our SQL — so the type alone is a poor discriminator, and the obvious shortlist is
+    wrong: a CHECK violation surfaces as `IntegrityError`, but a bad enum value surfaces as bare
+    `DBAPIError`, because asyncpg's InvalidTextRepresentationError has no DBAPI category to map
+    onto. Both are the catalog being wrong. A list of types would have caught the first and missed
+    the second, which is the failure item 7 of this cleanup already ran into once.
+
+    So ask a positional question instead. If the connection works and these tables exist, then
+    anything the upserts go on to raise is about the DATA we sent, and the environment is fine.
+
+    `to_regclass` returns NULL rather than raising for a name that does not exist, which is what
+    makes "unmigrated" a value here instead of another exception to classify.
+    """
+    present = await session.execute(
+        text(
+            "SELECT to_regclass('concepts') IS NOT NULL "
+            "   AND to_regclass('modules')  IS NOT NULL "
+            "   AND to_regclass('metrics')  IS NOT NULL"
+        )
+    )
+    return bool(present.scalar_one())
+
+
 async def seed(dry_run: bool = False, catalog_path: Path | None = None) -> Exit:
     """Seed the catalog, or preview it. Returns the process exit status.
 
@@ -266,17 +293,32 @@ async def seed(dry_run: bool = False, catalog_path: Path | None = None) -> Exit:
         # want to do.
         try:
             async with AsyncSessionLocal() as session:
-                concept_ids = await _upsert_concepts(session, concepts)
-                module_ids = await _upsert_modules(session, modules)
-                await _upsert_metrics(session, metrics, module_ids, concept_ids)
-                violations = await find_heading_violations(session)
-                for violation in violations:
-                    print(f"  ERROR: {violation.describe()}")
-                    problems += 1
-                print(
-                    f"  heading invariant: {'would ABORT the real run' if violations else 'clean'} "
-                    f"({len(violations)} violation(s))"
-                )
+                if not await _catalog_tables_exist(session):
+                    print("  heading invariant: NOT CHECKED — the catalog tables do not exist here")
+                    print("    (run `alembic upgrade head` against this database)")
+                    could_not_verify = True
+                else:
+                    try:
+                        concept_ids = await _upsert_concepts(session, concepts)
+                        module_ids = await _upsert_modules(session, modules)
+                        await _upsert_metrics(session, metrics, module_ids, concept_ids)
+                        violations = await find_heading_violations(session)
+                        for violation in violations:
+                            print(f"  ERROR: {violation.describe()}")
+                            problems += 1
+                        print(
+                            f"  heading invariant: {'would ABORT the real run' if violations else 'clean'} "
+                            f"({len(violations)} violation(s))"
+                        )
+                    except Exception as refused:
+                        # Reached only after the tables were confirmed present, so the connection
+                        # and the schema are both fine and this is the server refusing our DATA —
+                        # a CHECK violation, a bad enum value, a FK that does not resolve. That is
+                        # the catalog being wrong, and re-running against a healthy database would
+                        # fail identically, which is exactly what CATALOG_INVALID means.
+                        detail = str(refused).splitlines()[0].strip()
+                        print(f"  ERROR: the database refused this catalog — {type(refused).__name__}: {detail}")
+                        problems += 1
         # Broad on purpose, and this was `except OSError` — which caught only two of the five ways
         # a database can be unusable. Measured, all five, against a real server:
         #
