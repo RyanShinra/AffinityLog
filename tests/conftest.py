@@ -43,27 +43,54 @@ sessions — one module-level object, built once in `app/database.py` when that 
 imported, and shared by everything that imported it. `AsyncSessionLocal()` calls the factory;
 `AsyncSessionLocal.configure(...)` reconfigures the factory itself, in place.
 
-WHY IN PLACE MATTERS. Eight modules do `from app.database import AsyncSessionLocal`, which binds
+WHY IN PLACE MATTERS. TEN modules do `from app.database import AsyncSessionLocal`, which binds
 the *object* into their namespace, not the name. Reassigning `app.database.AsyncSessionLocal`
 would therefore reach none of them. `.configure()` mutates the one object they all hold, which is
 the only reason the fixture can redirect the seeders at all.
+(`grep -rl 'from app.database import.*AsyncSessionLocal' app/ scripts/ tests/ experiment_results/`
+is the count. It said eight here for a while, which is the kind of number that rots quietly.)
+
+THE QUARANTINE HAS A SECOND DOOR, and it is not closed. Unbinding the sessionmaker does nothing
+about `app.database.engine`, which is importable directly and points at the dev corpus.
+`scripts/check_model_drift.py:52` does exactly that. No test does today, so this is a latent hole
+rather than a live one — but the guarantee below is "tests cannot reach the corpus through the
+sessionmaker", not "tests cannot reach the corpus".
 
 WHAT TO SCRUTINISE, specifically:
 
   * The bind is lifted ONLY inside a test that requested `session`, and restored to `None` in a
-    `finally`. A test that uses `AsyncSessionLocal` without requesting `session` raises
-    UnboundExecutionError. That is deliberate — it already caught one of our own tests reaching
-    for the app's sessionmaker when what it actually wanted was an unconnected session — but it is
-    a sharp edge and a reader deserves to be told rather than to discover it.
-  * Whether `create_savepoint` is the right join mode, and whether it leaking past the `bind=None`
-    reset is genuinely inert or merely harmless today.
+    `finally`. That is deliberate — it already caught one of our own tests reaching for the app's
+    sessionmaker when what it actually wanted was an unconnected session — but it is a sharp edge
+    and a reader deserves to be told rather than to discover it.
+
+    THE GUARANTEE IS NARROWER THAN IT READS. This said such a test "raises
+    UnboundExecutionError", full stop. It does not: an unbound sessionmaker still CONSTRUCTS
+    sessions happily, and only raises when one of them actually executes a statement. Five tests
+    in test_importer.py use `AsyncSessionLocal` without requesting `session` and pass — the code
+    under test parses CSV and builds ORM objects, and never reaches the database. So the real
+    guarantee is "cannot TOUCH the corpus", not "cannot be used", and a test that stops short of a
+    query gets no warning at all that it is holding an unusable session.
+  * Whether `create_savepoint` is the right join mode. The second half of this question — whether
+    it leaking past the `bind=None` reset is inert or merely harmless — is now measured, and the
+    answer is HARMLESS TODAY, NOT INERT, and NOT REMOVABLE:
+
+        configure(bind=engine, join_transaction_mode="create_savepoint", ...)
+        configure(bind=None)
+        -> {'bind': None, 'expire_on_commit': False, 'join_transaction_mode': 'create_savepoint'}
+
+    `configure()` merges (`self.kw.update(kw)`); there is no delete, and passing None sets the key
+    to None rather than dropping it. It is harmless because a bind of None makes the factory
+    unusable, and because the only thing that ever rebinds it is the `session` fixture, which sets
+    the same value anyway. It would stop being harmless the moment anything else in the test
+    process bound the factory to a real engine, which would silently inherit savepoint-join commit
+    semantics.
   * This assumes ONE test process. pytest-xdist is not installed; if it ever is, every worker
     mutates its own copy of the factory, which happens to be fine — but nobody has checked that
     the container-per-worker cost is acceptable.
-  * The two `TestTheFixtureContainsWhatATestWrites` tests in test_context_catalog.py are ORDER
-    COUPLED on purpose: A writes, B checks the write did not survive. If they are ever reordered,
-    split across files, or run in isolation, they stop testing anything. That is a real fragility,
-    not a style choice, and it deserves a decision rather than an inheritance.
+  * `TestTheFixtureContainsWhatATestWrites` in test_context_catalog.py used to be two ORDER
+    COUPLED tests — A writes, B checks the write did not survive — which meant `-k` or `--lf` ran
+    B alone against an empty schema and passed having proved nothing. It is now one self-contained
+    test that reads back from a second connection. Nothing here depends on test order any more.
 
 History: this shape came out of the max-effort review on PR #13, which found that binding the
 factory to the ENGINE (the previous version) gave it its own connection, so a `commit()` through
@@ -302,8 +329,9 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
             async with maker() as test_session:
                 yield test_session
         finally:
-            # `bind=None` alone restores the quarantine; the leftover join_transaction_mode is
-            # inert on a sessionmaker that cannot reach a database.
+            # `bind=None` alone restores the quarantine. The leftover join_transaction_mode
+            # cannot be removed — configure() merges — but it is harmless while the bind is None.
+            # See the flagged block above for the measurement.
             AsyncSessionLocal.configure(bind=None)
             await transaction.rollback()
 
