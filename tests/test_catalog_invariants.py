@@ -255,6 +255,89 @@ class TestAnAxisNothingCanSupply:
         assert await find_heading_violations(session) == []
 
 
+class TestAnAxisWithMissingValues:
+    """The fourth way a heading breaks the lookup: qualified along an axis it does not cover.
+
+    The first three ask whether an axis can be RESOLVED at all. This asks whether every value of a
+    resolvable axis is actually catalogued — because tier two builds
+    (module, column_key, 'INTERFACE', <the candidate's interface kind>) from the candidate, and if
+    no row was seeded for that particular kind the key resolves to nothing. Silently, for exactly
+    the candidates carrying that kind, while every other candidate resolves fine. That partial
+    failure is harder to notice than a total one.
+
+    All three scoreable interface kinds occur in the real corpus (6 / 4 / 4 of the 14 candidates),
+    so a heading seeded with two of three is a live bug, not a hypothetical.
+    """
+
+    async def test_interface_rows_must_cover_every_scoreable_kind(self, session: AsyncSession) -> None:
+        boltz2 = await _module(session, "boltz2")
+        session.add_all(
+            [
+                _metric(boltz2, "protein_iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(
+                    boltz2,
+                    "protein_iptm",
+                    variant_kind=db.VariantKind.INTERFACE,
+                    variant="antibody only (H/L pairing)",
+                ),
+                # 'single chain (no interface)' is missing. Four of the 14 real candidates have it.
+            ]
+        )
+        await session.flush()
+
+        violations = await find_heading_violations(session)
+
+        assert len(violations) == 1
+        assert "single chain (no interface)" in violations[0].describe()
+
+    async def test_the_no_chains_arm_is_not_required(self, session: AsyncSession) -> None:
+        """The exemption, which the fixtures already state as project policy.
+
+        `tests/conftest.py` calls the fourth arm "a data-quality state" and leaves it
+        unrepresented; `sql/candidate_summary.sql` adds it defensively, so `bool_or` over zero
+        chain rows cannot return NULL and fall through to the ELSE. A candidate with no chains has
+        no interface to score, and the only recipe that could produce one (ESM2) emits no boltz2
+        columns at all. So a row for it would be dead data, and demanding one would flag the live
+        corpus three times over.
+        """
+        boltz2 = await _module(session, "boltz2")
+        session.add_all(
+            [
+                _metric(boltz2, "protein_iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(
+                    boltz2,
+                    "protein_iptm",
+                    variant_kind=db.VariantKind.INTERFACE,
+                    variant="antibody only (H/L pairing)",
+                ),
+                _metric(
+                    boltz2,
+                    "protein_iptm",
+                    variant_kind=db.VariantKind.INTERFACE,
+                    variant="single chain (no interface)",
+                ),
+            ]
+        )
+        await session.flush()
+
+        assert await find_heading_violations(session) == []
+
+    async def test_parameter_rows_must_cover_every_variant_the_rule_declares(self, session: AsyncSession) -> None:
+        """The same question on the other axis, askable only since the rules table carries `variants`.
+
+        `evoprotgrad.esm_pseudolikelihood_ratio` and `...amplify_...` both appear in the corpus. Seed
+        one arm and the other resolves to nothing.
+        """
+        evoprotgrad = await _module(session, "evoprotgrad")
+        session.add(_metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"))
+        await session.flush()
+
+        violations = await find_heading_violations(session)
+
+        assert len(violations) == 1
+        assert "amplify" in violations[0].describe()
+
+
 class TestTheDatabaseRefusesHalfPopulatedRows:
     """`variant_kind` and `variant` are both-or-neither, enforced by migration 008.
 
@@ -315,11 +398,31 @@ class TestProblemsNeedsNoDatabase:
     """`Heading.problems()` is a pure function, so the classification is testable on its own."""
 
     def test_a_clean_heading_has_no_problems(self) -> None:
-        assert Heading("boltz2", "ptm", (), 1).problems() == ()
+        assert Heading("boltz2", "ptm", (), (), 1).problems() == ()
 
     def test_every_applicable_reason_is_reported(self) -> None:
-        both = Heading("boltz2", "iptm", ("INTERFACE", "PARAMETER"), 2).problems()
+        both = Heading("boltz2", "iptm", ("INTERFACE", "PARAMETER"), (), 2).problems()
 
         assert len(both) == 2
         assert any("2 axes" in reason for reason in both)
         assert any("can never be reached" in reason for reason in both)
+
+    def test_coverage_is_only_asked_of_a_single_axis(self) -> None:
+        """Two axes is already refused, and the query aggregates variants across the whole heading
+        rather than per kind — so asking about coverage there would compare against the wrong set."""
+        mixed = Heading("boltz2", "iptm", ("INTERFACE", "PARAMETER"), ("esm",), 0).problems()
+
+        assert not any("has no row for" in reason for reason in mixed)
+
+    def test_a_partly_covered_interface_heading_names_what_is_missing(self) -> None:
+        partial = Heading(
+            "boltz2",
+            "protein_iptm",
+            ("INTERFACE",),
+            ("antibody-target complex", "antibody only (H/L pairing)"),
+            0,
+        ).problems()
+
+        assert len(partial) == 1
+        assert "single chain (no interface)" in partial[0]
+        assert "no chains recorded" not in partial[0], "the fourth arm is deliberately not required"

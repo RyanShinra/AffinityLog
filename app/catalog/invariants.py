@@ -45,9 +45,9 @@ heading. The constraint makes that row unwritable, which is why no branch here r
 Python version would be dead code. Before adding a check to this file, ask whether a constraint can
 carry it instead.
 
-THREE WAYS A HEADING BREAKS THE LOOKUP
---------------------------------------
-All three are silent, and only the first is about "more than one kind":
+FOUR WAYS A HEADING BREAKS THE LOOKUP
+-------------------------------------
+All four are silent, and only the first is about "more than one kind":
 
   * MIXED AXES — one heading catalogued along two different axes. No identity can name both,
     because a metric row carries a single (variant_kind, variant) pair; the cross product has
@@ -87,6 +87,22 @@ All three are silent, and only the first is about "more than one kind":
 
     Note how it composes with the case above rather than contradicting it: TRANSFORM beside a bare
     row is fine (the bare row answers), TRANSFORM alone is not (nothing answers).
+
+  * AN AXIS WITH MISSING VALUES — a heading qualified along a RESOLVABLE axis that it does not
+    fully cover. The three above ask whether an axis can be resolved at all; this asks whether
+    every value of it was actually catalogued. Tier two builds
+    (module, column_key, 'INTERFACE', <the candidate's interface kind>), so a heading seeded with
+    two of the three scoreable kinds resolves to nothing for exactly the candidates carrying the
+    third, while every other candidate resolves fine. A partial failure is harder to notice than a
+    total one, and all three kinds occur in the real corpus (6 / 4 / 4 of the 14 candidates).
+
+    The expected set comes from `InterfaceKind.scoreable()` for INTERFACE and from
+    `declared_variants_for()` for everything else — the latter only askable since the rules table
+    began carrying its variants as data rather than as regex capture groups.
+
+    `NO_CHAINS_RECORDED` is excluded, which is not a new judgment: the enum docstring, the CASE
+    comment in sql/candidate_summary.sql, and tests/conftest.py all already say the catalog carries
+    three rows per interface-dependent column and not four.
 """
 
 from __future__ import annotations
@@ -96,7 +112,8 @@ from typing import NamedTuple
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog.keys import decomposable_kinds_for
+from app.catalog.interface_kind import InterfaceKind
+from app.catalog.keys import declared_variants_for, decomposable_kinds_for
 from app.models import orm as db
 
 
@@ -106,6 +123,7 @@ class Heading(NamedTuple):
     module: str
     column_key: str
     variant_kinds: tuple[str, ...]  # the distinct non-NULL axes found, sorted
+    variants: tuple[str, ...]  # the distinct non-NULL variant values found, sorted
     bare_rows: int  # rows with variant_kind IS NULL under the same heading
 
     def problems(self) -> tuple[str, ...]:
@@ -143,6 +161,22 @@ class Heading(NamedTuple):
                     f"(INTERFACE only), and there is no variant-less row to fall back to"
                 )
 
+        # FOURTH: a resolvable axis this heading does not fully cover. Only asked when there is
+        # exactly ONE axis — two or more is already refused above, and the query aggregates variants
+        # across the whole heading rather than per kind, so pairing them back up is neither possible
+        # here nor needed. An empty `expected` means nothing declares what full coverage is, which is
+        # not the same as being covered: that case is the third branch's to refuse, not this one's.
+        if len(self.variant_kinds) == 1:
+            (kind,) = self.variant_kinds
+            expected = InterfaceKind.scoreable() if kind == interface else declared_variants_for(self.module, self.column_key)
+            missing = sorted(expected - set(self.variants))
+            if missing:
+                reasons.append(
+                    f"is qualified along {kind} but has no row for {missing} — a candidate whose "
+                    f"variant is one of those resolves to no metric, while every other candidate "
+                    f"under this heading resolves fine"
+                )
+
         return tuple(reasons)
 
     def describe(self) -> str:
@@ -161,6 +195,8 @@ _HEADINGS_SQL = text("""
             me.column_key                                                 AS column_key,
             array_agg(DISTINCT me.variant_kind::text)
                 FILTER (WHERE me.variant_kind IS NOT NULL)                AS variant_kinds,
+            array_agg(DISTINCT me.variant)
+                FILTER (WHERE me.variant IS NOT NULL)                     AS variants,
             count(*) FILTER (WHERE me.variant_kind IS NULL)               AS bare_rows
     FROM        metrics me
     JOIN        modules mo ON mo.id = me.module_id
@@ -182,6 +218,7 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
             module=row.module,
             column_key=row.column_key,
             variant_kinds=tuple(sorted(row.variant_kinds or ())),
+            variants=tuple(sorted(row.variants or ())),
             bare_rows=row.bare_rows,
         )
         for row in result

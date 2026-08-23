@@ -131,6 +131,21 @@ def decomposable_kinds_for(module: str, column_key: str) -> frozenset[str]:
     return frozenset({rule.variant_kind}) if rule is not None else frozenset()
 
 
+def declared_variants_for(module: str, column_key: str) -> frozenset[str]:
+    """Every variant this heading's key strings may carry, or empty if no rule covers it.
+
+    The companion to `decomposable_kinds_for`: that one says WHICH AXIS the key encodes, this says
+    WHICH VALUES of it exist. `app/catalog/invariants.py` uses it to refuse a heading catalogued
+    along a declared axis without a row for every value — seed `esm` but not `amplify` and every
+    `evoprotgrad.amplify_pseudolikelihood_ratio` key resolves to nothing.
+
+    Only askable because the rules table carries `variants` as data. While the regex was the source
+    of truth, the values were capture groups and this function could not have been written.
+    """
+    rule = _VARIANT_RULES.get((module, column_key))
+    return rule.variants if rule is not None else frozenset()
+
+
 # Two keys in the corpus ("tier", "recommendation") carry NO module prefix — they are run-level
 # verdicts the exporter attaches to the whole result, not a module's output. `recommendation` is
 # even a paragraph of AI-generated prose. Filing them under a synthetic module keeps them in the
