@@ -193,8 +193,9 @@ async def seed(dry_run: bool = False) -> None:
         # bites is a curated INTERFACE row landing beside a BARE row that `seed_metric_skeleton`
         # already committed, and that row exists only in the database. So the dry run applies the
         # upserts, asks, and returns without committing. It stays useful offline — the checks above
-        # ran, and an unreachable database is reported rather than fatal — because editing
-        # catalog.json on a machine with no Postgres is a real thing to want to do.
+        # ran, and a database it cannot use is reported rather than fatal — because editing
+        # catalog.json on a machine with no Postgres, or one not yet migrated, is a real thing to
+        # want to do.
         try:
             async with AsyncSessionLocal() as session:
                 concept_ids = await _upsert_concepts(session, concepts)
@@ -207,8 +208,31 @@ async def seed(dry_run: bool = False) -> None:
                     f"  heading invariant: {'would ABORT the real run' if violations else 'clean'} "
                     f"({len(violations)} violation(s))"
                 )
-        except OSError as unreachable:
-            print(f"  heading invariant: NOT CHECKED — no database ({type(unreachable).__name__})")
+        # Broad on purpose, and this was `except OSError` — which caught only two of the five ways
+        # a database can be unusable. Measured, all five, against a real server:
+        #
+        #     connection refused   ConnectionRefusedError    OSError
+        #     no such host         gaierror                  OSError
+        #     no schema            ProgrammingError          SQLAlchemyError
+        #     wrong password       InvalidPasswordError      asyncpg's own
+        #     no such database     InvalidCatalogNameError   asyncpg's own
+        #
+        # Three unrelated hierarchies, and no reason to think that list is complete — asyncpg raises
+        # its own at connect time, before SQLAlchemy has anything to wrap. An unmigrated database is
+        # the one that actually happened: `relation "concepts" does not exist`, an unhandled
+        # traceback out of a --dry-run whose entire promise is that it is safe to run and tells you
+        # what the real run would do.
+        #
+        # Enumerating the hierarchies would be a guess that fails silently the next time one is
+        # added. So catch everything and report precisely instead: the message names the exception
+        # rather than asserting a cause, so a genuine bug in the upserts above reads as its own type
+        # here rather than being laundered into "no database".
+        except Exception as unusable:
+            # First line only: `str()` on a SQLAlchemy DBAPIError appends the whole statement and
+            # its bound parameters, which buries a one-line diagnosis in a screen of SQL that reads
+            # like the traceback this branch exists to prevent.
+            detail = str(unusable).splitlines()[0].strip()
+            print(f"  heading invariant: NOT CHECKED — {type(unusable).__name__}: {detail}")
         print("(dry run — nothing written)")
         return
 
