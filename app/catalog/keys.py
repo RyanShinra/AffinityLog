@@ -103,6 +103,19 @@ def _pattern_for(column_key: str, variants: frozenset[str]) -> re.Pattern[str]:
     of making the data primary, and is deliberate: the corpus is the source of truth for what
     exists, so a shape we have never seen is not one to guess at.
     """
+    if not variants:
+        # An empty alternation compiles to `^(?P<variant>)_(?P<column>foo)$`, which happily matches
+        # the literal key `module._foo` and yields variant="". That variant matches no catalog row,
+        # so the key would resolve to no metric SILENTLY — the failure this whole module exists to
+        # prevent, introduced by a typo in a hand-edited table. Raising here fires at import,
+        # because `_MATCHERS_PER_MODULE` below is built at import: a bad rule stops the process
+        # rather than shipping a matcher that quietly parses keys wrong.
+        raise ValueError(
+            f"_VARIANT_RULES entry for column_key={column_key!r} declares no variants. "
+            f"A rule exists to name the closed set of values its prefix may take; an empty set "
+            f"means the entry should be deleted rather than left to match an empty prefix."
+        )
+
     alternation = "|".join(re.escape(variant) for variant in sorted(variants))
     return re.compile(rf"^(?P<variant>{alternation})_(?P<column>{re.escape(column_key)})$")
 
