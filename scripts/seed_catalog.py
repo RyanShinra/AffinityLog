@@ -178,7 +178,19 @@ async def _upsert_metrics(
     return len(rows)
 
 
-async def seed(dry_run: bool = False) -> None:
+async def seed(dry_run: bool = False) -> int:
+    """Seed the catalog, or preview it. Returns the process exit status.
+
+    0 means "checked everything, and the real run would succeed". Anything else means it would
+    not, or that we could not tell — and NOT BEING ABLE TO TELL IS NOT SUCCESS. Widening the
+    dry run's exception handling so an unmigrated database stops crashing also made it exit 0,
+    which turned `--dry-run && seed_catalog.py` into a gate that opens on a database the preview
+    never managed to look at.
+
+    Nothing scripts this today (no CI job, no shell script, no Python caller), so the contract is
+    being set now rather than changed later. The real run is unaffected: it still raises out of
+    `raise_on_heading_violations`, which is louder than any status code.
+    """
     catalog = json.loads(_CATALOG.read_text(encoding="utf-8"))
     concepts = catalog["concepts"]
     modules = catalog["modules"]
@@ -190,11 +202,17 @@ async def seed(dry_run: bool = False) -> None:
         named_modules = {m["name"] for m in modules}
         named_concepts = {c["name"] for c in concepts}
         # Same referential checks the real run makes, without touching the database.
+        # Counted, not just printed. These lines predate the exit status and were reported into a
+        # run that exited 0 regardless, so a preview could name a broken catalog and still look
+        # like a pass.
+        problems = 0
         for m in metrics:
             if m["module"] not in named_modules:
                 print(f"  ERROR: metric {m['module']}.{m['column_key']} names an unlisted module")
+                problems += 1
             if (c := m.get("concept")) and c not in named_concepts:
                 print(f"  ERROR: metric {m['module']}.{m['column_key']} names an unlisted concept '{c}'")
+                problems += 1
 
         # The heading invariant cannot be answered from the JSON alone: the violation that actually
         # bites is a curated INTERFACE row landing beside a BARE row that `seed_metric_skeleton`
@@ -211,6 +229,7 @@ async def seed(dry_run: bool = False) -> None:
                 violations = await find_heading_violations(session)
                 for violation in violations:
                     print(f"  ERROR: {violation.describe()}")
+                    problems += 1
                 print(
                     f"  heading invariant: {'would ABORT the real run' if violations else 'clean'} "
                     f"({len(violations)} violation(s))"
@@ -240,8 +259,12 @@ async def seed(dry_run: bool = False) -> None:
             # like the traceback this branch exists to prevent.
             detail = str(unusable).splitlines()[0].strip()
             print(f"  heading invariant: NOT CHECKED — {type(unusable).__name__}: {detail}")
+            # Not an error in the catalog, but not a clean bill of health either: half the checks
+            # did not run. A human editing catalog.json offline still gets the full report above;
+            # only the status differs, and only a script reads that.
+            problems += 1
         print("(dry run — rolled back, nothing committed)")
-        return
+        return 1 if problems else 0
 
     # One transaction for the whole seed: a half-applied catalog (modules without their metrics)
     # would be worse than no catalog, and the whole thing is small enough to commit atomically.
@@ -258,6 +281,10 @@ async def seed(dry_run: bool = False) -> None:
         await session.commit()
 
     print(f"seeded {len(concept_ids)} concepts, {len(module_ids)} modules, {n_metrics} metrics")
+    # The real run reports failure by raising, not by returning: `raise_on_heading_violations`
+    # aborts before the commit, and anything the database refuses propagates. Reaching here means
+    # it committed.
+    return 0
 
 
 def main() -> None:
@@ -268,7 +295,7 @@ def main() -> None:
         help="parse and validate; applies the writes, then rolls back without committing",
     )
     args = parser.parse_args()
-    asyncio.run(seed(dry_run=args.dry_run))
+    raise SystemExit(asyncio.run(seed(dry_run=args.dry_run)))
 
 
 if __name__ == "__main__":
