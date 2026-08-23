@@ -36,7 +36,14 @@ each pass and using it to resolve the next:
 `RETURNING id` on the upsert is what gives us the id whether the row was inserted or updated.
 
     python scripts/seed_catalog.py            # seed / re-seed
-    python scripts/seed_catalog.py --dry-run  # parse and report, touch nothing
+    python scripts/seed_catalog.py --dry-run  # parse, report, and predict the real run
+
+`--dry-run` does not touch nothing. It connects, applies the same upserts the real run would, asks
+the heading-invariant check what it thinks, and then returns WITHOUT committing, so the transaction
+is discarded. That is the only way the preview can predict an abort: the violation that actually
+bites is a curated row landing beside one `seed_metric_skeleton` already committed, which cannot be
+seen from the JSON alone. So it needs a reachable database and write permission — it just never
+keeps anything. A database it cannot use is reported, not fatal.
 """
 
 from __future__ import annotations
@@ -233,7 +240,7 @@ async def seed(dry_run: bool = False) -> None:
             # like the traceback this branch exists to prevent.
             detail = str(unusable).splitlines()[0].strip()
             print(f"  heading invariant: NOT CHECKED — {type(unusable).__name__}: {detail}")
-        print("(dry run — nothing written)")
+        print("(dry run — rolled back, nothing committed)")
         return
 
     # One transaction for the whole seed: a half-applied catalog (modules without their metrics)
@@ -255,7 +262,11 @@ async def seed(dry_run: bool = False) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed the metric catalog from seed/catalog.json")
-    parser.add_argument("--dry-run", action="store_true", help="parse and validate without writing")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="parse and validate; applies the writes, then rolls back without committing",
+    )
     args = parser.parse_args()
     asyncio.run(seed(dry_run=args.dry_run))
 
