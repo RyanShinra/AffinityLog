@@ -206,7 +206,13 @@ class TestTheSessionIsNotUsedConcurrently:
         this needs is simply a session that has not connected yet, which is what production's
         `get_session` hands every request.
 
-        Read-only, so nothing here needs the rollback the `session` fixture would provide.
+        WHICH MEANS THIS SESSION IS UNMANAGED, and that is a real cost rather than a detail. It
+        sits outside the `session` fixture's transaction, so there is nothing to roll it back:
+        anything written here would persist in the test database for every later test in the run.
+        It is read-only today and must stay that way. The protection cannot simply be added either
+        — opening a transaction to roll back would check out a connection, and a session with a
+        connection is warm, which is the one state where the bug does not reproduce. The test needs
+        a virgin session, and a virgin session is by definition one nothing is managing yet.
 
         Before the lock: `IllegalStateChangeError: Method 'close()' can't be called here` raised out
         of the session's own `__aexit__`, so the request 500s with a poisoned session rather than

@@ -117,10 +117,15 @@ class TestShapesItMustRefuse:
         assert "2 axes" in violations[0].describe()
 
     async def test_both_reasons_are_reported_together(self, session: AsyncSession) -> None:
-        """The two HAVING arms are independent, so one heading can trip both.
+        """`problems()` returns every applicable reason, not the first one.
 
         Reporting only the first would send the operator round twice: fix the axes, re-run, fail
         again on the orphan that was in the tuple all along.
+
+        (This said "the two HAVING arms". There is no HAVING — the query returns every heading and
+        `Heading.problems()` classifies in Python, because two of the branches need sets imported
+        from app.catalog.keys and app.catalog.interface_kind that SQL cannot see. There are four
+        branches now, not two.)
         """
         boltz2 = await _module(session, "boltz2")
         session.add_all(
