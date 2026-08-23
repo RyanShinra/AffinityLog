@@ -5,8 +5,8 @@
 > is not what shipped — it is the sequence of questions that turned a tripwire into a design
 > change, and because every one of those questions came from the owner rather than from the code.
 
-**Span:** 2026-08-21 · **branch:** `spring-cleaning-in-summer` · 6 files, +199 / −69 ·
-93 → 96 tests · zero test-construction changes
+**Span:** 2026-08-21 → 2026-08-23 · **branch:** `spring-cleaning-in-summer` · 13 commits ·
+19 files, +1299 / −159 · 93 → 120 tests · all 15 cleanup items closed
 
 ---
 
@@ -232,10 +232,120 @@ explanation needs six messages, the design is the thing that is wrong, not the l
 
 ---
 
-## What's next on this branch
+## Epilogue — the other fourteen
 
-Items 1, 2 and 6 — the three in `app/catalog/invariants.py` and `app/catalog/keys.py` that let bad
-catalog data commit and then resolve to silence. Then the remaining eleven, which are mostly
-one-liners in test and tooling code.
+Item 15 was written up first because its story was the interesting one. The remaining fourteen were
+expected to be a tail of one-liners. Three of them were not.
 
-Item 15 is closed, and closing it removed the reason item 15 existed.
+### The ones that changed shape
+
+**Item 1 — the satisfiability check's own false negative.** `DECOMPOSABLE_VARIANT_KINDS` flattened
+the variant rules to a bare set of kind names, so it answered *"is PARAMETER decomposable?"* when
+the answerable question is *"is it decomposable **for this heading**?"* The rules are keyed by module
+and their regex pins the column, so PARAMETER is recoverable for exactly one heading in the corpus:
+
+```
+Heading('evoprotgrad', 'entropy', ('PARAMETER',), 0).problems()  ->  CLEAN
+```
+
+It could only ask the unanswerable form because the regex was the source of truth and the data was
+trapped inside it as capture groups. So the table was inverted — data primary, regex derived — and
+the check became a lookup. Drift became unrepresentable rather than tested for, which mattered
+because *the bug being fixed was a drift bug*.
+
+**Item 2 — a malformed row that silenced a check.** A metrics row with a NULL `variant_kind` and a
+non-NULL `variant` is unreachable, but it did not merely sit there: the query counted it as a BARE
+row, and `bare_rows` is the guard on the unsatisfiable-axis branch. One such row turned a real
+violation clean for its whole heading.
+
+```
+Heading('fastdpe','SFvCSP',('TRANSFORM',), bare_rows=0) -> "nothing can supply..."
+Heading('fastdpe','SFvCSP',('TRANSFORM',), bare_rows=1) -> CLEAN
+```
+
+The review proposed splitting the count and adding a Python branch. But unlike the functional
+dependency that module exists for, this invariant *is* expressible — `CHECK ((variant_kind IS NULL)
+= (variant IS NULL))` — so migration 008 enforces it and the Python branch was never written. Same
+move as item 15, one layer further down: the row cannot be created, so nothing needs to detect it.
+
+**Item 6 — coverage, which item 1 made possible.** Nothing checked whether a heading qualified along
+a *resolvable* axis actually covered it. Tier two builds
+`(module, column_key, 'INTERFACE', <the candidate's kind>)`, so a heading seeded with two of three
+scoreable kinds resolves to nothing for exactly the candidates carrying the third — a partial
+failure, which is harder to notice than a total one.
+
+The PARAMETER half of that check **could not have been written before item 1**. The two turned out
+to be one question — *this heading is qualified along X; is every value of X present?* — asked of
+two axes, with the enumeration coming from `InterfaceKind.scoreable()` or `declared_variants_for()`.
+
+The domain call looked open and was not: three separate places already said the catalog carries
+three interface rows and not four. Measured what the naive version would have cost:
+
+```
+demanding all four kinds -> flags boltz2.protein_iptm, .iptm and .complex_ipde
+                            i.e. every interface-dependent heading in the live corpus
+```
+
+Which is the failure `invariants.py` already calls worse than no check at all.
+
+### The tail, which was mostly a tail
+
+| # | what it was |
+|---|---|
+| 3 + 13 | the Docker probe performed a **registry login**, so an unreachable registry read as an absent daemon — and in CI that is `pytest.fail` on a healthy runner. Fixed by keeping testcontainers' host *resolution* and dropping its client, which necessarily closed 13 too |
+| 4 | the fixture-leak regression test was two tests, the writer asserting **nothing**. `-k` or `--lf` ran the reader alone against an empty schema and passed. Now one test, reading back from a second connection |
+| 5 | `os.environ.get("CI")` is a presence test, so `CI=false` meant yes |
+| 7 | `--dry-run` caught `OSError` only; an unmigrated database raised `ProgrammingError` and crashed |
+| 8,9,10,11,12,14 | documentation that was false when written, or had rotted since |
+
+### Two things the tail taught anyway
+
+**A test can pass against the bug it was written for, and look like coverage.** Item 3's first pair
+did. `monkeypatch.setenv("DOCKER_AUTH_CONFIG", ...)` does nothing, because the library reads that
+variable through a dataclass `default_factory` evaluated once at import; and the other test patched
+a *conditional* path that never fires on this machine or in CI. Both green, both vacuous. That
+produced a CLAUDE.md entry: monkeypatch is a smell, not a default — patch where the value is
+**read**, not where it is set, and prove it by reverting the fix.
+
+Only the revert step made either visible. Every fix in this branch was verified that way, and it
+caught something roughly one time in four.
+
+**Enumerating a hierarchy is a guess that fails silently.** Item 7's obvious widening —
+`(OSError, SQLAlchemyError)` — still missed two of the five ways a database can be unusable, because
+asyncpg raises its own exceptions at connect time before SQLAlchemy has anything to wrap:
+
+```
+connection refused   ConnectionRefusedError    OSError
+no such host         gaierror                  OSError
+no schema            ProgrammingError          SQLAlchemyError
+wrong password       InvalidPasswordError      asyncpg's own
+no such database     InvalidCatalogNameError   asyncpg's own
+```
+
+Three unrelated hierarchies, and no reason to believe five is the whole list. So: catch everything
+and *report precisely* rather than assert a cause — which pays down the real cost of a broad
+`except` instead of ignoring it.
+
+---
+
+## The branch, finished
+
+**13 commits · 19 files · +1299 / −159 · 93 → 120 tests · 15/15 items**
+
+Four of the fifteen produced real changes to the system — a new class, an inverted rules table, a
+schema constraint, a fourth invariant branch. Six were documentation that had rotted. The rest sat
+in between.
+
+The pattern across the substantial ones is the same one item 15 found, and it held every time:
+
+> **comment → exception → rename → split the locks → give the lock to the owner of the resource**
+
+Items 2 and 6 walked the same ladder in their own terms. Item 2 was offered as a Python check and
+became a `CHECK` constraint. Item 6 was offered as a hardcoded list and became an enumeration from
+the enum that already carried the reasoning. In every case the review's proposed fix was at the
+wrong altitude rather than wrong — which is worth knowing about review findings generally: they are
+reliable about *where something is broken* and much less reliable about *how deep the fix goes*.
+
+And one sequencing lesson: item 1 had to precede item 6, not for tidiness but because it made item 6
+expressible. A work list ordered by severity is not necessarily ordered by dependency, and nothing in
+the list said so.
