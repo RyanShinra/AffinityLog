@@ -200,6 +200,18 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   it `_interface_kinds_lock`, not the session's.
   `tests/test_context_catalog.py::TestTheTwoLocksAreSeparate` guards it, including a test that
   collapses the two locks back into one and asserts the hang.
+- **`monkeypatch` in a test is a smell — often the only way, never the first thing to reach for.**
+  It couples the test to the implementation's internals, so it can only be right if you know exactly
+  where the value is read, and it fails *silently* when you don't: the test passes, against the bug.
+  Consider the alternatives first — inject the dependency, use a real object, test at a boundary, or
+  run a subprocess when the thing genuinely is process-start state.
+  When you do patch, patch **where the value is read, not where it is set**, and prove it by
+  reverting the fix and watching the test go red. Two live examples from `tests/test_docker_probe.py`,
+  both of which passed against the bug on the first attempt:
+  `monkeypatch.setenv("DOCKER_AUTH_CONFIG", ...)` does nothing, because
+  `testcontainers.core.config` reads it through a dataclass `default_factory` evaluated once when
+  its singleton is built at import; and patching a *conditional* path (`if docker_host:`) asserts
+  nothing on a machine where the condition never holds — which was this machine, and CI.
 - **A new seeder must call `raise_on_heading_violations(session, source=...)` before `commit()`.**
   `app/catalog/invariants.py` enforces `(module_id, column_key) -> variant_kind`, a functional
   dependency the schema cannot express and the ScoreEntry lookup depends on. Breaking it makes score
