@@ -78,7 +78,7 @@ import contextlib
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pytest
 from alembic import command
@@ -108,6 +108,32 @@ def _alembic_config() -> Config:
     config = Config(str(_REPO_ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(_REPO_ROOT / "migrations"))
     return config
+
+
+# Values that mean "no" when someone sets CI by hand. Everything else present counts as CI,
+# including a value nobody anticipated — see `_running_in_ci`.
+_NOT_CI: Final[frozenset[str]] = frozenset({"", "0", "false", "no", "off"})
+
+
+def _running_in_ci() -> bool:
+    """Whether to treat this run as CI, where a missing database is a failure rather than a skip.
+
+    This was `os.environ.get("CI")`, a PRESENCE test — so `CI=false`, `CI=0` and `CI=no` all read as
+    "yes, this is CI" and turned a stopped Docker into a hard failure for someone explicitly saying
+    the opposite.
+
+    Deliberately asymmetric, and the asymmetry is the design. An unrecognised value counts as CI:
+    treating a real CI run as local means every database test SKIPS, `build` still only
+    `needs: [lint, test]`, and a green build ships with no database coverage at all — including
+    `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM finding
+    this schema exists for. Treating a local run as CI merely produces a loud, obvious failure that
+    takes one line to diagnose. When the two errors cost that differently, the default belongs on
+    the side of the cheap one.
+
+    So the only way to opt out is to say so explicitly. GitHub Actions, GitLab, CircleCI, Travis and
+    Netlify all set `CI=true`; Vercel sets `CI=1`. Nothing here needs to enumerate them.
+    """
+    return os.environ.get("CI", "").strip().lower() not in _NOT_CI
 
 
 def _docker_is_running() -> bool:
@@ -184,13 +210,16 @@ def database_url() -> Iterator[str]:
     `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM
     finding this whole schema exists for. A skip is the right ergonomic on a laptop and a blind
     spot in a pipeline; `CI` is set by GitHub Actions and by every other runner worth naming.
+    `_running_in_ci()` decides, and errs towards failing — see its docstring for why an unrecognised
+    value counts as CI, and how to opt out.
     """
     if not _docker_is_running():
-        if os.environ.get("CI"):
+        if _running_in_ci():
             pytest.fail(
                 "Docker is not reachable, so the database tests cannot run. Failing rather than "
-                "skipping because CI is set: a green build with no database coverage is worse than "
-                "a red one. Locally this is a skip.",
+                "skipping because this looks like CI: a green build with no database coverage is "
+                "worse than a red one. If this is not CI, set CI=false (or 0/no/off) and it "
+                "becomes a skip.",
                 pytrace=False,
             )
         pytest.skip("needs a database; Docker is not running — start Docker Desktop and re-run")

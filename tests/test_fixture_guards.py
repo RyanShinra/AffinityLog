@@ -1,11 +1,13 @@
-"""`_docker_is_running` is asked one question, and must not answer a different one.
+"""The two inputs to `database_url`'s skip-or-fail decision.
 
-Worth a test file of its own because of what the answer controls: `database_url` turns a False into
-`pytest.fail` when `CI` is set, so a probe that is wrong about a working daemon turns a healthy
-runner into a red build. Nothing else in the suite would notice — every database test would simply
-stop running, which is the failure mode the CI guard exists to prevent.
+`_docker_is_running()` answers "can the database tests run?" and `_running_in_ci()` answers "is a
+No louder than a skip?". Between them they decide whether a missing daemon quietly skips every
+database test or fails the build, so both are worth their own tests: get either wrong and the
+failure is a GREEN build with no database coverage, including
+`test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM finding.
+Nothing else in the suite would notice, because the tests would simply not run.
 
-Both tests are written to hold whether or not Docker is up locally.
+Written to hold whether or not Docker is up locally.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import pytest
 from testcontainers.core import docker_client as tc_docker_client
 from testcontainers.core.config import testcontainers_config
 
-from tests.conftest import _docker_is_running
+from tests.conftest import _docker_is_running, _running_in_ci
 
 # A registry that cannot resolve, with credentials that cannot work.
 _BOGUS_AUTH = '{"auths":{"registry.invalid.example":{"auth":"dXNlcjpwYXNz"}}}'
@@ -60,3 +62,37 @@ def test_the_probe_does_not_rewrite_docker_host(monkeypatch: pytest.MonkeyPatch)
     _docker_is_running()
 
     assert "DOCKER_HOST" not in os.environ
+
+
+class TestCiDetection:
+    """`_running_in_ci` was `os.environ.get("CI")` — a presence test, so `CI=false` meant yes.
+
+    `monkeypatch.setenv` is the right tool here and a smell elsewhere (see CLAUDE.md): this reads
+    `os.environ` live on every call, so the environment IS where the value is read. Contrast
+    tests/conftest.py's Docker probe, where the same idiom asserted nothing because the library had
+    already cached the variable at import.
+    """
+
+    @pytest.mark.parametrize("value", ["true", "TRUE", "1", "yes", "maybe"])
+    def test_anything_not_explicitly_negative_counts_as_ci(self, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Including "maybe", deliberately.
+
+        An unrecognised value must fail loudly rather than skip silently: mistaking real CI for
+        local means every database test is skipped and the build ships green with no coverage,
+        while mistaking local for CI is a one-line diagnosis.
+        """
+        monkeypatch.setenv("CI", value)
+
+        assert _running_in_ci() is True
+
+    @pytest.mark.parametrize("value", ["false", "FALSE", "0", "no", "off", "", "  "])
+    def test_explicitly_negative_values_do_not(self, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The bug: all of these used to mean "yes, this is CI" and turned a skip into a failure."""
+        monkeypatch.setenv("CI", value)
+
+        assert _running_in_ci() is False
+
+    def test_unset_is_not_ci(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CI", raising=False)
+
+        assert _running_in_ci() is False
