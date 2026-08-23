@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import enum
 import json
 from pathlib import Path
 from typing import Any, Final
@@ -59,6 +60,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.invariants import find_heading_violations, raise_on_heading_violations
 from app.database import AsyncSessionLocal
+
+
+class Exit(enum.IntEnum):
+    """What this script's exit status means.
+
+    MIRRORS THE REAL RUN, THEN REFINES IT. Measured: the real run exits 0 when it commits and 1
+    when anything stops it — an unmigrated database, an unreachable one, a heading violation — all
+    of which reach the shell as an uncaught exception. So `--dry-run` returning 0 for "would
+    succeed" and non-zero for "would not" is not a separate contract, it is a PREDICTION of the
+    real run's status, which is the only useful thing a preview can promise.
+
+    The split below refines that prediction without breaking it. Every non-zero still means "the
+    real run would fail", so `--dry-run && seed_catalog.py` behaves identically; callers that want
+    to know WHICH failure can look, and the two want different things done about them:
+
+        CATALOG_INVALID    the JSON is wrong. Edit seed/catalog.json. Re-running will not help.
+        COULD_NOT_VERIFY   the database could not be reached or used. Start it, migrate it, and
+                           re-run — the catalog itself may be perfectly fine, and half the checks
+                           (parse, referential integrity) did pass.
+
+    2 IS DELIBERATELY SKIPPED. argparse exits 2 on a usage error, before any of this code runs
+    (verified: `seed_catalog.py --nonsense` -> 2). Reusing it would make "you typed the flag wrong"
+    and "your catalog is broken" indistinguishable.
+
+    When both apply — a broken catalog AND an unusable database — CATALOG_INVALID wins, because it
+    is the one that is certainly true and certainly needs fixing.
+    """
+
+    CLEAN = 0
+    CATALOG_INVALID = 1
+    COULD_NOT_VERIFY = 3
+
 
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 _CATALOG: Final[Path] = _REPO_ROOT / "seed" / "catalog.json"
@@ -178,18 +211,17 @@ async def _upsert_metrics(
     return len(rows)
 
 
-async def seed(dry_run: bool = False) -> int:
+async def seed(dry_run: bool = False) -> Exit:
     """Seed the catalog, or preview it. Returns the process exit status.
 
-    0 means "checked everything, and the real run would succeed". Anything else means it would
-    not, or that we could not tell — and NOT BEING ABLE TO TELL IS NOT SUCCESS. Widening the
-    dry run's exception handling so an unmigrated database stops crashing also made it exit 0,
-    which turned `--dry-run && seed_catalog.py` into a gate that opens on a database the preview
-    never managed to look at.
+    See `Exit` for what each status means and why it mirrors the real run. In short: 0 predicts a
+    successful real run, and anything else predicts a failed one — including a database the preview
+    could not look at, because the real run needs that same database and would fail on it too.
 
-    Nothing scripts this today (no CI job, no shell script, no Python caller), so the contract is
-    being set now rather than changed later. The real run is unaffected: it still raises out of
-    `raise_on_heading_violations`, which is louder than any status code.
+    Widening the dry run's exception handling so an unmigrated database stopped crashing also made
+    it exit 0, which turned `--dry-run && seed_catalog.py` into a gate that opened on a schema that
+    does not exist. Nothing scripts this today (no CI job, no shell script, no Python caller), so
+    the contract is being set now rather than changed later.
     """
     catalog = json.loads(_CATALOG.read_text(encoding="utf-8"))
     concepts = catalog["concepts"]
@@ -206,6 +238,7 @@ async def seed(dry_run: bool = False) -> int:
         # run that exited 0 regardless, so a preview could name a broken catalog and still look
         # like a pass.
         problems = 0
+        could_not_verify = False
         for m in metrics:
             if m["module"] not in named_modules:
                 print(f"  ERROR: metric {m['module']}.{m['column_key']} names an unlisted module")
@@ -260,11 +293,17 @@ async def seed(dry_run: bool = False) -> int:
             detail = str(unusable).splitlines()[0].strip()
             print(f"  heading invariant: NOT CHECKED — {type(unusable).__name__}: {detail}")
             # Not an error in the catalog, but not a clean bill of health either: half the checks
-            # did not run. A human editing catalog.json offline still gets the full report above;
-            # only the status differs, and only a script reads that.
-            problems += 1
+            # did not run, and the real run needs the same database. A human editing catalog.json
+            # offline still gets the full report above; only the status differs, and only a script
+            # reads that.
+            could_not_verify = True
         print("(dry run — rolled back, nothing committed)")
-        return 1 if problems else 0
+
+        if problems:
+            return Exit.CATALOG_INVALID  # certainly wrong, and certainly needs the JSON edited
+        if could_not_verify:
+            return Exit.COULD_NOT_VERIFY
+        return Exit.CLEAN
 
     # One transaction for the whole seed: a half-applied catalog (modules without their metrics)
     # would be worse than no catalog, and the whole thing is small enough to commit atomically.
@@ -284,7 +323,7 @@ async def seed(dry_run: bool = False) -> int:
     # The real run reports failure by raising, not by returning: `raise_on_heading_violations`
     # aborts before the commit, and anything the database refuses propagates. Reaching here means
     # it committed.
-    return 0
+    return Exit.CLEAN
 
 
 def main() -> None:
