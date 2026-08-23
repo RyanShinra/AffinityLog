@@ -211,7 +211,7 @@ async def _upsert_metrics(
     return len(rows)
 
 
-async def seed(dry_run: bool = False) -> Exit:
+async def seed(dry_run: bool = False, catalog_path: Path | None = None) -> Exit:
     """Seed the catalog, or preview it. Returns the process exit status.
 
     See `Exit` for what each status means and why it mirrors the real run. In short: 0 predicts a
@@ -222,14 +222,24 @@ async def seed(dry_run: bool = False) -> Exit:
     it exit 0, which turned `--dry-run && seed_catalog.py` into a gate that opened on a schema that
     does not exist. Nothing scripts this today (no CI job, no shell script, no Python caller), so
     the contract is being set now rather than changed later.
+
+    `catalog_path` defaults to seed/catalog.json. It exists so a candidate file can be validated
+    before it replaces the real one — and so tests/test_seed_catalog_cli.py can drive the three
+    exit states from a subprocess. That has to be a subprocess: called in-process, `seed()` would
+    meet the conftest quarantine on `AsyncSessionLocal`, get UnboundExecutionError, and report
+    COULD_NOT_VERIFY for a reason that has nothing to do with a database.
     """
-    catalog = json.loads(_CATALOG.read_text(encoding="utf-8"))
+    catalog_file = catalog_path if catalog_path is not None else _CATALOG
+    catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
     concepts = catalog["concepts"]
     modules = catalog["modules"]
     metrics = catalog["metrics"]
 
     if dry_run:
-        print(f"{_CATALOG.relative_to(_REPO_ROOT)} parses: ")
+        # `relative_to` RAISES rather than falling back when the path is outside the repo, which a
+        # --catalog argument routinely is. Ask, do not assume.
+        shown = catalog_file.relative_to(_REPO_ROOT) if catalog_file.is_relative_to(_REPO_ROOT) else catalog_file
+        print(f"{shown} parses: ")
         print(f"  {len(concepts)} concepts, {len(modules)} modules, {len(metrics)} metrics")
         named_modules = {m["name"] for m in modules}
         named_concepts = {c["name"] for c in concepts}
@@ -333,8 +343,14 @@ def main() -> None:
         action="store_true",
         help="parse and validate; applies the writes, then rolls back without committing",
     )
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=None,
+        help="catalog JSON to use instead of seed/catalog.json (validate a candidate file)",
+    )
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(seed(dry_run=args.dry_run)))
+    raise SystemExit(asyncio.run(seed(dry_run=args.dry_run, catalog_path=args.catalog)))
 
 
 if __name__ == "__main__":
