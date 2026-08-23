@@ -74,6 +74,7 @@ Modules and saw 1 rather than 0.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -112,23 +113,57 @@ def _alembic_config() -> Config:
 def _docker_is_running() -> bool:
     """Whether the daemon `PostgresContainer` would use is reachable. Never raises.
 
-    Uses testcontainers' own `DockerClient` rather than `docker.from_env()`, and the difference is
-    not cosmetic. `from_env()` reads `DOCKER_HOST` only; `DockerClient.__init__` calls
-    `get_docker_host()`, which consults `tc.host` in ~/.testcontainers.properties FIRST. On a
-    machine running Colima, Rancher Desktop or rootless Docker — where the socket is configured
-    through `tc.host` and `DOCKER_HOST` is unset — `from_env()` reports no daemon while the
-    container on the next line would have started fine.
+    Resolves the host the way testcontainers does, but connects with the plain docker SDK.
 
-    That mattered more once the CI guard below turned "no daemon" into a hard failure: a probe that
-    can be wrong about a working daemon must not be the thing that fails a build. Probing through
-    the same resolution the container uses is what makes the two agree by construction.
+    The resolution matters and is why `docker.from_env()` alone is not enough: `from_env()` reads
+    `DOCKER_HOST` only, while `get_docker_host()` consults `tc.host` in ~/.testcontainers.properties
+    FIRST. On a machine running Colima, Rancher Desktop or rootless Docker — socket configured
+    through `tc.host`, `DOCKER_HOST` unset — `from_env()` reports no daemon while the container on
+    the next line would have started fine.
+
+    THE CLIENT IS A DIFFERENT MATTER. This used to construct testcontainers' own `DockerClient`, on
+    the reasoning that probing through the same object the container uses makes the two agree by
+    construction. It does not, because that constructor does more than connect:
+
+        if docker_auth_config := get_docker_auth_config():
+            if auth_config := parse_docker_auth_config(docker_auth_config):
+                self.login(auth_config[0])
+
+    So with `DOCKER_AUTH_CONFIG` set, a registry that is down, rate-limited or simply unreachable
+    makes construction raise, the bare `except` below turns that into False, and the caller reports
+    "Docker is not reachable" — about a daemon that is running. Reproduced exactly that way: daemon
+    up, `DOCKER_AUTH_CONFIG` pointed at a bogus registry, probe returns False. In CI that is
+    `pytest.fail` and a red build for a healthy machine.
+
+    That is precisely the failure the CI guard below was written to avoid: a probe that can be wrong
+    about a working daemon must not be the thing that fails a build. Whether a registry login
+    succeeds has nothing to do with whether a daemon is reachable, and this function is only asked
+    the second question. (Pulling `postgres:16-alpine` may well need that auth — but that happens
+    inside `PostgresContainer`, where a failure is a real error with a real message, rather than
+    being silently reinterpreted as "no Docker".)
+
+    Constructing the plain client also avoids `DockerClient.__init__`'s other side effect, an
+    `os.environ["DOCKER_HOST"] = docker_host` write that a probe has no business performing, and
+    `close()` releases the connection instead of leaving it to the garbage collector.
     """
+    client = None
     try:
-        from testcontainers.core.docker_client import DockerClient
+        from docker import DockerClient
+        from testcontainers.core.docker_client import get_docker_host
 
-        DockerClient().client.ping()
+        host = get_docker_host()
+        # `from_env()` when nothing is configured: it also honours DOCKER_TLS_VERIFY and
+        # DOCKER_CERT_PATH, which a bare `DockerClient()` would ignore.
+        client = DockerClient(base_url=host) if host else DockerClient.from_env()
+        client.ping()
     except Exception:
         return False
+    finally:
+        if client is not None:
+            # Suppressed: a close() that fails tells us nothing about reachability, and this
+            # function's contract is that it never raises.
+            with contextlib.suppress(Exception):
+                client.close()
     return True
 
 
