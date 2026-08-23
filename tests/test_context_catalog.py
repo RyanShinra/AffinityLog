@@ -225,26 +225,42 @@ class TestTheSessionIsNotUsedConcurrently:
 class TestTheFixtureContainsWhatATestWrites:
     """Regression test for the leak the max-effort review found.
 
-    FLAGGED FOR THE TEST-REVIEW PR: these two are ORDER COUPLED on purpose, which is a fragility
-    worth a deliberate decision rather than inheritance. See the flagged block in conftest.py for
-    what a sessionmaker is and why this fixture is subtle.
+    Before the fix the `engine` fixture bound `AsyncSessionLocal` to the ENGINE, so a seeder-style
+    `commit()` opened its own connection and landed OUTSIDE the `session` fixture's transaction:
+    permanent, and visible to every later test. It is now bound to the test's own connection, so
+    the same commit is a SAVEPOINT release inside that transaction and dies with it.
 
-    They run in file order and are meaningfully coupled: the first writes through the app's
-    own sessionmaker, the second checks the write did not survive. Before the fix the `engine`
-    fixture bound `AsyncSessionLocal` to the ENGINE, so it opened its own connection and its
-    commit landed outside the `session` fixture's transaction — test B saw 1 Module, not 0.
+    ONE TEST, DELIBERATELY. This was two — a writer with no assertions at all, and a reader that
+    checked the count was zero — which meant `pytest -k test_b_sees_none_of_it` or `pytest --lf`
+    ran the reader alone against an empty schema and passed having proved nothing. Verified: both
+    halves passed in isolation. A regression test that is only valid when the whole file runs in
+    order is a regression test that reports green in exactly the situation you reach for it.
+
+    The two assertions below are what the pair was trying to say, and each needs the other. Visible
+    inside proves the write actually happened, so absence outside cannot be explained by nothing
+    having been written. Invisible outside proves it did not escape.
     """
 
-    async def test_a_commits_through_the_apps_own_sessionmaker(self, session: AsyncSession) -> None:
-        """Exactly what a seeder does. All four use AsyncSessionLocal and commit."""
+    async def test_a_seeders_commit_is_contained_by_the_fixture(self, session: AsyncSession, engine: AsyncEngine) -> None:
+        probe = "leak-probe"
+
+        # Exactly what a seeder does: AsyncSessionLocal, add, commit.
         async with AsyncSessionLocal() as app_session:
-            app_session.add(db.Module(name="leak-probe", module_type=db.ModuleType.SCORE, functions=[]))
+            app_session.add(db.Module(name=probe, module_type=db.ModuleType.SCORE, functions=[]))
             await app_session.commit()
 
-    async def test_b_sees_none_of_it(self, session: AsyncSession) -> None:
-        modules = await session.scalar(select(func.count()).select_from(db.Module))
+        count = select(func.count()).select_from(db.Module).where(db.Module.name == probe)
 
-        assert modules == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"
+        inside = await session.scalar(count)
+        assert inside == 1, "the commit did not reach the fixture's transaction at all"
+
+        # A genuinely separate connection. The fixture's outer transaction is still open, so a
+        # contained write is invisible here while an escaped one — a real COMMIT on its own
+        # connection — would be visible to everybody. That difference is the whole test.
+        async with engine.connect() as outside:
+            escaped = await outside.scalar(count)
+
+        assert escaped == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"
 
 
 class TestTheTwoLocksAreSeparate:
