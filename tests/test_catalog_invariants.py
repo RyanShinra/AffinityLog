@@ -8,6 +8,7 @@ version of this one did exactly that to a catalog addition the project has alrea
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.invariants import Heading, find_heading_violations, raise_on_heading_violations
@@ -252,6 +253,62 @@ class TestAnAxisNothingCanSupply:
         await session.flush()
 
         assert await find_heading_violations(session) == []
+
+
+class TestTheDatabaseRefusesHalfPopulatedRows:
+    """`variant_kind` and `variant` are both-or-neither, enforced by migration 008.
+
+    A row with exactly one populated is unreachable — `decompose()` never emits a variant without a
+    kind, and an INTERFACE row with a NULL variant can never match
+    (module, column_key, 'INTERFACE', <interface_kind>). It is dead data, and it also HID things:
+    `_HEADINGS_SQL` counts `variant_kind IS NULL` as a bare row, and a bare row is what suppresses
+    the unsatisfiable-axis branch, so one malformed row silenced that check for a whole heading.
+
+    That suppression has no test here because it is no longer expressible — the row cannot be
+    written. This class asserts the constraint instead, which is the enforcement it was traded for.
+    A Python-side branch reporting the same thing would be dead code.
+
+    Note this is the OPPOSITE call to the rest of the module. The functional dependency
+    `(module_id, column_key) -> variant_kind` cannot be expressed by any constraint, so it is
+    checked at write time; both-or-neither is a plain CHECK, so it is enforced by the schema.
+    """
+
+    async def test_a_variant_without_a_kind_is_rejected(self, session: AsyncSession) -> None:
+        temstapro = await _module(session, "temstapro")
+        session.begin_nested()
+        session.add(_metric(temstapro, "clash", variant="esm"))
+
+        with pytest.raises(IntegrityError, match="ck_metric_variant_pair"):
+            await session.flush()
+
+        await session.rollback()
+
+    async def test_a_kind_without_a_variant_is_rejected(self, session: AsyncSession) -> None:
+        """The mirror case, which the symmetric expression catches for free."""
+        temstapro = await _module(session, "temstapro")
+        session.begin_nested()
+        session.add(_metric(temstapro, "clash", variant_kind=db.VariantKind.PARAMETER))
+
+        with pytest.raises(IntegrityError, match="ck_metric_variant_pair"):
+            await session.flush()
+
+        await session.rollback()
+
+    async def test_both_clean_shapes_are_still_accepted(self, session: AsyncSession) -> None:
+        """The check that keeps the constraint from being over-broad.
+
+        133 of the corpus's 144 metrics are bare and 11 are fully qualified; a constraint that
+        refused either would refuse the real catalog.
+        """
+        temstapro = await _module(session, "temstapro")
+        session.add_all(
+            [
+                _metric(temstapro, "clash"),
+                _metric(temstapro, "clash", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+            ]
+        )
+
+        await session.flush()  # raises if either shape is refused
 
 
 class TestProblemsNeedsNoDatabase:

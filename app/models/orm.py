@@ -20,6 +20,7 @@ from typing import Any
 from sqlalchemy import (
     ARRAY,
     INTEGER,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -211,6 +212,24 @@ class Metric(ModelBase):
             "variant",
             name="uq_metric_identity",
             postgresql_nulls_not_distinct=True,
+        ),
+        # Both-or-neither. A row with exactly one of the pair populated is unreachable: `decompose()`
+        # never emits a variant without a kind, and an INTERFACE row with a NULL variant can never
+        # match (module, column_key, 'INTERFACE', <interface_kind>). It is dead data that also HIDES
+        # things — `app/catalog/invariants.py` counts variant_kind IS NULL as a "bare" row, and a
+        # bare row is what suppresses its unsatisfiable-axis branch, so one malformed row silenced
+        # that check for the whole heading.
+        #
+        # Unlike the functional dependency (module_id, column_key) -> variant_kind, which no
+        # constraint can express and which that module exists to check at write time, THIS one is a
+        # plain CHECK. So it is enforced here rather than detected there — migration 008.
+        #
+        # Written as an equality of two IS NULL tests on purpose: a CHECK passes when its expression
+        # is NULL and fails only on false, so a form that could evaluate to NULL would be a hole.
+        # `IS NULL` yields true/false and never NULL, so both sides are real booleans.
+        CheckConstraint(
+            "(variant_kind IS NULL) = (variant IS NULL)",
+            name="ck_metric_variant_pair",
         ),
     )
 

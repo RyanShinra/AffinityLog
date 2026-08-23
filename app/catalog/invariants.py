@@ -31,6 +31,20 @@ lift the axis into a parent keyed by the heading, so a second axis is unrepresen
 merely discouraged. See `docs/metric-heading-normalization.md`. Until that migration exists, this is
 the enforcement point.
 
+DO NOT READ THAT AS "EVERY CATALOG INVARIANT BELONGS IN THIS FILE"
+-----------------------------------------------------------------
+It applies to the functional dependency above and to nothing else by default. A sibling invariant —
+that `variant_kind` and `variant` are both set or both NULL — IS expressible as a plain CHECK, so it
+lives in the schema (migration 008, `ck_metric_variant_pair`) rather than here, and this module
+neither checks nor needs to check it.
+
+That one used to matter here in a way that is easy to miss: a row with a NULL `variant_kind` and a
+non-NULL `variant` was counted as a BARE row by the query below, and `bare_rows` is what suppresses
+the third branch. So a single malformed row silenced the unsatisfiable-axis check for its whole
+heading. The constraint makes that row unwritable, which is why no branch here reports it — the
+Python version would be dead code. Before adding a check to this file, ask whether a constraint can
+carry it instead.
+
 THREE WAYS A HEADING BREAKS THE LOOKUP
 --------------------------------------
 All three are silent, and only the first is about "more than one kind":
