@@ -22,6 +22,11 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://affinitylog:affinitylog@db:5432/affinitylog
       DEBUG: "false"
+    # Predicted structures are corpus data, not application code — same reason pg_data is a
+    # volume. Mounted read-only so /demo/pdb/{id} can find them (the image does not carry
+    # experiment_results/), and so a new <id>_boltz2.pdb shows up without a rebuild.
+    volumes:
+      - ./experiment_results:/app/experiment_results:ro
     depends_on:
       db:
         condition: service_healthy

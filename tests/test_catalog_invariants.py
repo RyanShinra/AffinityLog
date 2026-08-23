@@ -164,8 +164,8 @@ class TestAnAxisNothingCanSupply:
     back to therefore resolves to NOTHING, for every candidate, with no exception and no log.
 
     This is classified in Python rather than in the query's HAVING because it needs
-    `DECOMPOSABLE_VARIANT_KINDS`, which is derived from the rules in app/catalog/keys.py so the two
-    cannot drift apart.
+    `decomposable_kinds_for(module, column_key)` from app/catalog/keys.py — and it is keyed by
+    HEADING, not by kind, because the rules there are pinned to a module and a column.
     """
 
     async def test_a_heading_qualified_only_by_transform_is_refused(self, session: AsyncSession) -> None:
@@ -196,6 +196,49 @@ class TestAnAxisNothingCanSupply:
         await session.flush()
 
         assert await find_heading_violations(session) == []
+
+    async def test_parameter_is_not_satisfiable_under_a_column_the_rule_cannot_produce(self, session: AsyncSession) -> None:
+        """The satisfiability check's own false negative.
+
+        `_VARIANT_RULES` is keyed by MODULE and its regex pins the COLUMN, so the only heading whose
+        PARAMETER variant `decompose()` can recover is `evoprotgrad.pseudolikelihood_ratio`. Any
+        other column under the same module is unreachable:
+
+            decompose('evoprotgrad.esm_entropy') -> (evoprotgrad, esm_entropy, None, None)
+
+        `DECOMPOSABLE_VARIANT_KINDS` flattens the rules to the bare kind name {'PARAMETER'} and so
+        answers "is this kind decomposable?" when the answerable question is "is it decomposable
+        FOR THIS HEADING?".
+        """
+        evoprotgrad = await _module(session, "evoprotgrad")
+        session.add_all(
+            [
+                _metric(evoprotgrad, "entropy", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+                _metric(evoprotgrad, "entropy", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+            ]
+        )
+        await session.flush()
+
+        violations = await find_heading_violations(session)
+
+        assert len(violations) == 1
+        assert "nothing can supply" in violations[0].describe()
+
+    async def test_parameter_is_not_satisfiable_in_a_module_with_no_rule_at_all(self, session: AsyncSession) -> None:
+        """Same hole, reached from the other side: boltz2 has no entry in `_VARIANT_RULES`."""
+        boltz2 = await _module(session, "boltz2")
+        session.add_all(
+            [
+                _metric(boltz2, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+                _metric(boltz2, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+            ]
+        )
+        await session.flush()
+
+        violations = await find_heading_violations(session)
+
+        assert len(violations) == 1
+        assert "nothing can supply" in violations[0].describe()
 
     async def test_parameter_is_satisfiable_because_the_key_string_carries_it(self, session: AsyncSession) -> None:
         """No bare row, no INTERFACE — and still fine, because decompose() reads `esm_` off the key."""
