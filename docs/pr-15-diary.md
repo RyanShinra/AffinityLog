@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 13 commits · stages 1-3 done · 132 → 144 tests · `mypy .` clean, and CI now runs it
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 15 commits · stages 1-3 done, reviewed · 132 → 146 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -428,6 +428,54 @@ return (
 The one field that needs no cast is the one whose ORM type is already right. **That is stage 4's
 argument, arrived at by writing the code rather than by predicting it** — and the comment beside
 those casts says they are stage 4's to delete.
+
+## Act VII — what the review found
+
+Three findings, none of them in the typing itself. All three were in the *seams* the branch moved.
+
+**The sort that data can crash.** `extract_score_keys` ends with `sorted(buckets.items())`, which
+compares identity tuples element-wise — and since 3c the third element is `VariantKind | None`,
+neither of which defines `__lt__`. Two keys under one heading is enough:
+
+```
+evoprotgrad.pseudolikelihood_ratio        -> (…, None,      None)
+evoprotgrad.esm_pseudolikelihood_ratio    -> (…, PARAMETER, 'esm')
+TypeError: '<' not supported between 'NoneType' and 'VariantKind'
+```
+
+Reachable from **data**, not from a code change — one export that stops prefixing the model name.
+The `None`/`str` form of it predates the branch; retyping the tuple widened it to enum-vs-enum too.
+Worth noticing what this says about the exercise: mypy accepted the sort at every stage, because
+`sorted` is happy to take anything and the failure is at runtime.
+
+**The cycle that was one line away.** `orm.py` imports `app.catalog.variant_kind`, which runs
+`app/catalog/__init__.py`; `keys.py` imports the ORM back for `ChainRole`. So after 3a, a single
+convenience re-export in that `__init__.py` would take the whole application down at import with an
+`AttributeError` about `ChainRole` raised from `keys.py` — nowhere near the line at fault.
+
+The property was *already* load-bearing before this branch (it is why moving `VariantKind` worked at
+all), and it was recorded only in the plan document. That is the recurring lesson of PR #14 arriving
+in a new costume: a constraint that lives somewhere other than the file that has to honour it is a
+constraint waiting to be broken. It is now in the docstring, with the cycle drawn out, and
+`tests/test_catalog_package_has_no_imports.py` parses the file with `ast` and fails if an import
+appears — cheap, needs no database, and reports the line number instead of leaving you to debug the
+AttributeError.
+
+**The half-fixed package.** `dddc8f9` added `scripts/__init__.py` to stop `mypy .` halting, but left
+two cross-script imports going through a `sys.path.insert` of `scripts/` itself. One file could then
+load under both names, as two module objects with two copies of every class — `top.RecipeDag is
+pkg.RecipeDag` was False. Fixing the symptom and leaving the cause is exactly what that commit
+should not have done.
+
+Both now insert the repo root and import `scripts.<name>`. **The fix paid for itself in one step:**
+with the import resolvable, mypy could finally see `scrape()`'s signature and reported that
+`_property_of` iterates an `object`. `scrape()` gained a `ScrapedPage` TypedDict, and the `str(...)`
+wrapper added back in `dd3345a` — which existed only to launder an unresolvable import — deleted
+itself.
+
+Which is the review's real finding, stated once: **the typing work was sound; the seams around it
+were not.** Every defect was at a boundary the branch moved — a sort, a package `__init__`, an
+import path — and none was in the retyped code itself.
 
 ## Still open
 
