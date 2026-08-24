@@ -48,7 +48,7 @@ def _property_of(overview_html: Path) -> str | None:
     """The single 'Fine-tuned Regression Model' value from a sub-experiment's Overview page."""
     for param in scrape(overview_html)["input_parameters"]:
         if "Regression Model" in param["name"]:
-            return param["value"]
+            return str(param["value"])
     return None
 
 
@@ -82,7 +82,8 @@ def xlsx_property_map(xlsx_path: Path) -> dict[str, str]:
         cells = []
         for c in row.findall(f"{_XLSX_NS}c"):
             v = c.find(f"{_XLSX_NS}v")
-            cells.append(shared[int(v.text)] if c.get("t") == "s" and v is not None else "")
+            shared_index = v.text if c.get("t") == "s" and v is not None else None
+            cells.append(shared[int(shared_index)] if shared_index else "")
         if len(cells) >= 6 and re.fullmatch(r"[0-9a-f]{32}", cells[3] or ""):
             out[cells[3]] = cells[5]
     return out

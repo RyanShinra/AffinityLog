@@ -29,6 +29,7 @@ import re
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import TypedDict
 
 _PARAM_HEADERS = ["Name", "Value", "Description", "Module", "Parameter configuration"]
 # Visible text that marks the end of the parameters table (unrelated page chrome / next section).
@@ -129,7 +130,19 @@ def scrape_candidate_map(results_html_path: Path) -> list[dict[str, str]]:
     return [{"candidate": c, "subexperiment": s} for c, s in dict.fromkeys(parser.rows)]
 
 
-def scrape_recipe_dag(diagram_html_path: Path) -> dict[str, list]:
+class RecipeDag(TypedDict):
+    """A recipe's wiring, as recovered from a saved React Flow canvas.
+
+    Named rather than left as a bare dict because nothing in Python calls this yet — the
+    consumer is the deferred work in `docs/recipe-topology-note.md`, and the shape is the
+    part that note needs to know.
+    """
+
+    nodes: list[str]  # module names, sorted
+    edges: list[dict[str, str]]  # {"from": <module>, "to": <module>}
+
+
+def scrape_recipe_dag(diagram_html_path: Path) -> RecipeDag:
     """Recover a recipe's node/edge topology from a saved recipe-builder *Diagram* page.
 
     The recipe canvas is a React Flow (xyflow) graph rendered to the DOM: module nodes carry
@@ -145,7 +158,7 @@ def scrape_recipe_dag(diagram_html_path: Path) -> dict[str, list]:
     raw = diagram_html_path.read_text(encoding="utf-8")
     nodes = sorted(set(re.findall(r'react-flow__node[^"]*"[^>]*data-id="([^"]+)"', raw)))
     edges = [{"from": m.group(1), "to": m.group(2)} for m in re.finditer(r'aria-label="Edge from (\S+) to (\S+)"', raw)]
-    return {"nodes": nodes, "edges": edges}
+    return RecipeDag(nodes=nodes, edges=edges)
 
 
 def main() -> None:

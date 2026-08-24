@@ -9,6 +9,8 @@ that can rot silently.
 
 from pathlib import Path
 
+import pytest
+
 from app.routers.demo import _KIND_ORDER, _epitope_ints, _kind_rank, structure_ids
 
 
@@ -48,14 +50,14 @@ class TestStructureIds:
         for n in names:
             (run / n).write_text("ATOM", encoding="utf-8")
 
-    def test_finds_valid_ids_and_strips_the_suffix(self, tmp_path: Path, monkeypatch) -> None:
+    def test_finds_valid_ids_and_strips_the_suffix(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         good = "a" * 32
         other = "0123456789abcdef" * 2
         self._make(tmp_path, f"{good}_boltz2.pdb", f"{other}_boltz2.pdb")
         monkeypatch.setattr("app.routers.demo._STRUCTURES_DIR", tmp_path)
         assert structure_ids() == {good, other}
 
-    def test_rejects_anything_that_is_not_a_candidate_id(self, tmp_path: Path, monkeypatch) -> None:
+    def test_rejects_anything_that_is_not_a_candidate_id(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # The ids this returns are fed straight into a membership test against database rows, so
         # the filename is treated as untrusted input: wrong length, non-hex, uppercase, a different
         # tool's suffix, or an id with anything appended must all be ignored rather than matched.
@@ -71,7 +73,7 @@ class TestStructureIds:
         monkeypatch.setattr("app.routers.demo._STRUCTURES_DIR", tmp_path)
         assert structure_ids() == set()
 
-    def test_missing_directory_is_empty_not_an_error(self, tmp_path: Path, monkeypatch) -> None:
+    def test_missing_directory_is_empty_not_an_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # A clone without experiment_results/ should render a page with no structures, not a 500.
         monkeypatch.setattr("app.routers.demo._STRUCTURES_DIR", tmp_path / "nope")
         assert structure_ids() == set()

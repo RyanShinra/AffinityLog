@@ -1,7 +1,10 @@
 import asyncio
+from collections.abc import Iterable
 from logging.config import fileConfig
 
 from alembic import context
+from alembic.operations.ops import MigrationScript
+from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -15,7 +18,11 @@ fileConfig(config.config_file_name)  # type: ignore[arg-type]
 target_metadata = ModelBase.metadata
 
 
-def process_revision_directives(_context, _revision, directives):
+def process_revision_directives(
+    _context: MigrationContext,
+    _revision: str | Iterable[str | None] | Iterable[str],
+    directives: list[MigrationScript],
+) -> None:
     """Zero-padded sequential revision ids (001, 002, 003…) instead of GUID hashes."""
     if not directives:
         return

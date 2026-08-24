@@ -44,9 +44,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from typing import Final
+from typing import Any, Final, cast
 
-from sqlalchemy import text
+from sqlalchemy import CursorResult, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
@@ -180,17 +180,17 @@ async def seed(dry_run: bool = False) -> None:
 
         if dry_run:
             print(f"{len(experiments)} experiments -> {len(groups)} recipes\n")
-            for modules, members in sorted(groups.items(), key=lambda kv: -len(kv[1])):
-                print(f"  {recipe_name(list(modules))}  <- {len(members)} experiment(s)")
+            for module_set, members in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+                print(f"  {recipe_name(list(module_set))}  <- {len(members)} experiment(s)")
                 for _, name in members:
                     print(f"      {name}")
             return
 
         linked = 0
-        for modules, members in groups.items():
+        for module_set, members in groups.items():
             # Resolve first: the same id set is then used for BOTH the identity lookup and linking.
-            module_ids = await _resolve_modules(session, list(modules))
-            recipe_id = await _get_or_create_recipe(session, recipe_name(list(modules)), module_ids)
+            module_ids = await _resolve_modules(session, list(module_set))
+            recipe_id = await _get_or_create_recipe(session, recipe_name(list(module_set)), module_ids)
             await _link_modules(session, recipe_id, module_ids)
             for exp_id, _ in members:
                 # COALESCE so a hand-corrected recipe_id is never overwritten by a re-run.
@@ -201,7 +201,8 @@ async def seed(dry_run: bool = False) -> None:
                         """),
                     {"recipe_id": recipe_id, "exp_id": exp_id},
                 )
-                linked += result.rowcount or 0
+                # `rowcount` is a CursorResult attribute; `session.execute()` is typed as Result.
+                linked += cast("CursorResult[Any]", result).rowcount or 0
         await session.commit()
 
     print(f"{len(groups)} recipes derived from {len(experiments)} experiments; {linked} newly linked")
