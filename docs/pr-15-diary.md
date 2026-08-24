@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 132 → 142 tests
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 6 commits · 132 → 142 tests · `mypy .` clean
 
 ---
 
@@ -248,14 +248,47 @@ check — the lesson `test_catalog_invariants.py` was written to record.
 
 132 -> 142 tests.
 
+## Act V — the errors nobody had ever seen
+
+Making `scripts/` a package so `mypy .` would stop halting had a second effect: it made twelve
+pre-existing errors visible for the first time. CI runs `mypy app/`, so none of them had ever been
+reported by anything.
+
+Eleven were annotation gaps. **One was a real bug.** `rebuild_rosetta_stone.py` read shared-string
+cells as `int(v.text)`, and `ElementTree` types `.text` as `str | None` — an empty `<v/>` is legal
+xlsx and reached `int(None)`. Reproduced with a hand-built one-row workbook before touching it,
+which is the only reason it can be called a bug rather than a warning:
+
+```
+old line:  TypeError: int() argument must be ... not 'NoneType'
+new code:  {'aaaa…': 'Thermostability'}
+```
+
+Two of the others are worth recording for what they say about type-checking as a review tool rather
+than a formality:
+
+* `seed_recipes.seed` bound `modules` twice in one function, once to a `list[str]` and once to a
+  `tuple[str, ...]`. Completely harmless at runtime, which is exactly why it survived — nothing
+  except a type checker was ever going to mention it.
+* `_property_of` returned `Any` out of a `str | None`, and the reason is structural: the two
+  cross-script imports go through a `sys.path` insert, so `scrape_input_parameters` is not
+  importable as `scripts.scrape_input_parameters`. That is not fixable by tidying, because
+  `scripts/` is deliberately not installed — `[tool.setuptools.packages.find]` is `include =
+  ["app*"]`. Left as it is, with the cast made explicit.
+
+The two behavioural changes were both proved rather than assumed: the xlsx crash above, and
+`migrations/env.py`'s revision hook, whose annotations must not disturb the sequential numbering
+`docs`/CLAUDE.md both depend on. `alembic revision -m "probe"` still produced
+`009_probe_delete_me.py` — zero-padded, sequential, correct. Probe deleted.
+
+`mypy .` now reports 67 files and no errors, for the first time in the project's life.
+
 ## Still open
 
-* **12 ordinary mypy errors outside `app/`** — 8 in `scripts/`, 3 in `tests/test_demo_router.py`,
-  1 in `migrations/env.py`. Mostly missing annotations, but `rebuild_rosetta_stone.py:85` passes a
-  `str | None` straight into `int()`, which is a latent bug rather than a typing gap. CI has never
-  seen any of them: it runs `mypy app/`.
-  (The hard stop that hid them — `scripts/` having no `__init__.py`, so `mypy .` met one file under
-  two module names and halted — was closed in `dddc8f9`.)
+* **Should CI run `mypy .` rather than `mypy app/`?** As of `dd3345a` the whole repo type-checks
+  clean — 67 files, zero errors — so the gap between what CI checks and what is actually true has
+  closed on its own. Widening the job would keep it closed. Not done, because changing CI is a
+  decision rather than a cleanup.
 * Do the identifier aliases reach `scripts/`, or stop at the `app/` boundary? Scripts are where a
   raw string legitimately enters the system from a CSV.
 * `Concept.name`, `Experiment.name`, `Module.name` are all `Mapped[str]` and all mean different
