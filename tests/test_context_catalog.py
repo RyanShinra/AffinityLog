@@ -19,12 +19,18 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.catalog.keys import MetricIdentity, decompose
+from app.catalog.keys import ColumnKey, MetricIdentity, ModuleName, VariantName, decompose
 from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
 from app.graphql.context import Context
 from app.graphql.schema import schema
 from app.models import orm as db
+
+
+def _heading(module: str, column_key: str) -> tuple[ModuleName, ColumnKey]:
+    """A heading key from plain strings — see `_key` in test_catalog_keys.py for why this is safe
+    in a test and would not be in production code."""
+    return (ModuleName(module), ColumnKey(column_key))
 
 
 def _identity_for(key: str, catalog_kinds: frozenset[VariantKind], interface_kind: str | None) -> MetricIdentity:
@@ -42,7 +48,7 @@ def _identity_for(key: str, catalog_kinds: frozenset[VariantKind], interface_kin
             # resolve to nothing silently. That is the precise failure the two-tier design exists
             # to prevent, so it must not be removable by an interpreter flag.
             raise ValueError(f"{key!r} is interface-qualified; resolving it needs the candidate's interface kind")
-        return (score_key.module, score_key.column_key, VariantKind.INTERFACE, interface_kind)
+        return (score_key.module, score_key.column_key, VariantKind.INTERFACE, VariantName(interface_kind))
     return score_key.identity
 
 
@@ -64,13 +70,13 @@ class TestCatalogIsBuiltFromTheDatabase:
         # back — but it is one line, and it raises rather than mismatching.
         catalog = await Context(session=seeded_catalog).catalog()
 
-        assert catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")] == frozenset({VariantKind.INTERFACE})
+        assert catalog.variant_kinds_per_heading[_heading("boltz2", "protein_iptm")] == frozenset({VariantKind.INTERFACE})
 
     async def test_a_heading_can_carry_several_variants_of_one_kind(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
 
         # Two PARAMETER rows, one kind. The frozenset is about AXES, not about how many rows exist.
-        assert catalog.variant_kinds_per_heading[("evoprotgrad", "pseudolikelihood_ratio")] == frozenset(
+        assert catalog.variant_kinds_per_heading[_heading("evoprotgrad", "pseudolikelihood_ratio")] == frozenset(
             {VariantKind.PARAMETER}
         )
         assert len([i for i in catalog.metric_by_identity if i[:2] == ("evoprotgrad", "pseudolikelihood_ratio")]) == 2
@@ -92,7 +98,9 @@ class TestCatalogIsBuiltFromTheDatabase:
         seeded_catalog.expunge_all()
 
         catalog = await Context(session=seeded_catalog).catalog()
-        metric = catalog.metric_by_identity[("boltz2", "protein_iptm", VariantKind.INTERFACE, "antibody-target complex")]
+        metric = catalog.metric_by_identity[
+            (*_heading("boltz2", "protein_iptm"), VariantKind.INTERFACE, VariantName("antibody-target complex"))
+        ]
 
         assert metric.module.name == "boltz2"
         assert metric.concept is not None and metric.concept.name == "interface_confidence"
@@ -121,7 +129,7 @@ class TestTheIptmFinding:
         say.
         """
         catalog = await Context(session=seeded_catalog).catalog()
-        kinds = catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")]
+        kinds = catalog.variant_kinds_per_heading[_heading("boltz2", "protein_iptm")]
 
         expected = {
             "antibody-target complex": "HER2 binding confidence",
@@ -142,19 +150,19 @@ class TestTheIptmFinding:
     async def test_a_parameter_key_needs_no_second_tier(self, seeded_catalog: AsyncSession) -> None:
         """The asymmetry: a PARAMETER variant is in the key string, an INTERFACE variant is not."""
         catalog = await Context(session=seeded_catalog).catalog()
-        kinds = catalog.variant_kinds_per_heading[("evoprotgrad", "pseudolikelihood_ratio")]
+        kinds = catalog.variant_kinds_per_heading[_heading("evoprotgrad", "pseudolikelihood_ratio")]
 
         identity = _identity_for("evoprotgrad.esm_pseudolikelihood_ratio.H", kinds, interface_kind=None)
-        assert identity == ("evoprotgrad", "pseudolikelihood_ratio", VariantKind.PARAMETER, "esm")
+        assert identity == (*_heading("evoprotgrad", "pseudolikelihood_ratio"), VariantKind.PARAMETER, VariantName("esm"))
         assert identity in catalog.metric_by_identity
 
     async def test_an_ordinary_key_resolves_on_identity_alone(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
-        kinds = catalog.variant_kinds_per_heading.get(("temstapro", "clash"), frozenset())
+        kinds = catalog.variant_kinds_per_heading.get(_heading("temstapro", "clash"), frozenset())
 
         assert kinds == frozenset(), "no entry at all, which is the common case"
         identity = _identity_for("temstapro.clash.H", kinds, interface_kind=None)
-        assert identity == ("temstapro", "clash", None, None)
+        assert identity == (*_heading("temstapro", "clash"), None, None)
         assert catalog.metric_by_identity[identity].column_key == "clash"
 
 

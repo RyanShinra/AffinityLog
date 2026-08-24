@@ -47,17 +47,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
-from app.catalog.keys import MetricIdentity
+from app.catalog.keys import ColumnKey, MetricIdentity, ModuleName, VariantName
 from app.catalog.variant_kind import VariantKind
 from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
 
 
 def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
-    # `Metric.variant_kind` is already a VariantKind, and `MetricIdentity` now holds one, so this
-    # no longer converts. It used to read `.name`, which is what the Postgres column stores — the
-    # string form is real, but it belongs at the SQL boundary in `app/catalog/invariants.py`.
-    return (metric.module.name, metric.column_key, metric.variant_kind, metric.variant)
+    # `Metric.variant_kind` is already a VariantKind, so that field needs no conversion. It used to
+    # read `.name`, which is what the Postgres column stores — the string form is real, but it
+    # belongs at the SQL boundary in `app/catalog/invariants.py`.
+    #
+    # THE THREE CASTS ARE STAGE 4's ARGUMENT, WRITTEN OUT. `Module.name`, `Metric.column_key` and
+    # `Metric.variant` are `Mapped[str]`, so every read of them has to be re-wrapped at the boundary
+    # to say what it already is. Retype the ORM (stage 4 of docs/type-safety-plan.md) and these
+    # three calls delete themselves; leave it and this is the friction that gets `NewType`
+    # abandoned six months from now, one boundary at a time.
+    return (
+        ModuleName(metric.module.name),
+        ColumnKey(metric.column_key),
+        metric.variant_kind,
+        VariantName(metric.variant) if metric.variant is not None else None,
+    )
 
 
 @dataclass(frozen=True, eq=False)
@@ -115,7 +126,7 @@ class MetricCatalog:
     """
 
     metric_by_identity: Mapping[MetricIdentity, db.Metric]
-    variant_kinds_per_heading: Mapping[tuple[str, str], frozenset[VariantKind]]
+    variant_kinds_per_heading: Mapping[tuple[ModuleName, ColumnKey], frozenset[VariantKind]]
     # End MetricCatalog Class
 
 
@@ -277,7 +288,7 @@ class Context(BaseContext):
         #     InterfaceKind enum, and the INTERFACE variants in seed/catalog.json against it too,
         #     all without a database. What is unguarded is the SHAPE above, not the spelling.)
         metric_by_identity: dict[MetricIdentity, db.Metric] = dict()
-        kinds_seen_per_heading: defaultdict[tuple[str, str], set[VariantKind]] = defaultdict(set)
+        kinds_seen_per_heading: defaultdict[tuple[ModuleName, ColumnKey], set[VariantKind]] = defaultdict(set)
 
         stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
             selectinload(db.Metric.module),
@@ -298,11 +309,11 @@ class Context(BaseContext):
             metric_by_identity[metric_identity] = metric
 
             if metric.variant_kind is not None:
-                kinds_seen_per_heading[(metric.module.name, metric.column_key)].add(metric.variant_kind)
+                kinds_seen_per_heading[(ModuleName(metric.module.name), ColumnKey(metric.column_key))].add(metric.variant_kind)
 
         # Now we need to freeze the sets; recreating it is the easiest way
         # (I'm specifically not doing the dict comprehension for future readability)
-        variant_kinds_per_heading: dict[tuple[str, str], frozenset[VariantKind]] = dict()
+        variant_kinds_per_heading: dict[tuple[ModuleName, ColumnKey], frozenset[VariantKind]] = dict()
 
         for heading, seen_kinds in kinds_seen_per_heading.items():
             variant_kinds_per_heading[heading] = frozenset(seen_kinds)

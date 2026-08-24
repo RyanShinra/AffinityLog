@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.invariants import Heading, find_heading_violations, raise_on_heading_violations
-from app.catalog.keys import decompose
+from app.catalog.keys import ColumnKey, ModuleName, VariantName, decompose
 from app.catalog.variant_kind import VariantKind
 from app.graphql.context import Context
 from app.models import orm as db
@@ -33,6 +33,24 @@ def _metric(module: db.Module, column_key: str, **kwargs: object) -> db.Metric:
         "provenance": db.Provenance.INFERRED,
     }
     return db.Metric(module_id=module.id, column_key=column_key, **{**defaults, **kwargs})
+
+
+def _heading(
+    module: str,
+    column_key: str,
+    variant_kinds: tuple[VariantKind, ...] = (),
+    variants: tuple[str, ...] = (),
+    bare_rows: int = 0,
+) -> Heading:
+    """A Heading from plain strings — see `_key` in test_catalog_keys.py for why the `NewType`
+    laundering is safe in a test and would not be in production code."""
+    return Heading(
+        ModuleName(module),
+        ColumnKey(column_key),
+        variant_kinds,
+        tuple(VariantName(v) for v in variants),
+        bare_rows,
+    )
 
 
 class TestShapesItMustAccept:
@@ -436,10 +454,10 @@ class TestProblemsNeedsNoDatabase:
     """`Heading.problems()` is a pure function, so the classification is testable on its own."""
 
     def test_a_clean_heading_has_no_problems(self) -> None:
-        assert Heading("boltz2", "ptm", (), (), 1).problems() == ()
+        assert _heading("boltz2", "ptm", bare_rows=1).problems() == ()
 
     def test_every_applicable_reason_is_reported(self) -> None:
-        both = Heading("boltz2", "iptm", (VariantKind.INTERFACE, VariantKind.PARAMETER), (), 2).problems()
+        both = _heading("boltz2", "iptm", (VariantKind.INTERFACE, VariantKind.PARAMETER), bare_rows=2).problems()
 
         assert len(both) == 2
         assert any("2 axes" in reason for reason in both)
@@ -448,17 +466,16 @@ class TestProblemsNeedsNoDatabase:
     def test_coverage_is_only_asked_of_a_single_axis(self) -> None:
         """Two axes is already refused, and the query aggregates variants across the whole heading
         rather than per kind — so asking about coverage there would compare against the wrong set."""
-        mixed = Heading("boltz2", "iptm", (VariantKind.INTERFACE, VariantKind.PARAMETER), ("esm",), 0).problems()
+        mixed = _heading("boltz2", "iptm", (VariantKind.INTERFACE, VariantKind.PARAMETER), ("esm",)).problems()
 
         assert not any("has no row for" in reason for reason in mixed)
 
     def test_a_partly_covered_interface_heading_names_what_is_missing(self) -> None:
-        partial = Heading(
+        partial = _heading(
             "boltz2",
             "protein_iptm",
             (VariantKind.INTERFACE,),
             ("antibody-target complex", "antibody only (H/L pairing)"),
-            0,
         ).problems()
 
         assert len(partial) == 1

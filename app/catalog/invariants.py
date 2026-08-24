@@ -117,17 +117,17 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.interface_kind import InterfaceKind
-from app.catalog.keys import declared_variants_for, decomposable_kinds_for
+from app.catalog.keys import ColumnKey, ModuleName, VariantName, declared_variants_for, decomposable_kinds_for
 from app.catalog.variant_kind import VariantKind
 
 
 class Heading(NamedTuple):
     """One `(module, column_key)` and the shape of its catalog rows."""
 
-    module: str
-    column_key: str
+    module: ModuleName
+    column_key: ColumnKey
     variant_kinds: tuple[VariantKind, ...]  # the distinct non-NULL axes found, sorted by name
-    variants: tuple[str, ...]  # the distinct non-NULL variant values found, sorted
+    variants: tuple[VariantName, ...]  # the distinct non-NULL variant values found, sorted
     bare_rows: int  # rows with variant_kind IS NULL under the same heading
 
     def problems(self) -> tuple[str, ...]:
@@ -221,14 +221,14 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
     result = await session.execute(_HEADINGS_SQL)
     headings = [
         Heading(
-            module=row.module,
-            column_key=row.column_key,
+            module=ModuleName(row.module),
+            column_key=ColumnKey(row.column_key),
             # THE STRING BOUNDARY. `_HEADINGS_SQL` casts the enum column to text, so this is the
             # one place a label becomes a member. `VariantKind[...]` raises KeyError on a label no
             # Python member declares — which cannot happen, because
             # `tests/test_postgres_enum_labels.py` refuses a database whose type carries one.
             variant_kinds=tuple(sorted((VariantKind[label] for label in row.variant_kinds or ()), key=lambda k: k.name)),
-            variants=tuple(sorted(row.variants or ())),
+            variants=tuple(VariantName(v) for v in sorted(row.variants or ())),
             bare_rows=row.bare_rows,
         )
         for row in result
