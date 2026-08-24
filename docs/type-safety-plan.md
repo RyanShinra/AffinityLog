@@ -1,6 +1,7 @@
 # Type safety: making the domain vocabulary un-mistypeable
 
-> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1 and 2 shipped; 3-5 open.** Supersedes the open-decision note
+> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1-3 SHIPPED. Stages 4 and 5 are
+> open, and stage 3 produced the evidence for deciding them — see below.** Supersedes the open-decision note
 > that lived at `stringly-typed-catalog-note.md`. Read this before writing any of it — the sequencing
 > is load-bearing, and several of the facts below took measuring rather than reasoning.
 
@@ -112,16 +113,37 @@ ORM imports it and keeps `SAEnum(VariantKind)`, so the database is untouched.
 
 ### 3 — The aliases, in `app/catalog/keys.py`
 
+> **SHIPPED**, in four commits: `29f7ad5` (chain), `63c89c7` (the move), `83ba7a7` (the enum),
+> `171afce` (the identifiers).
+
 `ModuleName`, `ColumnKey`, `VariantName` as `NewType`. `MetricIdentity` moves here from
 `app/graphql/context.py` — its own comment already anticipates that. `ScoreKey` and `_Rule` retype;
 `ScoreKey.chain` becomes `ChainRole | None` and `_CHAIN_SUFFIX` is built from the enum's values.
 
 ### 4 — `app/models/orm.py`
 
+> **OPEN. Stage 3 measured what this is worth**, so it is no longer a prediction. Retyping the whole
+> `app/` needed five fixes, and three of them are the casts below. Everything else — 49 of 54
+> errors — was test literals, which one helper per file absorbed.
+
 `Mapped[ColumnKey]`, `Mapped[ModuleName]`, plus the `type_annotation_map` entries. **This is the
 stage that decides whether the exercise is worth doing.** Leave the ORM as `Mapped[str]` and every
 read needs `ColumnKey(metric.column_key)` at the boundary — the friction that gets `NewType`
 abandoned six months later. Retype it and the alias flows outward for free.
+
+The concrete case, as it stands in `app/graphql/context.py` today:
+
+```python
+return (
+    ModuleName(metric.module.name),      # Mapped[str]
+    ColumnKey(metric.column_key),        # Mapped[str]
+    metric.variant_kind,                 # Mapped[VariantKind | None] — no cast needed
+    VariantName(metric.variant) if metric.variant is not None else None,
+)
+```
+
+The one field needing no cast is the one whose ORM type is already right. That is the argument in
+four lines. It is currently ONE function; the question is whether it stays one.
 
 `app/models/views.py` has `interface_kind: Mapped[str]`, which is an `InterfaceKind` value and one
 of the 11.
