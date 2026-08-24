@@ -285,10 +285,9 @@ The two behavioural changes were both proved rather than assumed: the xlsx crash
 
 ## Still open
 
-* **Should CI run `mypy .` rather than `mypy app/`?** As of `dd3345a` the whole repo type-checks
-  clean — 67 files, zero errors — so the gap between what CI checks and what is actually true has
-  closed on its own. Widening the job would keep it closed. Not done, because changing CI is a
-  decision rather than a cleanup.
+* ~~Should CI run `mypy .`?~~ **Done.** The narrow scope existed because the rest of the tree had
+  errors nobody had triaged; once they were cleared it only bought a gap between what CI checks and
+  what is true.
 * Do the identifier aliases reach `scripts/`, or stop at the `app/` boundary? Scripts are where a
   raw string legitimately enters the system from a CSV.
 * `Concept.name`, `Experiment.name`, `Module.name` are all `Mapped[str]` and all mean different
