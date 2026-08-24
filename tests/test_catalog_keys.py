@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from app.catalog.keys import ScoreKey, _pattern_for, decompose
+from app.models import orm as db
 
 
 class TestPlainKeys:
@@ -31,12 +32,14 @@ class TestPlainKeys:
 
     def test_a_column_key_may_contain_spaces(self) -> None:
         # JSONB keys are just strings and the CSV header goes in verbatim, so this is normal.
-        assert decompose("biophi.OASis Percentile_After.H") == ScoreKey("biophi", "OASis Percentile_After", None, None, "H")
+        assert decompose("biophi.OASis Percentile_After.H") == ScoreKey(
+            "biophi", "OASis Percentile_After", None, None, db.ChainRole.HEAVY
+        )
 
 
 class TestChainSuffix:
     def test_the_chain_is_captured_and_stripped(self) -> None:
-        assert decompose("temstapro.clash.H") == ScoreKey("temstapro", "clash", None, None, "H")
+        assert decompose("temstapro.clash.H") == ScoreKey("temstapro", "clash", None, None, db.ChainRole.HEAVY)
 
     def test_chain_is_not_part_of_identity(self) -> None:
         # THE POINT OF THE WHOLE MODULE. `clash` is the same metric whether measured on the heavy or
@@ -46,7 +49,7 @@ class TestChainSuffix:
         heavy = decompose("temstapro.clash.H")
         light = decompose("temstapro.clash.L")
         assert heavy[:4] == light[:4]
-        assert (heavy.chain, light.chain) == ("H", "L")
+        assert (heavy.chain, light.chain) == (db.ChainRole.HEAVY, db.ChainRole.LIGHT)
 
     def test_only_H_L_T_count_as_a_chain_suffix(self) -> None:
         # A trailing segment that is not a chain label stays part of the column key. Stripping it
@@ -103,7 +106,7 @@ class TestVariantRules:
         # The chain is stripped BEFORE the variant rule runs, so the rule's anchored regex still
         # matches. Order matters here and this is what pins it.
         assert decompose("evoprotgrad.esm_pseudolikelihood_ratio.L") == ScoreKey(
-            "evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm", "L"
+            "evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm", db.ChainRole.LIGHT
         )
 
     def test_the_rule_is_scoped_to_its_module(self) -> None:

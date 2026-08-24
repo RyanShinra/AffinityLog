@@ -70,7 +70,9 @@ async def collect() -> list[MetricKey]:
         module, column, variant_kind, variant, chain = decompose(key)
         chains, originals = buckets[(module, column, variant_kind, variant)]
         if chain:
-            chains.add(chain)
+            # `.value` because `chains` is informational output — printed, and serialised to JSON
+            # by `--json`. The enum is the internal spelling; the letter is the reported one.
+            chains.add(chain.value)
         originals.append(key)
 
     return [

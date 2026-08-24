@@ -48,8 +48,23 @@ from __future__ import annotations
 import re
 from typing import Final, NamedTuple
 
+from app.models import orm as db
+
 # Trailing .H/.L/.T — the chain the value was measured on, not part of the metric's identity.
-_CHAIN_SUFFIX: Final[re.Pattern[str]] = re.compile(r"\.(H|L|T)$")
+#
+# DERIVED FROM THE ENUM, not spelled out. This was `r"\.(H|L|T)$"` with nothing checking that the
+# three letters still matched `ChainRole`'s values — two copies of one vocabulary, and the kind of
+# pair that stays right until the day it does not. A role added to the enum now widens this regex on
+# its own; one removed narrows it.
+#
+# `db.ChainRole` rather than a catalog-local enum because it IS the database schema: a native
+# `chainrole` type backing `candidate_chains.role`. Importing the ORM here costs no database — the
+# tests in `tests/test_catalog_keys.py` still run in hundredths of a second with no connection.
+# Sorting is for a stable pattern string, not for correctness: the `$` anchor means a shorter
+# alternative cannot win over a longer one that also fits.
+_CHAIN_SUFFIX: Final[re.Pattern[str]] = re.compile(
+    r"\.(" + "|".join(re.escape(role.value) for role in sorted(db.ChainRole, key=lambda r: r.value)) + r")$"
+)
 
 
 class _Rule(NamedTuple):
@@ -194,7 +209,7 @@ class ScoreKey(NamedTuple):
     column_key: str
     variant_kind: str | None
     variant: str | None
-    chain: str | None
+    chain: db.ChainRole | None
 
 
 def decompose(key: str) -> ScoreKey:
@@ -203,7 +218,7 @@ def decompose(key: str) -> ScoreKey:
         return ScoreKey(_NO_MODULE, key, None, None, None)
     module, _, rest = key.partition(".")
     chain_match = _CHAIN_SUFFIX.search(rest)
-    chain = chain_match.group(1) if chain_match else None
+    chain = db.ChainRole(chain_match.group(1)) if chain_match else None
     if chain_match:
         rest = rest[: chain_match.start()]
 
