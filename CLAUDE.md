@@ -221,6 +221,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `testcontainers.core.config` reads it through a dataclass `default_factory` evaluated once when
   its singleton is built at import; and patching a *conditional* path (`if docker_host:`) asserts
   nothing on a machine where the condition never holds — which was this machine, and CI.
+- **Adding a member to a Postgres-backed enum is a migration, and `tests/test_postgres_enum_labels.py`
+  enforces it.** `SAEnum` binds the member NAME, so the Python class and the Postgres type are two
+  copies of one vocabulary; a new member needs `op.execute("ALTER TYPE <name> ADD VALUE '...'")` in
+  its own transaction (003 and 005 are the worked examples). The test reads `pg_enum` from the live
+  schema and compares, for all seven enums — including `modules.functions`, which is
+  `ARRAY(Enum(ModuleFunction))` and invisible to a plain `isinstance` check on the column type. It
+  compares labels as SETS, deliberately: `ADD VALUE` appends, so Postgres order and Python order may
+  legitimately differ. Before this existed, a member added with no migration left all 132 tests
+  green and failed later as a `DataError` against real data.
 - **A new seeder must call `raise_on_heading_violations(session, source=...)` before `commit()`.**
   `app/catalog/invariants.py` enforces `(module_id, column_key) -> variant_kind`, a functional
   dependency the schema cannot express and the ScoreEntry lookup depends on. Breaking it makes score

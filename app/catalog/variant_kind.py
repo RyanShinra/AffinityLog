@@ -36,6 +36,11 @@ Because it is a live Postgres ENUM, a new member here is not enough on its own. 
 migration's other DDL — pre-PG12 you cannot ADD VALUE and then use the new value in the same
 transaction, and autogenerate will not emit it for you. Migrations 003 (TRANSFORM) and 005
 (INTERFACE) are the two worked examples.
+
+`tests/test_postgres_enum_labels.py` is what makes that fail loudly instead of later. Before it
+existed, adding a member here with no migration left all 132 tests passing — the type is built from
+literal strings in the migration, so a member nothing writes cannot fail, and the bill arrived as a
+`DataError` against real data.
 """
 
 from __future__ import annotations

@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 132 tests
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 132 → 142 tests
 
 ---
 
@@ -186,14 +186,76 @@ Three, all of which had become false rather than merely stale:
 * `orm.py`'s enum-section header, which read as an exhaustive list of the native Postgres ENUM
   types. It no longer is, and now says so.
 
+## Act IV — what the `db.` prefix was actually carrying
+
+A question about the rename, and the best one asked so far: `db.VariantKind` was partly there to say
+*this type belongs to the ORM*. Is `VariantKind` now a thing that can go anywhere, with no attendant
+connection to the database?
+
+Structurally, yes — measured in a fresh process rather than argued:
+
+```
+sqlalchemy loaded:   False
+app.models loaded:   False
+app.database loaded: False
+new app modules:     ['app', 'app.catalog', 'app.catalog.variant_kind']
+MRO:                 VariantKind -> enum.Enum -> object
+```
+
+Semantically, no. `SAEnum` binds the member NAME, so the Python members and the Postgres labels are
+two copies of one vocabulary, and adding a member is an `ALTER TYPE ... ADD VALUE` migration in its
+own transaction. That obligation did not move. The hint did.
+
+So the question became: what enforces the obligation now? Nothing. Measured, by adding
+`VariantKind.SMUGGLED` with no migration:
+
+```
+132 passed
+```
+
+Invisible because the migrations build the type from literal strings — the test database never
+consults the Python class, and a member nothing writes cannot fail. The bill arrives later, as a
+`DataError` against real data.
+
+Worth keeping in proportion: this was **not** a regression the move caused. Adding a member while
+the class lived in `orm.py` was equally uncaught; `db.` was a hint, never a check. What the move did
+was remove the last thing pointing at a hole that was already there — and leave a docstring section
+in its place, which is the exact shape PR #14 spent a branch deleting.
+
+### The guard, and the hole in its own first draft
+
+`tests/test_postgres_enum_labels.py` reads `pg_enum` from the live schema and asserts the labels
+equal the Python members, for every native enum the ORM binds. It needs no dev container: the
+testcontainers suite already migrates a fresh database, so the types are right there.
+
+Its first draft covered six of the seven enums. `modules.functions` is
+`ARRAY(Enum(ModuleFunction))`, and a plain `isinstance(column.type, SAEnum)` walks straight past an
+array's item type — so the enum with the **most members**, and therefore the most room to drift, was
+the one silently uncovered. A guard that quietly stops guarding is worse than the gap it was written
+for, so the collector now has its own tests rather than being trusted.
+
+Broken on purpose, both ways, before being believed:
+
+| what was broken | what failed |
+|---|---|
+| `VariantKind.SMUGGLED`, no migration | `test_the_labels_agree[variantkind]`, naming the member and the `ALTER TYPE` it needs |
+| collector stops descending into ARRAY | the collector test by name, **and** the both-sides test reporting `modulefunction` as an orphan |
+
+Order is deliberately not asserted. Postgres appends with `ADD VALUE`, so a member inserted mid-list
+in Python legitimately sits last in the database; they agree today, and asserting that would turn an
+ordinary future migration into a failure. A check that refuses a legitimate shape is worse than no
+check — the lesson `test_catalog_invariants.py` was written to record.
+
+132 -> 142 tests.
+
 ## Still open
 
-* **`mypy .` is broken at the repo root, and stage 1 broke it.** `tests/test_schema_snapshot.py`
-  imports `from scripts.dump_schema import ...` while `scripts/` has no `__init__.py`, so mypy sees
-  one file under two module names and stops before checking anything. CI does not catch it — it runs
-  `mypy app/`. On `main` a root run reports 13 ordinary errors (9 in `scripts/`, 3 in `tests/`,
-  1 in `migrations/`) and still completes; this is a hard stop before any of them.
-  Needs its own commit and a decision about whether `scripts/` becomes a package.
+* **12 ordinary mypy errors outside `app/`** — 8 in `scripts/`, 3 in `tests/test_demo_router.py`,
+  1 in `migrations/env.py`. Mostly missing annotations, but `rebuild_rosetta_stone.py:85` passes a
+  `str | None` straight into `int()`, which is a latent bug rather than a typing gap. CI has never
+  seen any of them: it runs `mypy app/`.
+  (The hard stop that hid them — `scripts/` having no `__init__.py`, so `mypy .` met one file under
+  two module names and halted — was closed in `dddc8f9`.)
 * Do the identifier aliases reach `scripts/`, or stop at the `app/` boundary? Scripts are where a
   raw string legitimately enters the system from a CSV.
 * `Concept.name`, `Experiment.name`, `Module.name` are all `Mapped[str]` and all mean different
