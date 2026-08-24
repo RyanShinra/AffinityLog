@@ -1,6 +1,6 @@
 # Type safety: making the domain vocabulary un-mistypeable
 
-> **Status: the plan for PR #15, agreed 2026-08-24. Not started.** Supersedes the open-decision note
+> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1 and 2 shipped; 3-5 open.** Supersedes the open-decision note
 > that lived at `stringly-typed-catalog-note.md`. Read this before writing any of it — the sequencing
 > is load-bearing, and several of the facts below took measuring rather than reasoning.
 
@@ -92,6 +92,8 @@ remediation nobody can read.
 
 ### 1 — Snapshot the SDL, before touching anything
 
+> **SHIPPED** (`840eb2e`).
+
 Nothing asserts on the printed schema. The TODO at `app/graphql/schema.py` says so:
 
 > no test asserts on the printed SDL yet, so nothing currently checks this against the spec in
@@ -102,6 +104,8 @@ invisibly. This is the safety net that makes every stage after it reviewable, an
 that predates this plan.
 
 ### 2 — `VariantKind` moves to `app/catalog/variant_kind.py`
+
+> **SHIPPED** (`2b7a28c`).
 
 Mechanical but wide: 47 references across 9 files, 28 of them in `test_catalog_invariants.py`. The
 ORM imports it and keeps `SAEnum(VariantKind)`, so the database is untouched.
