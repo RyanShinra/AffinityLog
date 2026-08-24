@@ -165,6 +165,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   hand-write migration files.
 - **`app/models/views.py` is deliberately NOT imported by `migrations/env.py`** — it maps the
   `candidate_summary` VIEW, and importing it would make autogenerate emit CREATE/DROP TABLE for it.
+- **`schema.graphql` is generated — regenerate it, never hand-edit it.**
+  `python scripts/dump_schema.py`. It is a SNAPSHOT of what the code serves, not a specification:
+  `docs/graphql-schema.md` is the design and still describes types (`Metric`, `ScoreEntry`,
+  `Mutation`) that are not built, so the two are deliberately not the same file.
+  `tests/test_schema_snapshot.py` fails when the snapshot drifts from Strawberry's output, which
+  makes changing the public GraphQL contract a deliberate act with a reviewable diff. It exists
+  because the schema is code-first — a changed annotation three layers down can alter the API with
+  no diff to see. Verified to catch both an accidentally-added field and a `strawberry.scalar`, the
+  latter being exactly what `docs/type-safety-plan.md` could trigger.
 - The view is created by migration 004 and duplicated in `sql/candidate_summary.sql` (the
   iterate-in-TablePlus copy). `scripts/check_view_migration.py` runs in CI and fails the build if
   the two define different columns.
