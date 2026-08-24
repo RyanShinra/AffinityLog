@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 6 commits · 132 → 142 tests · `mypy .` clean
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 8 commits · 132 → 142 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -282,6 +282,64 @@ The two behavioural changes were both proved rather than assumed: the xlsx crash
 `009_probe_delete_me.py` — zero-padded, sequential, correct. Probe deleted.
 
 `mypy .` now reports 67 files and no errors, for the first time in the project's life.
+
+## Interlude — the criterion that decides where a vocabulary lives
+
+Stage 3 wants `ScoreKey.chain` typed as `ChainRole`, and `ChainRole` lives in the ORM. Which would
+re-create the `app/catalog/` → ORM dependency stage 2 had just removed — so the question came back
+one layer up, and got a better answer than the one stage 2 improvised:
+
+> if it is truly part of the database schema (and not a free floating concept) then importing it
+> from ORM is fine. The only restriction is that GraphQL can't have the literal specter of
+> `db.ChainRole` as something that shows up in its SDL.
+
+That is a sharper rule than "the catalog owns the vocabulary it reasons about", and it settles two
+things at once.
+
+**`ChainRole` stays in the ORM and gets imported as `db.ChainRole`.** It is schema: a native
+`chainrole` type backing `candidate_chains.role`. Its readers are the importer, the ORM and the
+GraphQL layer; the catalog would be a fourth consumer, not its home.
+
+**`InterfaceKind` does NOT move back**, by the same rule. Measured rather than argued — the ORM
+binds seven native Postgres enum types:
+
+```
+chainrole, direction, metricvaluetype, modulefunction, moduletype, provenance, variantkind
+interfacekind present: False
+```
+
+There is no such type. It is a string the `CASE` in `sql/candidate_summary.sql` computes at query
+time, and `views.py` types the column `Mapped[str]`. Its own docstring said so all along: putting it
+beside the native enums "would imply an `ALTER TYPE` obligation that does not exist". Its *values*
+are stored — they are the `variant` column of the nine INTERFACE metric rows — but that is data, not
+schema. The two enums land on opposite sides of the line, which is why they were already in
+different places.
+
+**The SDL restriction is already satisfied, and now provable.** The committed snapshot says
+`enum ChainRole` while the class is reached as `db.ChainRole`. Strawberry names types from
+`__name__`, not the module — verified with two identical enums in differently-named packages:
+
+```
+pkg_alpha  __module__=pkg_alpha  -> SDL: enum Widget {
+pkg_beta   __module__=pkg_beta   -> SDL: enum Widget {
+```
+
+The same rule as `SAEnum`, arrived at twice on this branch for two different reasons. A Python
+spelling cannot reach the contract, and stage 1's snapshot fails if that ever changes.
+
+### Three "for now" comments, and which gates have opened
+
+An audit prompted by a half-remembered note about something living somewhere temporarily:
+
+| comment | gate | open? |
+|---|---|---|
+| `context.py:58` — `MetricIdentity` "probably wants to live in `keys.py`… once `ScoreKey.identity` exists" | `ScoreKey.identity` | **yes, in stage 3** |
+| `test_context_catalog.py:33` — `_identity_for` is in the test "because the resolver does not exist yet" | the `ScoreEntry` resolver | no — the home stretch |
+| `orm.py:451` — `Artifact`, "the placeholder hook for now" | artifacts being served | no |
+
+The middle one is the sharpest and worth naming before it is due: that test currently guards a
+*copy* of the two-tier lookup rather than the lookup itself. Its own docstring says to delete it
+when the resolver lands, "or the test stops guarding the real code path".
 
 ## Still open
 
