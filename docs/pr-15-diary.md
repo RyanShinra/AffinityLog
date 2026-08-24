@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 8 commits · 132 → 142 tests · `mypy .` clean, and CI now runs it
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 13 commits · stages 1-3 done · 132 → 144 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -340,6 +340,94 @@ An audit prompted by a half-remembered note about something living somewhere tem
 The middle one is the sharpest and worth naming before it is due: that test currently guards a
 *copy* of the two-tier lookup rather than the lookup itself. Its own docstring says to delete it
 when the resolver lands, "or the test stops guarding the real code path".
+
+## Act VI — stage 3, in four parts
+
+Split four ways because a 60-site retype landing as one diff is unreviewable, and each part turned
+out to answer a different question.
+
+**3a — the chain suffix.** `_CHAIN_SUFFIX` was `r"\.(H|L|T)$"` and `ChainRole` was
+HEAVY="H"/LIGHT="L"/TARGET="T", with nothing checking the two agreed. The pattern is built from the
+enum now — the same string today, checked, and derived from here on. Proved it rather than assuming
+the equality was causal: adding `SCAFFOLD = "S"` gives `\.(H|L|S|T)$` with nothing else edited.
+
+The nice part was unplanned. That same probe also turns
+`test_the_labels_agree[chainrole]` red, because a new role owes an `ALTER TYPE`. Widening the regex
+and owing a migration are both automatic now, and neither was arranged — they just both follow from
+the enum being the source.
+
+**3b — the move.** `MetricIdentity` to `keys.py`, and `ScoreKey.identity` to go with it, closing the
+comment whose gate had finally opened. Three call sites were rebuilding the four-tuple by hand.
+
+mypy caught what stage 2 had to settle with a convention. With the alias moved, one test was still
+importing it from `app.graphql.context`, and strict mode refuses an implicit re-export **by name**:
+
+```
+Module "app.graphql.context" does not explicitly export attribute "MetricIdentity"
+```
+
+Stage 2's "one spelling is a convention and a grep, not something the type system holds" was true of
+an enum the ORM must import either way. It is not true here.
+
+**3c — the enum.** `variant_kind` stopped being a member name carried five layers above the one
+place it comes from. The string boundary is now two marked lines: `VariantKind[label]` where
+`_HEADINGS_SQL`'s `::text` comes back, and `.name` where `seed_metric_skeleton` binds
+`CAST(:variant_kind AS variantkind)`.
+
+**That second line was a bug I introduced, and mypy did not catch it** — the bind parameters go
+through an untyped dict. Found by reading, then reproduced against the dev database rather than
+argued:
+
+```
+bind VariantKind.PARAMETER        -> asyncpg DataError
+bind VariantKind.PARAMETER.name   -> 'PARAMETER'
+```
+
+Worth recording as the honest limit of the whole exercise: **raw SQL is a hole the type system does
+not cover.** Every remaining `text()` bind is a place a retyped value can still go wrong silently,
+and there is no stage of this plan that closes them.
+
+One test had to be rewritten rather than fixed. `test_variant_kinds_are_member_names_not_values`
+guarded against `.value` ("interface") being used where `.name` ("INTERFACE") was meant. Tier one
+holds members now, so that mistake is unspellable *there* — but the hazard did not vanish, it moved
+to the two lines above. The test says so instead of pretending it is gone.
+
+**3d — the identifiers.** `ModuleName`, `ColumnKey`, `VariantName`. Both failing lines from the plan
+now fail to typecheck, and the correct spellings still pass:
+
+```
+metric_by_identity[(column_key, module, None, None)]
+  -> Invalid index type "tuple[ColumnKey, ModuleName, None, None]"
+decomposable_kinds_for(m, c) == {"PARMETER"}
+  -> Non-overlapping equality check
+```
+
+They are deliberately **not** a spelling check — `ModuleName("bolz2")` is a perfectly good
+ModuleName that matches nothing. That is the whole reason the closed sets went the other way in 3c.
+
+### The number that decides stage 4
+
+App code needed five fixes. **Forty-nine of the fifty-four errors were test literals.** Rather than
+wrap thirty of them inline, each test file gained one helper taking plain strings — safe there
+because the expected value is compared against real output, so a transposed argument fails the
+assertion loudly, where in production it would miss the catalog and resolve to nothing.
+
+But five of those app fixes are casts that should not exist. `metric_identity_from_db_metric` now
+re-wraps three fields to say what they already are, because `Module.name`, `Metric.column_key` and
+`Metric.variant` are still `Mapped[str]`:
+
+```python
+return (
+    ModuleName(metric.module.name),
+    ColumnKey(metric.column_key),
+    metric.variant_kind,          # already a VariantKind — no cast
+    VariantName(metric.variant) if metric.variant is not None else None,
+)
+```
+
+The one field that needs no cast is the one whose ORM type is already right. **That is stage 4's
+argument, arrived at by writing the code rather than by predicting it** — and the comment beside
+those casts says they are stage 4's to delete.
 
 ## Still open
 
