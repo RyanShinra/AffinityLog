@@ -25,9 +25,33 @@ ORM reach for them there closes a cycle and the whole application stops importin
     AttributeError: partially initialized module 'app.models.orm' has no attribute 'ChainRole'
     (most likely due to a circular import)
 
-So this file must stay a LEAF — no imports at all, not even from elsewhere in `app.catalog`. It is
-the same shape as `variant_kind.py`, for the same reason, and
-`tests/test_import_graph.py` is what keeps it that way.
+So this file must stay a LEAF — nothing from `app`, not even from elsewhere in `app.catalog`. It is
+the same shape as `variant_kind.py`, for the same reason, and `tests/test_import_graph.py` is what
+keeps it that way.
+
+WHY NOT JUST `if TYPE_CHECKING:` IN `orm.py`? — IT DOES NOT WORK HERE
+--------------------------------------------------------------------
+That is the right first question, and normally the right answer: guard the edge where the name is
+used only as an annotation, and the cycle dissolves without moving anything. Both edges were tested,
+and neither qualifies.
+
+`orm.py` -> these aliases. Annotation-only in the source, but SQLAlchemy RESOLVES ``Mapped[...]``
+at class-creation time, so the name must exist at runtime. A guarded import gives::
+
+    sqlalchemy.orm.exc.MappedAnnotationError: Could not resolve all types within mapped
+    annotation: "Mapped[ColumnKey]".  Ensure all types are written correctly and are
+    imported within the module in use.
+
+``from __future__ import annotations`` does not rescue it — the test above included it.
+
+`keys.py` -> ``orm.ChainRole``. Not annotation-only. ``_CHAIN_SUFFIX`` iterates the enum AT IMPORT
+TIME to build the pattern, and ``decompose`` calls ``ChainRole(...)`` per key. Only the
+``ScoreKey.chain`` annotation could be guarded — a ``NamedTuple`` stores it as a ``ForwardRef`` and
+never resolves it — and that is one of three uses.
+
+With no annotation-only edge to guard, splitting the leaf out is what is left. The alternative would
+be moving ``ChainRole`` into ``app/catalog/`` too, which was considered and rejected on its own
+merits: it IS the database schema, a native ``chainrole`` type behind ``candidate_chains.role``.
 """
 
 from __future__ import annotations

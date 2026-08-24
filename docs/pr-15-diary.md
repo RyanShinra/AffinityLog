@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 15 commits · stages 1-3 done, reviewed · 132 → 146 tests · `mypy .` clean, and CI now runs it
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 17 commits · stages 1-4 done, reviewed · 132 → 151 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -476,6 +476,82 @@ itself.
 Which is the review's real finding, stated once: **the typing work was sound; the seams around it
 were not.** Every defect was at a boundary the branch moved — a sort, a package `__init__`, an
 import path — and none was in the retyped code itself.
+
+## Act VIII — stage 4, and a correction about how it was reached
+
+The stage that was supposed to decide whether any of this was worth doing. It was, and it cost
+almost nothing: three annotations, and the casts deleted themselves.
+
+```python
+# before                                  # after
+ModuleName(metric.module.name),           metric.module.name,
+ColumnKey(metric.column_key),             metric.column_key,
+metric.variant_kind,                      metric.variant_kind,
+VariantName(metric.variant) if ...,       metric.variant,
+```
+
+**The plan was wrong about two things**, both measured. Stage 4 as written was *impossible* —
+`orm.py` importing the aliases from `keys.py` closes a cycle, because `keys.py` imports the ORM back
+for `ChainRole`. And no `type_annotation_map` entries were needed: `Mapped[NewType]` is deprecated
+only on a BARE annotation, where it also silently drops the length (`VARCHAR`, not `VARCHAR(128)`).
+Every column here is explicit.
+
+### The correction, which is the part worth keeping
+
+The fix shipped was a new leaf module, `app/catalog/identifiers.py`. Then the owner asked the
+question that should have been asked first:
+
+> the correct solution is to identify the place where the type is used only as a type annotation and
+> not actually as a solid object. Find that and use the import guards to break the cycle. Is that
+> what you did?
+
+No. And the honest failure is not the answer — it is that **the alternative was never evaluated.**
+The leaf module was reached by pattern-matching on stage 2, which had the same shape, rather than by
+eliminating the cheaper option. Those look identical from the outside when the conclusion happens to
+agree; they are not the same, and only one of them survives the conclusion being different.
+
+Tested afterwards, which is the wrong order but better than never. Neither edge is annotation-only:
+
+| edge | guardable? | why |
+|---|---|---|
+| `orm.py` → the aliases | **no** | SQLAlchemy resolves `Mapped[...]` at class creation — `MappedAnnotationError`, and `from __future__ import annotations` does not rescue it |
+| `keys.py` → `ChainRole` | **no** | `_CHAIN_SUFFIX` iterates the enum at IMPORT time; `decompose` calls `ChainRole(...)` per key |
+
+The `ScoreKey.chain` annotation *would* have been guardable — a `NamedTuple` stores it as a
+`ForwardRef` and never resolves it — but it is one of three uses. With no annotation-only edge, the
+leaf is what is left.
+
+That reasoning now lives in `identifiers.py`'s docstring, because "why not just `TYPE_CHECKING`?" is
+the first thing a competent reader asks, and a file that cannot answer it invites the change that
+breaks it.
+
+### What stage 4 does not buy
+
+Checked rather than assumed. Reads and attribute assignment are protected; **constructor kwargs are
+not**, because SQLAlchemy's declarative `__init__` is `**kw: Any`:
+
+```
+m.column_key = "protein_iptm"     -> error
+db.Module(name="boltz2", ...)     -> accepted
+```
+
+Which is the third entry in a growing list — raw SQL binds (3c), `sorted()` (the review), and now
+ORM construction. The pattern across all three: **mypy protects the code it can see the types of,
+and every one of these holes is a place where a value crosses into something dynamically typed.**
+That is worth knowing before anyone reads the aliases as airtight.
+
+### The guard that replaced the guard
+
+`tests/test_import_graph.py` supersedes the narrow `__init__.py` check from Act VII. It asserts that
+every module the ORM can reach imports nothing from `app`, and — in a subprocess, because
+`sys.modules` is already populated by the time pytest runs — that the three entry points each import
+first on a cold interpreter. Probing both shapes showed they are complementary rather than
+redundant: an import in `identifiers.py` trips only the static check, because it binds the module
+without using it, while one in `__init__.py` trips both.
+
+Writing it also caught the first version forbidding ALL imports, which would have forbidden the leaf
+files themselves — `enum` and `typing` are what they are made of. Stdlib is not the hazard; a cycle
+needs two of our own modules.
 
 ## Still open
 
