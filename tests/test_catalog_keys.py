@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.catalog.keys import ColumnKey, ModuleName, ScoreKey, VariantName, _pattern_for, decompose
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
+from app.catalog.keys import ScoreKey, _pattern_for, decompose
 from app.catalog.variant_kind import VariantKind
 from app.models import orm as db
 

@@ -116,8 +116,9 @@ from typing import NamedTuple
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.interface_kind import InterfaceKind
-from app.catalog.keys import ColumnKey, ModuleName, VariantName, declared_variants_for, decomposable_kinds_for
+from app.catalog.keys import declared_variants_for, decomposable_kinds_for
 from app.catalog.variant_kind import VariantKind
 
 

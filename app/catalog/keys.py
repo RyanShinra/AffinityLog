@@ -46,26 +46,11 @@ pure function of the key string is what makes it testable without a database.
 from __future__ import annotations
 
 import re
-from typing import Final, NamedTuple, NewType
+from typing import Final, NamedTuple
 
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.variant_kind import VariantKind
 from app.models import orm as db
-
-# THE THREE IDENTIFIER ALIASES
-# ---------------------------
-# All three are `str` at runtime — `NewType` costs nothing and generates no class. What they buy is
-# that the four-field identity below stops being four interchangeable strings. `(column_key, module)`
-# is a transposition mypy cannot see when both are `str`; it typechecks, misses the catalog, and
-# resolves to no metric with no exception and no log.
-#
-# They are NOT a spelling check. `ModuleName("bolz2")` is a perfectly good ModuleName and matches
-# nothing — which is exactly why the closed sets (`VariantKind`, `ChainRole`) are real enums
-# instead. These three are open: a module name is whatever the export header says, and new ones
-# arrive with new recipes.
-ModuleName = NewType("ModuleName", str)
-ColumnKey = NewType("ColumnKey", str)
-VariantName = NewType("VariantName", str)
-
 
 # Trailing .H/.L/.T — the chain the value was measured on, not part of the metric's identity.
 #

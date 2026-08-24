@@ -29,6 +29,13 @@ The move cost no migration: `SAEnum(VariantKind).name` is `'variantkind'`, deriv
 name and not the module, so the Postgres type kept its name. Renaming the class WOULD rename the
 type. Don't.
 
+THIS FILE MUST IMPORT NOTHING FROM `app`
+----------------------------------------
+`app/models/orm.py` imports it, and `app/catalog/keys.py` imports the ORM back for `ChainRole`. A
+first-party import here closes that loop and the application stops importing entirely, with an
+`AttributeError` about `ChainRole` raised from `keys.py` — nowhere near the line at fault, which is
+what makes a circular import expensive to find. `tests/test_import_graph.py` enforces it.
+
 ADDING A MEMBER IS A MIGRATION
 ------------------------------
 Because it is a live Postgres ENUM, a new member here is not enough on its own. It needs an

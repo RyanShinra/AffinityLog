@@ -19,7 +19,8 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.catalog.keys import ColumnKey, MetricIdentity, ModuleName, VariantName, decompose
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
+from app.catalog.keys import MetricIdentity, decompose
 from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
 from app.graphql.context import Context

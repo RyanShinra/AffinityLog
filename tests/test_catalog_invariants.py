@@ -11,8 +11,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.invariants import Heading, find_heading_violations, raise_on_heading_violations
-from app.catalog.keys import ColumnKey, ModuleName, VariantName, decompose
+from app.catalog.keys import decompose
 from app.catalog.variant_kind import VariantKind
 from app.graphql.context import Context
 from app.models import orm as db

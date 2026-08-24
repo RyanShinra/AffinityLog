@@ -39,6 +39,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.variant_kind import VariantKind
 from app.database import ModelBase
 
@@ -139,7 +140,7 @@ class Module(ModelBase):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Non-Optional Mapped[str] → NOT NULL. unique=True → a UNIQUE index on the column.
-    name: Mapped[str] = mapped_column(String(128), unique=True)
+    name: Mapped[ModuleName] = mapped_column(String(128), unique=True)
 
     # Enum → a native Postgres ENUM type.  SQL: module_type moduletype NOT NULL
     module_type: Mapped[ModuleType] = mapped_column(SAEnum(ModuleType))
@@ -210,7 +211,7 @@ class Metric(ModelBase):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     module_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"))
-    column_key: Mapped[str] = mapped_column(String(128))  # raw export header, e.g. "pseudo_perplexity"
+    column_key: Mapped[ColumnKey] = mapped_column(String(128))  # raw export header, e.g. "pseudo_perplexity"
     display_name: Mapped[str] = mapped_column(String(255))  # "ESM2 Perplexity"
     value_type: Mapped[MetricValueType] = mapped_column(SAEnum(MetricValueType))
     unit: Mapped[str | None] = mapped_column(String(32))  # "kcal/mol", "°C"; NULL = dimensionless
@@ -226,7 +227,7 @@ class Metric(ModelBase):
     #   MODE          a distinct run-mode of the same module
     # Both NULL = the common case: this column appears once, nothing to disambiguate.
     variant_kind: Mapped[VariantKind | None] = mapped_column(SAEnum(VariantKind))
-    variant: Mapped[str | None] = mapped_column(String(128))
+    variant: Mapped[VariantName | None] = mapped_column(String(128))
 
     concept_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="SET NULL"))
     concept: Mapped["Concept | None"] = relationship(back_populates="metrics")
