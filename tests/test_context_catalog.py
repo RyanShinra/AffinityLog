@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.catalog.keys import decompose
+from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
 from app.graphql.context import Context, MetricIdentity
 from app.graphql.schema import schema
@@ -34,14 +35,14 @@ def _identity_for(key: str, catalog_kinds: frozenset[str], interface_kind: str |
     instead, or the test stops guarding the real code path.
     """
     score_key = decompose(key)
-    if db.VariantKind.INTERFACE.name in catalog_kinds:
+    if VariantKind.INTERFACE.name in catalog_kinds:
         if interface_kind is None:
             # Not an `assert`: `python -O` strips those, and the identity this would build
             # instead — (module, column, 'INTERFACE', None) — is in no catalog, so the key would
             # resolve to nothing silently. That is the precise failure the two-tier design exists
             # to prevent, so it must not be removable by an interpreter flag.
             raise ValueError(f"{key!r} is interface-qualified; resolving it needs the candidate's interface kind")
-        return (score_key.module, score_key.column_key, db.VariantKind.INTERFACE.name, interface_kind)
+        return (score_key.module, score_key.column_key, VariantKind.INTERFACE.name, interface_kind)
     return (score_key.module, score_key.column_key, score_key.variant_kind, score_key.variant)
 
 
@@ -60,7 +61,7 @@ class TestCatalogIsBuiltFromTheDatabase:
 
         assert catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")] == frozenset({"INTERFACE"})
         # `.value` would give "interface" and match nothing decompose() produces — silently.
-        assert db.VariantKind.INTERFACE.name in catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")]
+        assert VariantKind.INTERFACE.name in catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")]
 
     async def test_a_heading_can_carry_several_variants_of_one_kind(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()

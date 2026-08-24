@@ -118,7 +118,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.interface_kind import InterfaceKind
 from app.catalog.keys import declared_variants_for, decomposable_kinds_for
-from app.models import orm as db
+from app.catalog.variant_kind import VariantKind
 
 
 class Heading(NamedTuple):
@@ -139,7 +139,7 @@ class Heading(NamedTuple):
         loop once per problem.
         """
         reasons: list[str] = []
-        interface = db.VariantKind.INTERFACE.name
+        interface = VariantKind.INTERFACE.name
 
         if len(self.variant_kinds) > 1:
             reasons.append(f"catalogued along {len(self.variant_kinds)} axes {list(self.variant_kinds)}")

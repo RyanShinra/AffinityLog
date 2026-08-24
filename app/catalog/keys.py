@@ -55,10 +55,13 @@ _CHAIN_SUFFIX: Final[re.Pattern[str]] = re.compile(r"\.(H|L|T)$")
 class _Rule(NamedTuple):
     """What one heading's key strings encode beyond the heading itself.
 
-    `variant_kind` is the VariantKind member NAME, matching what the Postgres enum stores. It stays
-    a `str` rather than becoming `db.VariantKind` because `app/catalog/` must not import the ORM —
-    see docs/stringly-typed-catalog-note.md, which proposes exactly that change and sequences it
-    after this one.
+    `variant_kind` is the VariantKind member NAME, matching what the Postgres enum stores. Still a
+    `str` here; `docs/type-safety-plan.md` stage 3 is where it becomes the enum itself.
+
+    An earlier version of this docstring justified the `str` by claiming `app/catalog/` must not
+    import the ORM. There was never such a rule — `invariants.py` imported it until the enum moved
+    into this package. What IS true is the direction: `app/models/orm.py` now imports
+    `app.catalog.variant_kind`, so that module has to stay a leaf.
     """
 
     variants: frozenset[str]

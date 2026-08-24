@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.invariants import Heading, find_heading_violations, raise_on_heading_violations
 from app.catalog.keys import decompose
+from app.catalog.variant_kind import VariantKind
 from app.graphql.context import Context
 from app.models import orm as db
 
@@ -54,7 +55,7 @@ class TestShapesItMustAccept:
                     fastdpe,
                     "SFvCSP",
                     display_name="SFvCSP-transformed",
-                    variant_kind=db.VariantKind.TRANSFORM,
+                    variant_kind=VariantKind.TRANSFORM,
                     variant="transformed",
                 ),
             ]
@@ -84,7 +85,7 @@ class TestShapesItMustAccept:
                 _metric(
                     evoprotgrad,
                     "pseudolikelihood_ratio",
-                    variant_kind=db.VariantKind.TRANSFORM,
+                    variant_kind=VariantKind.TRANSFORM,
                     variant="transformed",
                 ),
             ]
@@ -98,8 +99,8 @@ class TestShapesItMustAccept:
         evoprotgrad = await _module(session, "evoprotgrad")
         session.add_all(
             [
-                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
-                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="esm"),
+                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="amplify"),
             ]
         )
         await session.flush()
@@ -114,7 +115,7 @@ class TestShapesItMustRefuse:
         session.add_all(
             [
                 _metric(boltz2, "protein_iptm"),  # bare, and unreachable
-                _metric(boltz2, "protein_iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(boltz2, "protein_iptm", variant_kind=VariantKind.INTERFACE, variant="antibody-target complex"),
             ]
         )
         await session.flush()
@@ -129,8 +130,8 @@ class TestShapesItMustRefuse:
         boltz2 = await _module(session, "boltz2")
         session.add_all(
             [
-                _metric(boltz2, "iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
-                _metric(boltz2, "iptm", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+                _metric(boltz2, "iptm", variant_kind=VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(boltz2, "iptm", variant_kind=VariantKind.PARAMETER, variant="esm"),
             ]
         )
         await session.flush()
@@ -155,8 +156,8 @@ class TestShapesItMustRefuse:
         session.add_all(
             [
                 _metric(boltz2, "complex_ipde"),  # bare
-                _metric(boltz2, "complex_ipde", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
-                _metric(boltz2, "complex_ipde", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+                _metric(boltz2, "complex_ipde", variant_kind=VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(boltz2, "complex_ipde", variant_kind=VariantKind.PARAMETER, variant="esm"),
             ]
         )
         await session.flush()
@@ -172,7 +173,7 @@ class TestShapesItMustRefuse:
         session.add_all(
             [
                 _metric(boltz2, "protein_iptm"),
-                _metric(boltz2, "protein_iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(boltz2, "protein_iptm", variant_kind=VariantKind.INTERFACE, variant="antibody-target complex"),
             ]
         )
         await session.flush()
@@ -202,8 +203,8 @@ class TestAnAxisNothingCanSupply:
         fastdpe = await _module(session, "fastdpe")
         session.add_all(
             [
-                _metric(fastdpe, "SFvCSP", variant_kind=db.VariantKind.TRANSFORM, variant="raw"),
-                _metric(fastdpe, "SFvCSP", variant_kind=db.VariantKind.TRANSFORM, variant="transformed"),
+                _metric(fastdpe, "SFvCSP", variant_kind=VariantKind.TRANSFORM, variant="raw"),
+                _metric(fastdpe, "SFvCSP", variant_kind=VariantKind.TRANSFORM, variant="transformed"),
             ]
         )
         await session.flush()
@@ -220,7 +221,7 @@ class TestAnAxisNothingCanSupply:
         session.add_all(
             [
                 _metric(fastdpe, "SFvCSP"),
-                _metric(fastdpe, "SFvCSP", variant_kind=db.VariantKind.TRANSFORM, variant="transformed"),
+                _metric(fastdpe, "SFvCSP", variant_kind=VariantKind.TRANSFORM, variant="transformed"),
             ]
         )
         await session.flush()
@@ -243,8 +244,8 @@ class TestAnAxisNothingCanSupply:
         evoprotgrad = await _module(session, "evoprotgrad")
         session.add_all(
             [
-                _metric(evoprotgrad, "entropy", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
-                _metric(evoprotgrad, "entropy", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+                _metric(evoprotgrad, "entropy", variant_kind=VariantKind.PARAMETER, variant="esm"),
+                _metric(evoprotgrad, "entropy", variant_kind=VariantKind.PARAMETER, variant="amplify"),
             ]
         )
         await session.flush()
@@ -259,8 +260,8 @@ class TestAnAxisNothingCanSupply:
         boltz2 = await _module(session, "boltz2")
         session.add_all(
             [
-                _metric(boltz2, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
-                _metric(boltz2, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+                _metric(boltz2, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="esm"),
+                _metric(boltz2, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="amplify"),
             ]
         )
         await session.flush()
@@ -275,8 +276,8 @@ class TestAnAxisNothingCanSupply:
         evoprotgrad = await _module(session, "evoprotgrad")
         session.add_all(
             [
-                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
-                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="esm"),
+                _metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="amplify"),
             ]
         )
         await session.flush()
@@ -302,11 +303,11 @@ class TestAnAxisWithMissingValues:
         boltz2 = await _module(session, "boltz2")
         session.add_all(
             [
-                _metric(boltz2, "protein_iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(boltz2, "protein_iptm", variant_kind=VariantKind.INTERFACE, variant="antibody-target complex"),
                 _metric(
                     boltz2,
                     "protein_iptm",
-                    variant_kind=db.VariantKind.INTERFACE,
+                    variant_kind=VariantKind.INTERFACE,
                     variant="antibody only (H/L pairing)",
                 ),
                 # 'single chain (no interface)' is missing. Four of the 14 real candidates have it.
@@ -332,17 +333,17 @@ class TestAnAxisWithMissingValues:
         boltz2 = await _module(session, "boltz2")
         session.add_all(
             [
-                _metric(boltz2, "protein_iptm", variant_kind=db.VariantKind.INTERFACE, variant="antibody-target complex"),
+                _metric(boltz2, "protein_iptm", variant_kind=VariantKind.INTERFACE, variant="antibody-target complex"),
                 _metric(
                     boltz2,
                     "protein_iptm",
-                    variant_kind=db.VariantKind.INTERFACE,
+                    variant_kind=VariantKind.INTERFACE,
                     variant="antibody only (H/L pairing)",
                 ),
                 _metric(
                     boltz2,
                     "protein_iptm",
-                    variant_kind=db.VariantKind.INTERFACE,
+                    variant_kind=VariantKind.INTERFACE,
                     variant="single chain (no interface)",
                 ),
             ]
@@ -358,7 +359,7 @@ class TestAnAxisWithMissingValues:
         one arm and the other resolves to nothing.
         """
         evoprotgrad = await _module(session, "evoprotgrad")
-        session.add(_metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"))
+        session.add(_metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="esm"))
         await session.flush()
 
         violations = await find_heading_violations(session)
@@ -411,7 +412,7 @@ class TestTheDatabaseRefusesHalfPopulatedRows:
         # already aborted.
         with pytest.raises(IntegrityError, match="ck_metric_variant_pair"):
             async with session.begin_nested():
-                session.add(_metric(temstapro, "clash", variant_kind=db.VariantKind.PARAMETER))
+                session.add(_metric(temstapro, "clash", variant_kind=VariantKind.PARAMETER))
                 await session.flush()
 
     async def test_both_clean_shapes_are_still_accepted(self, session: AsyncSession) -> None:
@@ -424,7 +425,7 @@ class TestTheDatabaseRefusesHalfPopulatedRows:
         session.add_all(
             [
                 _metric(temstapro, "clash"),
-                _metric(temstapro, "clash", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
+                _metric(temstapro, "clash", variant_kind=VariantKind.PARAMETER, variant="esm"),
             ]
         )
 

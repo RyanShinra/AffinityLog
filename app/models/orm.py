@@ -39,6 +39,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.catalog.variant_kind import VariantKind
 from app.database import ModelBase
 
 # ---------------------------------------------------------------------------
@@ -46,6 +47,10 @@ from app.database import ModelBase
 # ---------------------------------------------------------------------------
 # NOTE: SAEnum binds the member .name (not .value) — Postgres enum labels are the
 # UPPERCASE names. Any hand-written `ALTER TYPE ... ADD VALUE` must use the name.
+#
+# NOT AN EXHAUSTIVE LIST. `VariantKind` is a native Postgres ENUM too, but it lives in
+# `app/catalog/variant_kind.py` — the catalog owns that vocabulary and this module only
+# stores it. It is imported above and used by `Metric.variant_kind` below.
 # ---------------------------------------------------------------------------
 
 
@@ -81,36 +86,6 @@ class Direction(enum.Enum):
     HIGHER_IS_BETTER = "higher_is_better"
     LOWER_IS_BETTER = "lower_is_better"
     NEUTRAL = "neutral"
-
-
-class VariantKind(enum.Enum):
-    PARAMETER = "parameter"
-    MODE = "mode"
-    SOURCE_MODEL = "source_model"
-    COMPONENT = "component"
-    # For the raw vs. "-transformed" card pairs found in the Module Evaluation scrape
-    # (see bio-discovery-scrape-handoff.md §6/§7
-    # — e.g. FastDPE's SFvCSP column has both a raw and a "-transformed" Metric).
-    # This is a live Postgres ENUM (SAEnum):
-    # adding a member here isn't enough on its own
-    # — migration 003 needs
-    # `op.execute("ALTER TYPE variantkind ADD VALUE 'TRANSFORM'")`
-    # run outside the migration's other DDL in its own transaction
-    # (can't ADD VALUE and use the new value in the same transaction pre-PG12; autogenerate won't emit this).
-    # Imported from the scrape's `module_output` "-transformed" suffix as variant_kind=TRANSFORM,
-    # variant="transformed" — the existing UniqueConstraint(module_id, column_key, variant_kind,
-    # variant) already handles the identity correctly.
-    TRANSFORM = "transform"
-    # Added in migration 005. The discriminator is NOT a property of the metric definition — it is
-    # the shape of the candidate the value was computed on, i.e. which chains went into the fold.
-    # `boltz2.protein_iptm` measures HER2 binding (0.196-0.793) on an antibody-target complex, the
-    # antibody's own heavy-light pairing (~0.95) with no antigen present, and nothing at all (0.000)
-    # on a lone chain — one column, three quantities. The variant carries the meaning; the CASE in
-    # the candidate_summary view decides which one a given row has.
-    # Only metrics whose value COLLAPSES TO 0.000 without an interface use this (iptm,
-    # protein_iptm, complex_ipde); complex_iplddt/complex_plddt/ptm stay meaningful for a single
-    # chain, so despite the "i" in ipLDDT they are not interface-dependent.
-    INTERFACE = "interface"
 
 
 class Provenance(enum.Enum):
@@ -277,9 +252,9 @@ class Metric(ModelBase):
     # properties; see the Module Evaluation scrape). Mirrors the `metrics` relationship on Module.
     benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(back_populates="metric", cascade="all, delete-orphan")
 
-    # A TRANSFORM-variant Metric (see VariantKind above) is a derived quantity of some raw Metric,
-    # not an independent one — this is the lineage link back to its raw counterpart. Only set on
-    # the transformed sibling.
+    # A TRANSFORM-variant Metric (see `app/catalog/variant_kind.py`) is a derived quantity of some
+    # raw Metric, not an independent one — this is the lineage link back to its raw counterpart.
+    # Only set on the transformed sibling.
     transform_of_metric_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("metrics.id", ondelete="SET NULL")
     )

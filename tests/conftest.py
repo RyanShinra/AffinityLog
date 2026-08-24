@@ -114,6 +114,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from testcontainers.postgres import PostgresContainer
 
+from app.catalog.variant_kind import VariantKind
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import orm as db
@@ -381,7 +382,7 @@ async def seeded_catalog(session: AsyncSession) -> AsyncIterator[AsyncSession]:
                 boltz2,
                 "protein_iptm",
                 display_name="HER2 binding confidence",
-                variant_kind=db.VariantKind.INTERFACE,
+                variant_kind=VariantKind.INTERFACE,
                 variant="antibody-target complex",
                 concept_id=binding.id,
                 direction=db.Direction.HIGHER_IS_BETTER,
@@ -390,7 +391,7 @@ async def seeded_catalog(session: AsyncSession) -> AsyncIterator[AsyncSession]:
                 boltz2,
                 "protein_iptm",
                 display_name="Heavy-light pairing confidence",
-                variant_kind=db.VariantKind.INTERFACE,
+                variant_kind=VariantKind.INTERFACE,
                 variant="antibody only (H/L pairing)",
                 concept_id=binding.id,
             ),
@@ -398,12 +399,12 @@ async def seeded_catalog(session: AsyncSession) -> AsyncIterator[AsyncSession]:
                 boltz2,
                 "protein_iptm",
                 display_name="Not an interface",
-                variant_kind=db.VariantKind.INTERFACE,
+                variant_kind=VariantKind.INTERFACE,
                 variant="single chain (no interface)",
             ),
             # PARAMETER: the variant is encoded in the key string, so decompose() recovers it.
-            metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="esm"),
-            metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=db.VariantKind.PARAMETER, variant="amplify"),
+            metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="esm"),
+            metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="amplify"),
             # The ordinary case: 193 of the corpus's 200 keys look like this.
             metric(temstapro, "clash", value_type=db.MetricValueType.INT),
         ]
