@@ -51,26 +51,126 @@ from typing import Final, NamedTuple
 # Trailing .H/.L/.T — the chain the value was measured on, not part of the metric's identity.
 _CHAIN_SUFFIX: Final[re.Pattern[str]] = re.compile(r"\.(H|L|T)$")
 
-# Columns whose name encodes a run PARAMETER rather than naming a distinct quantity. EvoProtGrad
-# reports the same statistic once per protein language model and distinguishes them by prefixing
-# the model name — so `esm_pseudolikelihood_ratio` and `amplify_pseudolikelihood_ratio` are ONE
-# metric with two variants, not two metrics. Splitting them here is what lets a consumer ask for
-# "pseudolikelihood ratio" and get both arms of the sweep.
+
+class _Rule(NamedTuple):
+    """What one heading's key strings encode beyond the heading itself.
+
+    `variant_kind` is the VariantKind member NAME, matching what the Postgres enum stores. It stays
+    a `str` rather than becoming `db.VariantKind` because `app/catalog/` must not import the ORM —
+    see docs/stringly-typed-catalog-note.md, which proposes exactly that change and sequences it
+    after this one.
+    """
+
+    variants: frozenset[str]
+    variant_kind: str
+
+
+# Headings whose key strings encode a run PARAMETER rather than naming a distinct quantity.
+# EvoProtGrad reports the same statistic once per protein language model and distinguishes them by
+# prefixing the model name — so `esm_pseudolikelihood_ratio` and `amplify_pseudolikelihood_ratio`
+# are ONE metric with two variants, not two metrics. Splitting them here is what lets a consumer ask
+# for "pseudolikelihood ratio" and get both arms of the sweep.
 #
-# Format: module -> (regex with a `variant` and `column` group, VariantKind name)
-_VARIANT_RULES: Final[dict[str, tuple[re.Pattern[str], str]]] = {
-    "evoprotgrad": (
-        re.compile(r"^(?P<variant>esm|amplify)_(?P<column>pseudolikelihood_ratio)$"),
-        "PARAMETER",
+# THE DATA IS THE SOURCE OF TRUTH; THE REGEX IS DERIVED FROM IT.
+# This used to be the other way round — one compiled pattern per module, with the columns and
+# variants trapped inside it as capture groups. Nothing outside could ask "which columns does this
+# cover?", so the satisfiability check in `app/catalog/invariants.py` had to settle for the only
+# thing that WAS reachable: the bare kind name. That gave it a false negative in exactly the shape
+# it was written to catch — PARAMETER read as recoverable everywhere, when it is recoverable for
+# precisely one heading. Keying on `(module, column_key)` and listing the variants makes the
+# question answerable and the drift unrepresentable.
+#
+# ADDING AN ENTRY: the key is the heading AFTER splitting, i.e. what `decompose()` returns as
+# `column_key`, not the raw export header. `variants` is the closed set of values the prefix may
+# take — closed because these name real things (protein language models, here) that are enumerable
+# from the module's own repo, not free text. Both are small and knowable; see
+# docs/pr-14-diary.md and the note in `_pattern_for` on the one shape this assumes.
+_VARIANT_RULES: Final[dict[tuple[str, str], _Rule]] = {
+    ("evoprotgrad", "pseudolikelihood_ratio"): _Rule(
+        variants=frozenset({"esm", "amplify"}),
+        variant_kind="PARAMETER",
     ),
 }
 
-# The variant kinds `decompose()` can recover from a key STRING, derived from the rules above so the
-# two cannot drift. Everything else — INTERFACE, and any kind a future curator invents — has to come
-# from somewhere other than the key. `app/catalog/invariants.py` uses this to refuse a catalog whose
-# heading is qualified along an axis nothing can supply, which would otherwise resolve to no metric
-# silently for every candidate.
-DECOMPOSABLE_VARIANT_KINDS: Final[frozenset[str]] = frozenset(kind for _, kind in _VARIANT_RULES.values())
+
+def _pattern_for(column_key: str, variants: frozenset[str]) -> re.Pattern[str]:
+    """Build the matcher for one rule.
+
+    ASSUMES ONE SHAPE: `{variant}_{column_key}`, a prefix and an underscore. That is the only shape
+    in the corpus, and both halves are escaped so a column key containing regex metacharacters is
+    matched literally. A module that encoded its variant as a suffix, or with another separator,
+    would need a second shape here rather than a new entry in the table above — which is the price
+    of making the data primary, and is deliberate: the corpus is the source of truth for what
+    exists, so a shape we have never seen is not one to guess at.
+    """
+    if not variants:
+        # An empty alternation compiles to `^(?P<variant>)_(?P<column>foo)$`, which happily matches
+        # the literal key `module._foo` and yields variant="". That variant matches no catalog row,
+        # so the key would resolve to no metric SILENTLY — the failure this whole module exists to
+        # prevent, introduced by a typo in a hand-edited table. Raising here fires at import,
+        # because `_MATCHERS_PER_MODULE` below is built at import: a bad rule stops the process
+        # rather than shipping a matcher that quietly parses keys wrong.
+        raise ValueError(
+            f"_VARIANT_RULES entry for column_key={column_key!r} declares no variants. "
+            f"A rule exists to name the closed set of values its prefix may take; an empty set "
+            f"means the entry should be deleted rather than left to match an empty prefix."
+        )
+
+    alternation = "|".join(re.escape(variant) for variant in sorted(variants))
+    return re.compile(rf"^(?P<variant>{alternation})_(?P<column>{re.escape(column_key)})$")
+
+
+# Compiled once at import and grouped by module, because `decompose()` has only the module in hand
+# when it needs to match — the column_key it would look the rule up by is the rule's OUTPUT.
+_MATCHERS_PER_MODULE: Final[dict[str, tuple[tuple[re.Pattern[str], _Rule], ...]]] = {}
+for (_module, _column_key), _rule in _VARIANT_RULES.items():
+    _MATCHERS_PER_MODULE.setdefault(_module, ())
+    _MATCHERS_PER_MODULE[_module] += ((_pattern_for(_column_key, _rule.variants), _rule),)
+
+
+def decomposable_kinds_for(module: str, column_key: str) -> frozenset[str]:
+    """The variant kinds `decompose()` can recover from a key string FOR THIS HEADING.
+
+    Everything else — INTERFACE, and any kind a future curator invents — has to come from somewhere
+    other than the key. `app/catalog/invariants.py` uses this to refuse a catalog whose heading is
+    qualified along an axis nothing can supply, which would otherwise resolve to no metric silently
+    for every candidate.
+
+    Keyed by heading, not by kind. "Is PARAMETER decomposable?" is not an answerable question: the
+    rules are pinned to a module AND a column, so PARAMETER is recoverable for
+    `evoprotgrad.pseudolikelihood_ratio` and for nothing else in the corpus.
+    """
+    rule = _VARIANT_RULES.get((module, column_key))
+    return frozenset({rule.variant_kind}) if rule is not None else frozenset()
+
+
+def declared_variants_for(module: str, column_key: str, variant_kind: str) -> frozenset[str]:
+    """Every variant this heading's key strings may carry ALONG THIS AXIS, or empty if none do.
+
+    The companion to `decomposable_kinds_for`: that one says which axis the key encodes, this says
+    which VALUES of it exist. `app/catalog/invariants.py` uses it to refuse a heading catalogued
+    along a declared axis without a row for every value — seed `esm` but not `amplify` and every
+    `evoprotgrad.amplify_pseudolikelihood_ratio` key resolves to nothing.
+
+    THE AXIS IS A REQUIRED ARGUMENT, not a convenience. This took only (module, column_key) at
+    first, and returned the rule's variants whatever axis the caller was asking about — so
+    `evoprotgrad.pseudolikelihood_ratio` catalogued along TRANSFORM was measured against
+    {esm, amplify} and refused for "having no row for" variants belonging to a different axis
+    entirely, while `fastdpe.SFvCSP` with the identical shape passed. Whether a heading happens to
+    carry a rule for some OTHER axis cannot be what decides it.
+
+    That is the same defect as the one `decomposable_kinds_for` exists to fix, one axis over: a
+    lookup keyed on less than the question needs will answer a question nobody asked. Taking the
+    axis makes the wrong call unspellable rather than merely wrong.
+
+    Only askable at all because the rules table carries `variants` as data. While the regex was the
+    source of truth, the values were capture groups and this function could not have been written.
+    """
+    rule = _VARIANT_RULES.get((module, column_key))
+    if rule is None or rule.variant_kind != variant_kind:
+        return frozenset()
+    return rule.variants
+
 
 # Two keys in the corpus ("tier", "recommendation") carry NO module prefix — they are run-level
 # verdicts the exporter attaches to the whole result, not a module's output. `recommendation` is
@@ -106,10 +206,9 @@ def decompose(key: str) -> ScoreKey:
 
     variant_kind: str | None = None
     variant: str | None = None
-    rule = _VARIANT_RULES.get(module)
-    if rule is not None:
-        pattern, kind = rule
+    for pattern, rule in _MATCHERS_PER_MODULE.get(module, ()):
         if (m := pattern.match(rest)) is not None:
-            variant_kind, variant, rest = kind, m.group("variant"), m.group("column")
+            variant_kind, variant, rest = rule.variant_kind, m.group("variant"), m.group("column")
+            break
 
     return ScoreKey(module, rest, variant_kind, variant, chain)

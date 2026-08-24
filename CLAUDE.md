@@ -179,18 +179,39 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   resolver, because type resolvers run after that has already returned. `app/database.py`'s
   `get_session` provides the shape; `app/graphql/context.py` wires it in.
   (This entry previously said the opposite — engine-per-resolver — which the code never did.)
-- **Resolvers call `info.context.execute(stmt)`, NEVER `info.context.session.execute(stmt)`.** One
-  session shared across a tree is unsafe under concurrency — graphql-core gathers sibling fields and
-  list items, and an `AsyncSession` is explicitly not safe for that. `Context.execute` holds
-  `_session_lock` for the statement; the lock is only worth anything if it is the single door.
-  Measured before the lock existed: `{ candidates { sequenceId } experiments { name } }` — two root
-  fields on a session that has not yet checked out a connection — raised `IllegalStateChangeError`
-  out of the session's own `__aexit__`, a 500 with a poisoned session that `MaskInternalErrors`
-  never sees. Nothing enforces this but the convention; `grep -n 'session.execute' app/graphql/` is
-  the check.
-  Corollary: `asyncio.Lock` is not reentrant, so code that already holds the lock (today only
-  `Context._load_catalog`) must call `self.session.execute` directly. Calling `self.execute` from
-  under the lock hangs the request with no traceback.
+- **Resolvers call `info.context.execute_statement(stmt)`.** There is no other door: `Context` holds
+  a `TaskSafeSession` (`app/database.py`) privately, so there is no `info.context.session` to reach
+  through. That class owns the session's lock and is the only thing that can acquire it. One session
+  shared across a tree is unsafe under concurrency — graphql-core gathers sibling fields and list
+  items, and SQLAlchemy's own docstring says an `AsyncSession` is "not safe for use in concurrent
+  tasks". Measured before the lock existed: `{ candidates { sequenceId } experiments { name } }` —
+  two root fields on a session that has not yet checked out a connection — raised
+  `IllegalStateChangeError` out of the session's own `__aexit__`, a 500 with a poisoned session that
+  `MaskInternalErrors` never sees.
+  The long name is deliberate: Strawberry's `Schema.execute()` runs a GraphQL *document*, and this
+  repo calls it (`test_two_root_fields_do_not_break_a_virgin_session`), so a bare `execute` would
+  mean SQL in one file and GraphQL in another.
+- **A method that needs a critical section of its own takes its OWN lock, never the session's.**
+  `Context.catalog()` holds `_catalog_lock` across the whole of `_load_catalog()`, which issues its
+  statement through `execute_statement()` — safe only because that takes a *different* lock. One
+  lock serving both invariants is the version that deadlocks: `asyncio.Lock` is not reentrant, so
+  the task waits on itself forever, with no exception, no traceback and no timeout, while every
+  other request on the loop is served normally. `interface_kinds()` wants exactly this shape — give
+  it `_interface_kinds_lock`, not the session's.
+  `tests/test_context_catalog.py::TestTheTwoLocksAreSeparate` guards it, including a test that
+  collapses the two locks back into one and asserts the hang.
+- **`monkeypatch` in a test is a smell — often the only way, never the first thing to reach for.**
+  It couples the test to the implementation's internals, so it can only be right if you know exactly
+  where the value is read, and it fails *silently* when you don't: the test passes, against the bug.
+  Consider the alternatives first — inject the dependency, use a real object, test at a boundary, or
+  run a subprocess when the thing genuinely is process-start state.
+  When you do patch, patch **where the value is read, not where it is set**, and prove it by
+  reverting the fix and watching the test go red. Two live examples from `tests/test_fixture_guards.py`,
+  both of which passed against the bug on the first attempt:
+  `monkeypatch.setenv("DOCKER_AUTH_CONFIG", ...)` does nothing, because
+  `testcontainers.core.config` reads it through a dataclass `default_factory` evaluated once when
+  its singleton is built at import; and patching a *conditional* path (`if docker_host:`) asserts
+  nothing on a machine where the condition never holds — which was this machine, and CI.
 - **A new seeder must call `raise_on_heading_violations(session, source=...)` before `commit()`.**
   `app/catalog/invariants.py` enforces `(module_id, column_key) -> variant_kind`, a functional
   dependency the schema cannot express and the ScoreEntry lookup depends on. Breaking it makes score
@@ -203,10 +224,11 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   test never executes a statement, which is why `tests/test_importer.py` gets away with it today.
   That file's module docstring carries a block flagged for the planned test-review PR; read it before
   changing any fixture.
-- **Before starting new feature work, read `docs/pr-13-diary.md`'s Act VI.** It is a fifteen-item
-  list of defects the second review pass found in PR #13's own fixes — two of which (the
-  `DECOMPOSABLE_VARIANT_KINDS` false negative and a half-populated `variant` row) let bad catalog
-  data through silently. That cleanup is the intended next branch.
+- **The PR #13 cleanup list is closed.** `docs/pr-13-diary.md`'s Act VI listed fifteen defects the
+  second review pass found in PR #13's own fixes; all fifteen shipped on `spring-cleaning-in-summer`
+  and `docs/pr-14-diary.md` records what each became. Read Act VI for the history, not as a work
+  list — three of its items turned into design changes rather than the one-line fixes it described,
+  so the entries no longer describe the code.
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image

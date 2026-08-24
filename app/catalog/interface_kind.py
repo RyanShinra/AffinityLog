@@ -62,3 +62,20 @@ class InterfaceKind(enum.Enum):
     ANTIBODY_TARGET_COMPLEX = "antibody-target complex"
     ANTIBODY_ONLY_HL_PAIRING = "antibody only (H/L pairing)"
     SINGLE_CHAIN_NO_INTERFACE = "single chain (no interface)"
+
+    @classmethod
+    def scoreable(cls) -> frozenset[str]:
+        """The kinds a catalog row should exist for — the three biological ones.
+
+        This is the asymmetry above, made checkable. `app/catalog/invariants.py` refuses a heading
+        whose INTERFACE rows do not cover every member of this set, because tier two builds
+        (module, column_key, 'INTERFACE', <the candidate's kind>) and a missing row resolves to
+        nothing for exactly the candidates carrying that kind — silently, while every other
+        candidate resolves fine.
+
+        `NO_CHAINS_RECORDED` is excluded rather than forgotten. A candidate with no chain rows has
+        no interface for ipTM to describe, so a row for it would be dead data; demanding one would
+        flag the real corpus, whose three interface-dependent headings each carry exactly these
+        three. Returns values, not members, because `metrics.variant` stores the CASE string.
+        """
+        return frozenset(kind.value for kind in cls if kind is not cls.NO_CHAINS_RECORDED)

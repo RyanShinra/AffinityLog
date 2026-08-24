@@ -31,9 +31,23 @@ lift the axis into a parent keyed by the heading, so a second axis is unrepresen
 merely discouraged. See `docs/metric-heading-normalization.md`. Until that migration exists, this is
 the enforcement point.
 
-THREE WAYS A HEADING BREAKS THE LOOKUP
---------------------------------------
-All three are silent, and only the first is about "more than one kind":
+DO NOT READ THAT AS "EVERY CATALOG INVARIANT BELONGS IN THIS FILE"
+-----------------------------------------------------------------
+It applies to the functional dependency above and to nothing else by default. A sibling invariant —
+that `variant_kind` and `variant` are both set or both NULL — IS expressible as a plain CHECK, so it
+lives in the schema (migration 008, `ck_metric_variant_pair`) rather than here, and this module
+neither checks nor needs to check it.
+
+That one used to matter here in a way that is easy to miss: a row with a NULL `variant_kind` and a
+non-NULL `variant` was counted as a BARE row by the query below, and `bare_rows` is what suppresses
+the third branch. So a single malformed row silenced the unsatisfiable-axis check for its whole
+heading. The constraint makes that row unwritable, which is why no branch here reports it — the
+Python version would be dead code. Before adding a check to this file, ask whether a constraint can
+carry it instead.
+
+FOUR WAYS A HEADING BREAKS THE LOOKUP
+-------------------------------------
+All four are silent, and only the first is about "more than one kind":
 
   * MIXED AXES — one heading catalogued along two different axes. No identity can name both,
     because a metric row carries a single (variant_kind, variant) pair; the cross product has
@@ -58,15 +72,41 @@ All three are silent, and only the first is about "more than one kind":
     error.
 
   * AN AXIS NOTHING CAN SUPPLY — a heading with no bare row, no INTERFACE rows, and an axis
-    `decompose()` cannot read out of the key string. `DECOMPOSABLE_VARIANT_KINDS` in
-    `app/catalog/keys.py` is derived from the rules there and today holds only PARAMETER; tier two
-    supplies only INTERFACE. So a heading qualified solely along MODE, SOURCE_MODEL, COMPONENT or
-    TRANSFORM resolves to NOTHING, for every candidate, with no exception and no log. This is the
-    check that guards not just "one axis per heading" but "the axis is one the lookup can satisfy" —
-    the assertion that actually protects the read path.
+    `decompose()` cannot read out of the key string. `decomposable_kinds_for(module, column_key)` in
+    `app/catalog/keys.py` answers what the key string carries FOR THAT HEADING; tier two supplies
+    only INTERFACE. So a heading qualified solely along MODE, SOURCE_MODEL, COMPONENT or TRANSFORM
+    resolves to NOTHING, for every candidate, with no exception and no log. This is the check that
+    guards not just "one axis per heading" but "the axis is one the lookup can satisfy" — the
+    assertion that actually protects the read path.
+
+    Per heading, and that word is load-bearing. This asked `kind in DECOMPOSABLE_VARIANT_KINDS`
+    until 2026-08-23 — a flat set of kind NAMES flattened from rules that are pinned to a module
+    and a column. PARAMETER is recoverable for `evoprotgrad.pseudolikelihood_ratio` and for nothing
+    else, so `evoprotgrad.entropy` catalogued along PARAMETER passed clean while resolving to
+    nothing: a false negative in precisely the shape this branch exists to catch.
 
     Note how it composes with the case above rather than contradicting it: TRANSFORM beside a bare
     row is fine (the bare row answers), TRANSFORM alone is not (nothing answers).
+
+  * AN AXIS WITH MISSING VALUES — a heading qualified along a RESOLVABLE axis that it does not
+    fully cover. The three above ask whether an axis can be resolved at all; this asks whether
+    every value of it was actually catalogued. Tier two builds
+    (module, column_key, 'INTERFACE', <the candidate's interface kind>), so a heading seeded with
+    two of the three scoreable kinds resolves to nothing for exactly the candidates carrying the
+    third, while every other candidate resolves fine. A partial failure is harder to notice than a
+    total one, and all three kinds occur in the real corpus (6 / 4 / 4 of the 14 candidates).
+
+    The expected set comes from `InterfaceKind.scoreable()` for INTERFACE and from
+    `declared_variants_for(module, column_key, kind)` for everything else — the latter only askable
+    since the rules table began carrying its variants as data rather than as regex capture groups.
+    It takes the AXIS as well as the heading, and must: without it, a heading carrying a rule for
+    one axis was measured against that rule's variants while catalogued along a different one, so
+    `evoprotgrad.pseudolikelihood_ratio` with a TRANSFORM row beside a bare row was refused while
+    `fastdpe.SFvCSP` in the identical shape passed.
+
+    `NO_CHAINS_RECORDED` is excluded, which is not a new judgment: the enum docstring, the CASE
+    comment in sql/candidate_summary.sql, and tests/conftest.py all already say the catalog carries
+    three rows per interface-dependent column and not four.
 """
 
 from __future__ import annotations
@@ -76,7 +116,8 @@ from typing import NamedTuple
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog.keys import DECOMPOSABLE_VARIANT_KINDS
+from app.catalog.interface_kind import InterfaceKind
+from app.catalog.keys import declared_variants_for, decomposable_kinds_for
 from app.models import orm as db
 
 
@@ -86,6 +127,7 @@ class Heading(NamedTuple):
     module: str
     column_key: str
     variant_kinds: tuple[str, ...]  # the distinct non-NULL axes found, sorted
+    variants: tuple[str, ...]  # the distinct non-NULL variant values found, sorted
     bare_rows: int  # rows with variant_kind IS NULL under the same heading
 
     def problems(self) -> tuple[str, ...]:
@@ -108,12 +150,37 @@ class Heading(NamedTuple):
         # Nothing can supply the variant: no bare row to fall back to, no INTERFACE for tier two to
         # fill in, and an axis `decompose()` cannot read out of the key string.
         if not self.bare_rows and interface not in self.variant_kinds:
-            unsatisfiable = [k for k in self.variant_kinds if k not in DECOMPOSABLE_VARIANT_KINDS]
+            # Asked PER HEADING, because that is the only answerable form of the question: the
+            # rules in app/catalog/keys.py are pinned to a module AND a column, so PARAMETER is
+            # recoverable for `evoprotgrad.pseudolikelihood_ratio` and nowhere else. Asking whether
+            # a KIND is decomposable — which this did until 2026-08-23 — passes any heading whose
+            # axis happens to be spelled PARAMETER while nothing can resolve it.
+            recoverable = decomposable_kinds_for(self.module, self.column_key)
+            unsatisfiable = [k for k in self.variant_kinds if k not in recoverable]
             if unsatisfiable:
+                readable = sorted(recoverable) if recoverable else "nothing"
                 reasons.append(
                     f"is qualified along {unsatisfiable}, which nothing can supply — not the key "
-                    f"string (decompose reads only {sorted(DECOMPOSABLE_VARIANT_KINDS)}), not tier "
-                    f"two (INTERFACE only), and there is no variant-less row to fall back to"
+                    f"string (decompose recovers {readable} for this heading), not tier two "
+                    f"(INTERFACE only), and there is no variant-less row to fall back to"
+                )
+
+        # FOURTH: a resolvable axis this heading does not fully cover. Only asked when there is
+        # exactly ONE axis — two or more is already refused above, and the query aggregates variants
+        # across the whole heading rather than per kind, so pairing them back up is neither possible
+        # here nor needed. An empty `expected` means nothing declares what full coverage is, which is
+        # not the same as being covered: that case is the third branch's to refuse, not this one's.
+        if len(self.variant_kinds) == 1:
+            (kind,) = self.variant_kinds
+            expected = (
+                InterfaceKind.scoreable() if kind == interface else declared_variants_for(self.module, self.column_key, kind)
+            )
+            missing = sorted(expected - set(self.variants))
+            if missing:
+                reasons.append(
+                    f"is qualified along {kind} but has no row for {missing} — a candidate whose "
+                    f"variant is one of those resolves to no metric, while every other candidate "
+                    f"under this heading resolves fine"
                 )
 
         return tuple(reasons)
@@ -127,13 +194,15 @@ class Heading(NamedTuple):
 # the heading — because that is the granularity the resolver's tier one asks about.
 #
 # No HAVING: this returns EVERY heading and `Heading.problems()` decides which are broken. The
-# classification needs `DECOMPOSABLE_VARIANT_KINDS` from app.catalog.keys, which SQL cannot import,
+# classification needs `decomposable_kinds_for` from app.catalog.keys, which SQL cannot import,
 # and at 144 rows the difference is not worth splitting the logic across two languages.
 _HEADINGS_SQL = text("""
     SELECT  mo.name                                                       AS module,
             me.column_key                                                 AS column_key,
             array_agg(DISTINCT me.variant_kind::text)
                 FILTER (WHERE me.variant_kind IS NOT NULL)                AS variant_kinds,
+            array_agg(DISTINCT me.variant)
+                FILTER (WHERE me.variant IS NOT NULL)                     AS variants,
             count(*) FILTER (WHERE me.variant_kind IS NULL)               AS bare_rows
     FROM        metrics me
     JOIN        modules mo ON mo.id = me.module_id
@@ -155,6 +224,7 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
             module=row.module,
             column_key=row.column_key,
             variant_kinds=tuple(sorted(row.variant_kinds or ())),
+            variants=tuple(sorted(row.variants or ())),
             bare_rows=row.bare_rows,
         )
         for row in result

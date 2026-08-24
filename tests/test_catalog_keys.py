@@ -13,7 +13,9 @@ from the loaded exports.
 
 from __future__ import annotations
 
-from app.catalog.keys import ScoreKey, decompose
+import pytest
+
+from app.catalog.keys import ScoreKey, _pattern_for, decompose
 
 
 class TestPlainKeys:
@@ -53,6 +55,27 @@ class TestChainSuffix:
 
     def test_the_suffix_must_be_at_the_end(self) -> None:
         assert decompose("module.H_bond_count") == ScoreKey("module", "H_bond_count", None, None, None)
+
+
+class TestARuleMustDeclareItsVariants:
+    """An empty `variants` set is a typo, and it used to compile into a working-looking matcher.
+
+    `"|".join(())` is `""`, so the pattern became `^(?P<variant>)_(?P<column>foo)$` — which matches
+    the key `module._foo` and returns variant="". No catalog row has an empty-string variant, so
+    such a key would resolve to no metric silently, which is the exact failure this module exists
+    to prevent. It now raises at import instead, because the matcher table is built at import.
+    """
+
+    def test_an_empty_variant_set_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="declares no variants"):
+            _pattern_for("pseudolikelihood_ratio", frozenset())
+
+    def test_a_bare_underscore_is_not_a_variant(self) -> None:
+        """What the guard prevents, shown with a real rule: the prefix must actually be there."""
+        pattern = _pattern_for("pseudolikelihood_ratio", frozenset({"esm"}))
+
+        assert pattern.match("_pseudolikelihood_ratio") is None
+        assert pattern.match("esm_pseudolikelihood_ratio") is not None
 
 
 class TestVariantRules:

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -176,8 +177,8 @@ class TestTheSessionIsNotUsedConcurrently:
     """Regression tests for the concurrency bug the max-effort review found.
 
     graphql-core executes sibling fields and list items with `gather`, so several resolvers reach
-    the one per-request session in the same tick. Both of these failed before `Context` grew
-    `_session_lock`; neither would have been caught by any other test in the suite.
+    the one per-request session in the same tick. Both of these failed before the session grew a
+    lock; neither would have been caught by any other test in the suite.
     """
 
     async def test_the_memo_survives_concurrent_callers(self, seeded_catalog: AsyncSession) -> None:
@@ -205,7 +206,13 @@ class TestTheSessionIsNotUsedConcurrently:
         this needs is simply a session that has not connected yet, which is what production's
         `get_session` hands every request.
 
-        Read-only, so nothing here needs the rollback the `session` fixture would provide.
+        WHICH MEANS THIS SESSION IS UNMANAGED, and that is a real cost rather than a detail. It
+        sits outside the `session` fixture's transaction, so there is nothing to roll it back:
+        anything written here would persist in the test database for every later test in the run.
+        It is read-only today and must stay that way. The protection cannot simply be added either
+        — opening a transaction to roll back would check out a connection, and a session with a
+        connection is warm, which is the one state where the bug does not reproduce. The test needs
+        a virgin session, and a virgin session is by definition one nothing is managing yet.
 
         Before the lock: `IllegalStateChangeError: Method 'close()' can't be called here` raised out
         of the session's own `__aexit__`, so the request 500s with a poisoned session rather than
@@ -224,23 +231,80 @@ class TestTheSessionIsNotUsedConcurrently:
 class TestTheFixtureContainsWhatATestWrites:
     """Regression test for the leak the max-effort review found.
 
-    FLAGGED FOR THE TEST-REVIEW PR: these two are ORDER COUPLED on purpose, which is a fragility
-    worth a deliberate decision rather than inheritance. See the flagged block in conftest.py for
-    what a sessionmaker is and why this fixture is subtle.
+    Before the fix the `engine` fixture bound `AsyncSessionLocal` to the ENGINE, so a seeder-style
+    `commit()` opened its own connection and landed OUTSIDE the `session` fixture's transaction:
+    permanent, and visible to every later test. It is now bound to the test's own connection, so
+    the same commit is a SAVEPOINT release inside that transaction and dies with it.
 
-    They run in file order and are meaningfully coupled: the first writes through the app's
-    own sessionmaker, the second checks the write did not survive. Before the fix the `engine`
-    fixture bound `AsyncSessionLocal` to the ENGINE, so it opened its own connection and its
-    commit landed outside the `session` fixture's transaction — test B saw 1 Module, not 0.
+    ONE TEST, DELIBERATELY. This was two — a writer with no assertions at all, and a reader that
+    checked the count was zero — which meant `pytest -k test_b_sees_none_of_it` or `pytest --lf`
+    ran the reader alone against an empty schema and passed having proved nothing. Verified: both
+    halves passed in isolation. A regression test that is only valid when the whole file runs in
+    order is a regression test that reports green in exactly the situation you reach for it.
+
+    The two assertions below are what the pair was trying to say, and each needs the other. Visible
+    inside proves the write actually happened, so absence outside cannot be explained by nothing
+    having been written. Invisible outside proves it did not escape.
     """
 
-    async def test_a_commits_through_the_apps_own_sessionmaker(self, session: AsyncSession) -> None:
-        """Exactly what a seeder does. All four use AsyncSessionLocal and commit."""
+    async def test_a_seeders_commit_is_contained_by_the_fixture(self, session: AsyncSession, engine: AsyncEngine) -> None:
+        probe = "leak-probe"
+
+        # Exactly what a seeder does: AsyncSessionLocal, add, commit.
         async with AsyncSessionLocal() as app_session:
-            app_session.add(db.Module(name="leak-probe", module_type=db.ModuleType.SCORE, functions=[]))
+            app_session.add(db.Module(name=probe, module_type=db.ModuleType.SCORE, functions=[]))
             await app_session.commit()
 
-    async def test_b_sees_none_of_it(self, session: AsyncSession) -> None:
-        modules = await session.scalar(select(func.count()).select_from(db.Module))
+        count = select(func.count()).select_from(db.Module).where(db.Module.name == probe)
 
-        assert modules == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"
+        inside = await session.scalar(count)
+        assert inside == 1, "the commit did not reach the fixture's transaction at all"
+
+        # A genuinely separate connection. The fixture's outer transaction is still open, so a
+        # contained write is invisible here while an escaped one — a real COMMIT on its own
+        # connection — would be visible to everybody. That difference is the whole test.
+        async with engine.connect() as outside:
+            escaped = await outside.scalar(count)
+
+        assert escaped == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"
+
+
+class TestTheTwoLocksAreSeparate:
+    """The memo lock and the session lock must be different objects.
+
+    `catalog()` holds `_catalog_lock` across the whole of `_load_catalog()`, and `_load_catalog()`
+    issues a statement through `execute_statement()`, which takes the session's lock. That is only
+    safe while the two are distinct. Collapse them into one and the task waits on a lock it already
+    holds — `asyncio.Lock` is not reentrant — so the request hangs forever with no exception and no
+    traceback, while every other request on the loop is served normally.
+
+    These are timeout-bounded on purpose. A deadlock does not fail a test, it *hangs* one, and a
+    hung suite reads as CI being slow rather than as a bug.
+    """
+
+    async def test_the_memo_lock_is_not_the_sessions_lock(self, seeded_catalog: AsyncSession) -> None:
+        context = Context(session=seeded_catalog)
+
+        assert context._catalog_lock is not context._session._lock
+
+    async def test_the_catalog_builds_through_the_ordinary_front_door(self, seeded_catalog: AsyncSession) -> None:
+        """`_load_catalog` calls `execute_statement()` like every resolver does, holding the memo lock."""
+        context = Context(session=seeded_catalog)
+
+        catalog = await asyncio.wait_for(context.catalog(), timeout=10.0)
+
+        assert catalog.metric_by_identity, "the seeded catalog is not empty"
+
+    async def test_collapsing_them_into_one_lock_deadlocks(self, seeded_catalog: AsyncSession) -> None:
+        """Break the fix on purpose, and watch it hang.
+
+        This is the pre-cleanup design in one line: point the memo lock at the session's lock, so
+        both invariants are served by one object again. Without it, nothing in the suite would
+        notice if the two locks were quietly merged back together — every other test would still
+        pass, because they pass under both designs.
+        """
+        context = Context(session=seeded_catalog)
+        context._catalog_lock = context._session._lock
+
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(context.catalog(), timeout=1.0)

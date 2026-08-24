@@ -22,6 +22,23 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://affinitylog:affinitylog@db:5432/affinitylog
       DEBUG: "false"
+    # Predicted structures are corpus data, not application code — same reason pg_data is a
+    # volume. Mounted read-only so /demo/pdb/{id} can find them (the image does not carry
+    # experiment_results/; the final stage copies only app/, migrations/, alembic.ini and
+    # sample_data/), and so a new <id>_boltz2.pdb shows up without a rebuild.
+    #
+    # THE TARGET PATH IS COUPLED TO app/routers/demo.py AND NOTHING CHECKS IT.
+    # That module computes _STRUCTURES_DIR as `Path(__file__).resolve().parents[2] /
+    # "experiment_results"`, which lands on /app/experiment_results in the image (demo.py is at
+    # /app/app/routers/demo.py) and on the repo root outside it. Move demo.py, or change where the
+    # Dockerfile puts the package, and this mount points somewhere the code never looks — and the
+    # symptom is a /demo page with no structures rather than an error, because both call sites
+    # glob and an empty glob is a legal answer.
+    #
+    # Read-only because demo.py only globs and read_text()s. Nothing in the app writes here; the
+    # corpus is written by the loader scripts, which run on the host.
+    volumes:
+      - ./experiment_results:/app/experiment_results:ro
     depends_on:
       db:
         condition: service_healthy

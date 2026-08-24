@@ -83,7 +83,7 @@ class Query:
     @strawberry.field
     async def experiments(self, info: strawberry.Info[Context, None]) -> list[Experiment]:
         stmt: Select[tuple[db.Experiment]] = Experiment.select_statement().order_by(db.Experiment.name)
-        result: Result[tuple[db.Experiment]] = await info.context.execute(stmt)
+        result: Result[tuple[db.Experiment]] = await info.context.execute_statement(stmt)
         rows: Sequence[db.Experiment] = result.scalars().all()
 
         return [Experiment.from_row(r) for r in rows]
@@ -93,7 +93,7 @@ class Query:
         search_id: uuid.UUID = _as_uuid(str(id))  # This may throw, see above
 
         stmt: Select[tuple[db.Experiment]] = Experiment.select_statement().where(db.Experiment.id == search_id)
-        result: Result[tuple[db.Experiment]] = await info.context.execute(stmt)
+        result: Result[tuple[db.Experiment]] = await info.context.execute_statement(stmt)
         # Filtered on the primary key, so at most one row can come back. scalar_one_or_none raises
         # MultipleResultsFound above one — unreachable here, and that unreachability is the point:
         # it asserts the invariant, where .first() would quietly return an arbitrary row instead.
@@ -111,7 +111,7 @@ class Query:
         # Measured at 2 — but measured at 2 for `{ candidates { sequenceId } }` as well, where the
         # second query fetches chains nobody asked for. See types.py's "MEASURED COST".
         stmt: Select[tuple[db.Candidate]] = Candidate.select_statement().order_by(db.Candidate.sequence_id)
-        result: Result[tuple[db.Candidate]] = await info.context.execute(stmt)
+        result: Result[tuple[db.Candidate]] = await info.context.execute_statement(stmt)
         rows: Sequence[db.Candidate] = result.scalars().all()
 
         return [Candidate.from_row(r) for r in rows]
@@ -121,7 +121,7 @@ class Query:
         search_id: uuid.UUID = _as_uuid(str(id))  # This may throw, see above
 
         stmt: Select[tuple[db.Candidate]] = Candidate.select_statement().where(db.Candidate.id == search_id)
-        result: Result[tuple[db.Candidate]] = await info.context.execute(stmt)
+        result: Result[tuple[db.Candidate]] = await info.context.execute_statement(stmt)
         row: db.Candidate | None = result.scalar_one_or_none()  # PK filter — see `experiment` above
 
         if row is None:

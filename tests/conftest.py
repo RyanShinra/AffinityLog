@@ -43,27 +43,54 @@ sessions — one module-level object, built once in `app/database.py` when that 
 imported, and shared by everything that imported it. `AsyncSessionLocal()` calls the factory;
 `AsyncSessionLocal.configure(...)` reconfigures the factory itself, in place.
 
-WHY IN PLACE MATTERS. Eight modules do `from app.database import AsyncSessionLocal`, which binds
+WHY IN PLACE MATTERS. TEN modules do `from app.database import AsyncSessionLocal`, which binds
 the *object* into their namespace, not the name. Reassigning `app.database.AsyncSessionLocal`
 would therefore reach none of them. `.configure()` mutates the one object they all hold, which is
 the only reason the fixture can redirect the seeders at all.
+(`grep -rl 'from app.database import.*AsyncSessionLocal' app/ scripts/ tests/ experiment_results/`
+is the count. It said eight here for a while, which is the kind of number that rots quietly.)
+
+THE QUARANTINE HAS A SECOND DOOR, and it is not closed. Unbinding the sessionmaker does nothing
+about `app.database.engine`, which is importable directly and points at the dev corpus.
+`scripts/check_model_drift.py:52` does exactly that. No test does today, so this is a latent hole
+rather than a live one — but the guarantee below is "tests cannot reach the corpus through the
+sessionmaker", not "tests cannot reach the corpus".
 
 WHAT TO SCRUTINISE, specifically:
 
   * The bind is lifted ONLY inside a test that requested `session`, and restored to `None` in a
-    `finally`. A test that uses `AsyncSessionLocal` without requesting `session` raises
-    UnboundExecutionError. That is deliberate — it already caught one of our own tests reaching
-    for the app's sessionmaker when what it actually wanted was an unconnected session — but it is
-    a sharp edge and a reader deserves to be told rather than to discover it.
-  * Whether `create_savepoint` is the right join mode, and whether it leaking past the `bind=None`
-    reset is genuinely inert or merely harmless today.
+    `finally`. That is deliberate — it already caught one of our own tests reaching for the app's
+    sessionmaker when what it actually wanted was an unconnected session — but it is a sharp edge
+    and a reader deserves to be told rather than to discover it.
+
+    THE GUARANTEE IS NARROWER THAN IT READS. This said such a test "raises
+    UnboundExecutionError", full stop. It does not: an unbound sessionmaker still CONSTRUCTS
+    sessions happily, and only raises when one of them actually executes a statement. Five tests
+    in test_importer.py use `AsyncSessionLocal` without requesting `session` and pass — the code
+    under test parses CSV and builds ORM objects, and never reaches the database. So the real
+    guarantee is "cannot TOUCH the corpus", not "cannot be used", and a test that stops short of a
+    query gets no warning at all that it is holding an unusable session.
+  * Whether `create_savepoint` is the right join mode. The second half of this question — whether
+    it leaking past the `bind=None` reset is inert or merely harmless — is now measured, and the
+    answer is HARMLESS TODAY, NOT INERT, and NOT REMOVABLE:
+
+        configure(bind=engine, join_transaction_mode="create_savepoint", ...)
+        configure(bind=None)
+        -> {'bind': None, 'expire_on_commit': False, 'join_transaction_mode': 'create_savepoint'}
+
+    `configure()` merges (`self.kw.update(kw)`); there is no delete, and passing None sets the key
+    to None rather than dropping it. It is harmless because a bind of None makes the factory
+    unusable, and because the only thing that ever rebinds it is the `session` fixture, which sets
+    the same value anyway. It would stop being harmless the moment anything else in the test
+    process bound the factory to a real engine, which would silently inherit savepoint-join commit
+    semantics.
   * This assumes ONE test process. pytest-xdist is not installed; if it ever is, every worker
     mutates its own copy of the factory, which happens to be fine — but nobody has checked that
     the container-per-worker cost is acceptable.
-  * The two `TestTheFixtureContainsWhatATestWrites` tests in test_context_catalog.py are ORDER
-    COUPLED on purpose: A writes, B checks the write did not survive. If they are ever reordered,
-    split across files, or run in isolation, they stop testing anything. That is a real fragility,
-    not a style choice, and it deserves a decision rather than an inheritance.
+  * `TestTheFixtureContainsWhatATestWrites` in test_context_catalog.py used to be two ORDER
+    COUPLED tests — A writes, B checks the write did not survive — which meant `-k` or `--lf` ran
+    B alone against an empty schema and passed having proved nothing. It is now one self-contained
+    test that reads back from a second connection. Nothing here depends on test order any more.
 
 History: this shape came out of the max-effort review on PR #13, which found that binding the
 factory to the ENGINE (the previous version) gave it its own connection, so a `commit()` through
@@ -74,10 +101,11 @@ Modules and saw 1 rather than 0.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pytest
 from alembic import command
@@ -109,26 +137,86 @@ def _alembic_config() -> Config:
     return config
 
 
+# Values that mean "no" when someone sets CI by hand. Everything else present counts as CI,
+# including a value nobody anticipated — see `_running_in_ci`.
+_NOT_CI: Final[frozenset[str]] = frozenset({"", "0", "false", "no", "off"})
+
+
+def _running_in_ci() -> bool:
+    """Whether to treat this run as CI, where a missing database is a failure rather than a skip.
+
+    This was `os.environ.get("CI")`, a PRESENCE test — so `CI=false`, `CI=0` and `CI=no` all read as
+    "yes, this is CI" and turned a stopped Docker into a hard failure for someone explicitly saying
+    the opposite.
+
+    Deliberately asymmetric, and the asymmetry is the design. An unrecognised value counts as CI:
+    treating a real CI run as local means every database test SKIPS, `build` still only
+    `needs: [lint, test]`, and a green build ships with no database coverage at all — including
+    `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM finding
+    this schema exists for. Treating a local run as CI merely produces a loud, obvious failure that
+    takes one line to diagnose. When the two errors cost that differently, the default belongs on
+    the side of the cheap one.
+
+    So the only way to opt out is to say so explicitly. GitHub Actions, GitLab, CircleCI, Travis and
+    Netlify all set `CI=true`; Vercel sets `CI=1`. Nothing here needs to enumerate them.
+    """
+    return os.environ.get("CI", "").strip().lower() not in _NOT_CI
+
+
 def _docker_is_running() -> bool:
     """Whether the daemon `PostgresContainer` would use is reachable. Never raises.
 
-    Uses testcontainers' own `DockerClient` rather than `docker.from_env()`, and the difference is
-    not cosmetic. `from_env()` reads `DOCKER_HOST` only; `DockerClient.__init__` calls
-    `get_docker_host()`, which consults `tc.host` in ~/.testcontainers.properties FIRST. On a
-    machine running Colima, Rancher Desktop or rootless Docker — where the socket is configured
-    through `tc.host` and `DOCKER_HOST` is unset — `from_env()` reports no daemon while the
-    container on the next line would have started fine.
+    Resolves the host the way testcontainers does, but connects with the plain docker SDK.
 
-    That mattered more once the CI guard below turned "no daemon" into a hard failure: a probe that
-    can be wrong about a working daemon must not be the thing that fails a build. Probing through
-    the same resolution the container uses is what makes the two agree by construction.
+    The resolution matters and is why `docker.from_env()` alone is not enough: `from_env()` reads
+    `DOCKER_HOST` only, while `get_docker_host()` consults `tc.host` in ~/.testcontainers.properties
+    FIRST. On a machine running Colima, Rancher Desktop or rootless Docker — socket configured
+    through `tc.host`, `DOCKER_HOST` unset — `from_env()` reports no daemon while the container on
+    the next line would have started fine.
+
+    THE CLIENT IS A DIFFERENT MATTER. This used to construct testcontainers' own `DockerClient`, on
+    the reasoning that probing through the same object the container uses makes the two agree by
+    construction. It does not, because that constructor does more than connect:
+
+        if docker_auth_config := get_docker_auth_config():
+            if auth_config := parse_docker_auth_config(docker_auth_config):
+                self.login(auth_config[0])
+
+    So with `DOCKER_AUTH_CONFIG` set, a registry that is down, rate-limited or simply unreachable
+    makes construction raise, the bare `except` below turns that into False, and the caller reports
+    "Docker is not reachable" — about a daemon that is running. Reproduced exactly that way: daemon
+    up, `DOCKER_AUTH_CONFIG` pointed at a bogus registry, probe returns False. In CI that is
+    `pytest.fail` and a red build for a healthy machine.
+
+    That is precisely the failure the CI guard below was written to avoid: a probe that can be wrong
+    about a working daemon must not be the thing that fails a build. Whether a registry login
+    succeeds has nothing to do with whether a daemon is reachable, and this function is only asked
+    the second question. (Pulling `postgres:16-alpine` may well need that auth — but that happens
+    inside `PostgresContainer`, where a failure is a real error with a real message, rather than
+    being silently reinterpreted as "no Docker".)
+
+    Constructing the plain client also avoids `DockerClient.__init__`'s other side effect, an
+    `os.environ["DOCKER_HOST"] = docker_host` write that a probe has no business performing, and
+    `close()` releases the connection instead of leaving it to the garbage collector.
     """
+    client = None
     try:
-        from testcontainers.core.docker_client import DockerClient
+        from docker import DockerClient
+        from testcontainers.core.docker_client import get_docker_host
 
-        DockerClient().client.ping()
+        host = get_docker_host()
+        # `from_env()` when nothing is configured: it also honours DOCKER_TLS_VERIFY and
+        # DOCKER_CERT_PATH, which a bare `DockerClient()` would ignore.
+        client = DockerClient(base_url=host) if host else DockerClient.from_env()
+        client.ping()
     except Exception:
         return False
+    finally:
+        if client is not None:
+            # Suppressed: a close() that fails tells us nothing about reachability, and this
+            # function's contract is that it never raises.
+            with contextlib.suppress(Exception):
+                client.close()
     return True
 
 
@@ -149,13 +237,16 @@ def database_url() -> Iterator[str]:
     `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM
     finding this whole schema exists for. A skip is the right ergonomic on a laptop and a blind
     spot in a pipeline; `CI` is set by GitHub Actions and by every other runner worth naming.
+    `_running_in_ci()` decides, and errs towards failing — see its docstring for why an unrecognised
+    value counts as CI, and how to opt out.
     """
     if not _docker_is_running():
-        if os.environ.get("CI"):
+        if _running_in_ci():
             pytest.fail(
                 "Docker is not reachable, so the database tests cannot run. Failing rather than "
-                "skipping because CI is set: a green build with no database coverage is worse than "
-                "a red one. Locally this is a skip.",
+                "skipping because this looks like CI: a green build with no database coverage is "
+                "worse than a red one. If this is not CI, set CI=false (or 0/no/off) and it "
+                "becomes a skip.",
                 pytrace=False,
             )
         pytest.skip("needs a database; Docker is not running — start Docker Desktop and re-run")
@@ -238,8 +329,9 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
             async with maker() as test_session:
                 yield test_session
         finally:
-            # `bind=None` alone restores the quarantine; the leftover join_transaction_mode is
-            # inert on a sessionmaker that cannot reach a database.
+            # `bind=None` alone restores the quarantine. The leftover join_transaction_mode
+            # cannot be removed — configure() merges — but it is harmless while the bind is None.
+            # See the flagged block above for the measurement.
             AsyncSessionLocal.configure(bind=None)
             await transaction.rollback()
 

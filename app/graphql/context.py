@@ -18,8 +18,12 @@ contain rows that never coexisted. One session is also one connection from the p
 one per node in the tree.
 
 ``app/database.py``'s ``get_session`` already provides exactly this shape, and this is the same
-decision its docstring records. (``CLAUDE.md`` describes an engine-per-resolver design instead —
-that note predates the session work and is stale; the code is right.)
+decision its docstring records.
+
+That session is not handed to resolvers raw. It arrives wrapped in ``TaskSafeSession`` (also in
+``app/database.py``), which owns the lock that makes sharing one session across a gathered resolver
+tree safe. See that class for the measurements, and for why the lock lives with the session rather
+than out here.
 
 WHY SUBCLASS ``BaseContext``
 ----------------------------
@@ -35,7 +39,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Annotated, Any, Final, TypeVar
+from typing import Annotated, Final
 
 from fastapi import Depends
 from sqlalchemy import Result, Select, select
@@ -43,12 +47,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
-from app.database import get_session
+from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
-
-# `Select[tuple[X]]` -> `Result[tuple[X]]`, matching SQLAlchemy's own `Select(Generic[_TP])`.
-# Named for the row tuple so `Context.execute` is as precise as the bare `session.execute` it replaces.
-_RowTuple = TypeVar("_RowTuple", bound=tuple[Any, ...])
 
 # The catalog's natural key: (module_name, column_key, variant_kind, variant). Matches `metrics`'
 # UNIQUE constraint and the first four fields of `ScoreKey`. Note `variant_kind` is the member NAME
@@ -130,55 +130,57 @@ class Context(BaseContext):
     Still a thin holder: it carries the session and serialises access to it, and it caches the one
     thing every ScoreEntry needs. Anything that answers a domain question belongs in a resolver.
 
-    WHY THIS OWNS A LOCK
-    --------------------
-    One session per request (see the module docstring) is right for read consistency and wrong
-    about concurrency, and nothing reconciled the two until now. graphql-core executes sibling
-    fields and list items with ``gather``, so several resolvers reach the session in the same tick.
-    An ``AsyncSession`` is explicitly not safe for that. Measured against a real database:
+    THE TWO LOCKS, AND WHY THEY ARE TWO
+    -----------------------------------
+    Sharing one session across a gathered resolver tree has to be serialised. ``TaskSafeSession``
+    does that and owns the lock for it; this class never sees that lock and cannot acquire it.
 
-        virgin session, 4 concurrent execute()  ->  3 raise InvalidRequestError
-                                                    "this session is provisioning a new connection;
-                                                     concurrent operations are not permitted"
-        warm session,   4 concurrent execute()  ->  0 raise
+    ``_catalog_lock`` is a second, unrelated lock guarding a different invariant — that the catalog
+    memo is built exactly once per request. It is held across the whole of ``_load_catalog()``,
+    which is only safe because the statement inside that build takes the *session's* lock, a
+    different object.
 
-    So the failure is not theoretical and not rare — it is *the first concurrent touch of a
-    request*. `{ candidates { sequenceId } experiments { name } }` is two root fields, which
-    graphql-core gathers onto a session that has not yet checked out a connection, and it raises
-    ``IllegalStateChangeError`` out of the session's own ``__aexit__`` — an unhandled 500 with a
-    poisoned session, not a masked GraphQL error.
+    That separation is the design, not an accident of refactoring. One lock serving both invariants
+    is the version that deadlocks: a caller holding it across the build re-enters it on the first
+    statement, and ``asyncio.Lock`` is not reentrant, so the task waits on itself — forever, with no
+    exception and no traceback, while every other request on the loop is served normally. Two locks,
+    one per invariant, makes that unspellable rather than merely forbidden: ``catalog()`` cannot
+    misuse the session lock because it cannot reach it.
 
-    ``execute()`` therefore holds ``_session_lock`` for the duration of the statement, and every
-    resolver goes through it rather than touching ``session.execute`` directly. The queries were
-    already serial — one session is one connection — so this costs nothing but honesty.
+    Lock ordering, for completeness: the memo lock is always taken before the session lock and never
+    the reverse. That is structural rather than a rule to remember, because the session lock is held
+    only inside ``TaskSafeSession.execute``, whose critical section is one statement and calls
+    nothing.
     """
 
     def __init__(self, session: AsyncSession) -> None:
         super().__init__()  # BaseContext populates request/response/background_tasks
-        self.session: AsyncSession = session
+        # Wrapped, not stored raw: resolvers get `execute_statement()` and no route to an
+        # unguarded `AsyncSession`. The constructor still TAKES a plain session, so every existing
+        # caller and test builds a Context exactly the way it did before.
+        self._session: TaskSafeSession = TaskSafeSession(session)
 
-        # Guards every statement this request runs. Constructed here rather than lazily because
-        # asyncio.Lock no longer binds to a loop at construction (3.10+), so there is no reason to
-        # defer it and every reason not to race on creating it.
-        self._session_lock = asyncio.Lock()
+        # Guards the catalog memo below, and nothing else. Emphatically not the session's lock —
+        # see the class docstring for why those have to be two objects.
+        self._catalog_lock = asyncio.Lock()
 
         # `None` rather than an empty MetricCatalog: an empty catalog is a legitimate state (an
         # unseeded database), so the sentinel has to be distinguishable from the real thing or a
         # fresh install would query once per ScoreEntry forever.
         self._catalog: MetricCatalog | None = None
 
-    async def execute(self, statement: Select[_RowTuple]) -> Result[_RowTuple]:
-        """Run one statement against this request's session, serialised against every other.
+    async def execute_statement(self, statement: Select[RowTuple]) -> Result[RowTuple]:
+        """Run one SQL statement against this request's session. What every resolver calls.
 
-        Resolvers call this, never `info.context.session.execute(...)` — the lock is only worth
-        anything if it is the single door. See the class docstring for what goes wrong otherwise.
+        Spelled longer than the `execute()` it delegates to because `Context` is a grab-bag — it
+        also carries a `request`, a `response` and `background_tasks` — and because Strawberry's own
+        `Schema.execute()` runs a GraphQL DOCUMENT, not a statement. This repo calls that one too
+        (`test_two_root_fields_do_not_break_a_virgin_session`, in tests/test_context_catalog.py), so
+        a bare `execute` would mean SQL in one file and GraphQL in another. Named rather than cited
+        by line: this said `:217` and pointed six lines off within a week, because a line number in
+        another file rots on any edit above it and nothing checks it.
         """
-        async with self._session_lock:
-            # Annotated rather than returned inline: `AsyncSession.execute` is declared
-            # `-> Result[Any]`, so mypy strict rejects handing that straight back as
-            # `Result[_RowTuple]`. Every call site in this app already binds the same way.
-            result: Result[_RowTuple] = await self.session.execute(statement)
-            return result
+        return await self._session.execute(statement)
 
     async def catalog(self) -> MetricCatalog:
         """The whole metric catalog, loaded once per request.
@@ -193,7 +195,7 @@ class Context(BaseContext):
         if self._catalog is not None:
             return self._catalog
 
-        async with self._session_lock:
+        async with self._catalog_lock:
             # Checked again inside the lock. Without this the lock would serialise the queries but
             # still run one per caller: measured, 14 concurrent callers (one per candidate in
             # `{ candidates { scores } }`, which graphql-core gathers across the list) produced 14
@@ -208,7 +210,7 @@ class Context(BaseContext):
     # End def catalog
 
     async def _load_catalog(self) -> MetricCatalog:
-        """Build the catalog. Call only from `catalog()`, holding `_session_lock`.
+        """Build the catalog. Call only from `catalog()`, holding `_catalog_lock`.
 
         Split out so `catalog()` is nothing but cache policy — the double-check, the lock, the
         memo — and this is nothing but how the two indexes get built.
@@ -289,9 +291,11 @@ class Context(BaseContext):
             selectinload(db.Metric.transform_of),
         )
 
-        # `self.session.execute`, not `self.execute`: the caller already holds `_session_lock`
-        # and asyncio.Lock is not reentrant, so going through the wrapper would deadlock.
-        result: Result[tuple[db.Metric]] = await self.session.execute(stmt)
+        # The ordinary front door, even though `catalog()` is holding `_catalog_lock` around this
+        # entire method. That is exactly what the two locks buy: this takes the SESSION's lock,
+        # a different object, so there is nothing to re-enter. Under one shared lock this line
+        # would hang the request forever, which is why this used to be `self.session.execute`.
+        result: Result[tuple[db.Metric]] = await self.execute_statement(stmt)
         rows: Sequence[db.Metric] = result.scalars().all()
 
         for metric in rows:
