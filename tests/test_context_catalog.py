@@ -27,7 +27,7 @@ from app.graphql.schema import schema
 from app.models import orm as db
 
 
-def _identity_for(key: str, catalog_kinds: frozenset[str], interface_kind: str | None) -> MetricIdentity:
+def _identity_for(key: str, catalog_kinds: frozenset[VariantKind], interface_kind: str | None) -> MetricIdentity:
     """The two-tier lookup, written out longhand.
 
     This mirrors what the ScoreEntry resolver will do. It lives in the test for now because the
@@ -35,14 +35,14 @@ def _identity_for(key: str, catalog_kinds: frozenset[str], interface_kind: str |
     instead, or the test stops guarding the real code path.
     """
     score_key = decompose(key)
-    if VariantKind.INTERFACE.name in catalog_kinds:
+    if VariantKind.INTERFACE in catalog_kinds:
         if interface_kind is None:
             # Not an `assert`: `python -O` strips those, and the identity this would build
             # instead — (module, column, 'INTERFACE', None) — is in no catalog, so the key would
             # resolve to nothing silently. That is the precise failure the two-tier design exists
             # to prevent, so it must not be removable by an interpreter flag.
             raise ValueError(f"{key!r} is interface-qualified; resolving it needs the candidate's interface kind")
-        return (score_key.module, score_key.column_key, VariantKind.INTERFACE.name, interface_kind)
+        return (score_key.module, score_key.column_key, VariantKind.INTERFACE, interface_kind)
     return score_key.identity
 
 
@@ -56,18 +56,23 @@ class TestCatalogIsBuiltFromTheDatabase:
             ("evoprotgrad", "pseudolikelihood_ratio"),
         }, "only headings with a non-NULL variant_kind appear; temstapro.clash is absent"
 
-    async def test_variant_kinds_are_member_names_not_values(self, seeded_catalog: AsyncSession) -> None:
+    async def test_variant_kinds_are_enum_members(self, seeded_catalog: AsyncSession) -> None:
+        # This used to assert they were member NAMES rather than values, because `.value` would
+        # give "interface", match nothing `decompose()` produced, and fail silently. Tier one holds
+        # members now, so that mistake is unspellable here. The name/value boundary still exists —
+        # it is `VariantKind[label]` in `app/catalog/invariants.py`, where the SQL's `::text` comes
+        # back — but it is one line, and it raises rather than mismatching.
         catalog = await Context(session=seeded_catalog).catalog()
 
-        assert catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")] == frozenset({"INTERFACE"})
-        # `.value` would give "interface" and match nothing decompose() produces — silently.
-        assert VariantKind.INTERFACE.name in catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")]
+        assert catalog.variant_kinds_per_heading[("boltz2", "protein_iptm")] == frozenset({VariantKind.INTERFACE})
 
     async def test_a_heading_can_carry_several_variants_of_one_kind(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
 
         # Two PARAMETER rows, one kind. The frozenset is about AXES, not about how many rows exist.
-        assert catalog.variant_kinds_per_heading[("evoprotgrad", "pseudolikelihood_ratio")] == frozenset({"PARAMETER"})
+        assert catalog.variant_kinds_per_heading[("evoprotgrad", "pseudolikelihood_ratio")] == frozenset(
+            {VariantKind.PARAMETER}
+        )
         assert len([i for i in catalog.metric_by_identity if i[:2] == ("evoprotgrad", "pseudolikelihood_ratio")]) == 2
 
     async def test_relationships_are_eager_loaded(self, seeded_catalog: AsyncSession) -> None:
@@ -87,7 +92,7 @@ class TestCatalogIsBuiltFromTheDatabase:
         seeded_catalog.expunge_all()
 
         catalog = await Context(session=seeded_catalog).catalog()
-        metric = catalog.metric_by_identity[("boltz2", "protein_iptm", "INTERFACE", "antibody-target complex")]
+        metric = catalog.metric_by_identity[("boltz2", "protein_iptm", VariantKind.INTERFACE, "antibody-target complex")]
 
         assert metric.module.name == "boltz2"
         assert metric.concept is not None and metric.concept.name == "interface_confidence"
@@ -140,7 +145,7 @@ class TestTheIptmFinding:
         kinds = catalog.variant_kinds_per_heading[("evoprotgrad", "pseudolikelihood_ratio")]
 
         identity = _identity_for("evoprotgrad.esm_pseudolikelihood_ratio.H", kinds, interface_kind=None)
-        assert identity == ("evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm")
+        assert identity == ("evoprotgrad", "pseudolikelihood_ratio", VariantKind.PARAMETER, "esm")
         assert identity in catalog.metric_by_identity
 
     async def test_an_ordinary_key_resolves_on_identity_alone(self, seeded_catalog: AsyncSession) -> None:

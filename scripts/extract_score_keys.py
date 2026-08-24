@@ -43,7 +43,8 @@ from sqlalchemy import text
 # GraphQL ScoreEntry resolver needs the SAME decomposition in the opposite direction — key in,
 # catalog row out — and two copies would drift silently. See app/catalog/keys.py for the full
 # reasoning and the key anatomy. This script is now one of its two callers, not its owner.
-from app.catalog.keys import decompose
+from app.catalog.keys import MetricIdentity, decompose
+from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
 
 
@@ -52,7 +53,7 @@ class MetricKey(NamedTuple):
 
     module: str
     column_key: str
-    variant_kind: str | None
+    variant_kind: VariantKind | None
     variant: str | None
     chains: tuple[str, ...]  # which chain suffixes were seen for this metric (informational)
     raw_keys: tuple[str, ...]  # the literal JSONB keys that collapsed into this row
@@ -65,7 +66,7 @@ async def collect() -> list[MetricKey]:
         raw_keys = [row[0] for row in result.all()]
 
     # identity -> (chains seen, raw keys that produced it)
-    buckets: dict[tuple[str, str, str | None, str | None], tuple[set[str], list[str]]] = defaultdict(lambda: (set(), []))
+    buckets: dict[MetricIdentity, tuple[set[str], list[str]]] = defaultdict(lambda: (set(), []))
     for key in raw_keys:
         module, column, variant_kind, variant, chain = decompose(key)
         chains, originals = buckets[(module, column, variant_kind, variant)]
@@ -95,7 +96,7 @@ def main() -> None:
                     {
                         "module": m.module,
                         "column_key": m.column_key,
-                        "variant_kind": m.variant_kind,
+                        "variant_kind": m.variant_kind.name if m.variant_kind else None,
                         "variant": m.variant,
                         "chains": list(m.chains),
                         "raw_keys": list(m.raw_keys),
@@ -117,7 +118,7 @@ def main() -> None:
         print(f"\n{module}  ({len(rows)} metrics, {sum(len(r.raw_keys) for r in rows)} raw keys)")
         for m in rows:
             chains = f"  [{'/'.join(m.chains)}]" if m.chains else ""
-            var = f"  ({m.variant_kind}={m.variant})" if m.variant else ""
+            var = f"  ({m.variant_kind.name if m.variant_kind else None}={m.variant})" if m.variant else ""
             print(f"    {m.column_key}{var}{chains}")
 
     print(f"\n{'=' * 70}")

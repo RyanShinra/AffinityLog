@@ -172,7 +172,11 @@ async def _insert_skeleton_metric(session: AsyncSession, module_id: str, metric:
             # text columns (protein_id, structureFile, the _export.recommendation prose) and any
             # consumer trusting value_type to parse them would raise.
             "value_type": value_type,
-            "variant_kind": metric.variant_kind,
+            # `.name` because the bind feeds `CAST(:variant_kind AS variantkind)`, and Postgres
+            # enum labels ARE the member names. Passing the member itself raises asyncpg's
+            # DataError — checked, not assumed. This is the other end of the boundary that
+            # `app/catalog/invariants.py` reads back with `VariantKind[label]`.
+            "variant_kind": metric.variant_kind.name if metric.variant_kind is not None else None,
             "variant": metric.variant,
         },
     )

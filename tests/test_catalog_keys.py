@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from app.catalog.keys import ScoreKey, _pattern_for, decompose
+from app.catalog.variant_kind import VariantKind
 from app.models import orm as db
 
 
@@ -43,7 +44,7 @@ class TestIdentity:
         # keyed by this tuple, and a transposition typechecks, misses, and resolves to no metric
         # with no exception and no log — see docs/type-safety-plan.md.
         key = decompose("evoprotgrad.esm_pseudolikelihood_ratio.L")
-        assert key.identity == ("evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm")
+        assert key.identity == ("evoprotgrad", "pseudolikelihood_ratio", VariantKind.PARAMETER, "esm")
         assert key.identity == (key.module, key.column_key, key.variant_kind, key.variant)
 
     def test_the_chain_is_not_in_it(self) -> None:
@@ -104,12 +105,12 @@ class TestVariantRules:
 
     def test_esm_prefix_becomes_a_parameter_variant(self) -> None:
         assert decompose("evoprotgrad.esm_pseudolikelihood_ratio") == ScoreKey(
-            "evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm", None
+            "evoprotgrad", "pseudolikelihood_ratio", VariantKind.PARAMETER, "esm", None
         )
 
     def test_amplify_prefix_becomes_the_other_variant(self) -> None:
         assert decompose("evoprotgrad.amplify_pseudolikelihood_ratio") == ScoreKey(
-            "evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "amplify", None
+            "evoprotgrad", "pseudolikelihood_ratio", VariantKind.PARAMETER, "amplify", None
         )
 
     def test_both_arms_share_one_column_key(self) -> None:
@@ -124,7 +125,7 @@ class TestVariantRules:
         # The chain is stripped BEFORE the variant rule runs, so the rule's anchored regex still
         # matches. Order matters here and this is what pins it.
         assert decompose("evoprotgrad.esm_pseudolikelihood_ratio.L") == ScoreKey(
-            "evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm", db.ChainRole.LIGHT
+            "evoprotgrad", "pseudolikelihood_ratio", VariantKind.PARAMETER, "esm", db.ChainRole.LIGHT
         )
 
     def test_the_rule_is_scoped_to_its_module(self) -> None:

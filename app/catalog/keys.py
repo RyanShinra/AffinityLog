@@ -48,6 +48,7 @@ from __future__ import annotations
 import re
 from typing import Final, NamedTuple
 
+from app.catalog.variant_kind import VariantKind
 from app.models import orm as db
 
 # Trailing .H/.L/.T — the chain the value was measured on, not part of the metric's identity.
@@ -70,17 +71,14 @@ _CHAIN_SUFFIX: Final[re.Pattern[str]] = re.compile(
 class _Rule(NamedTuple):
     """What one heading's key strings encode beyond the heading itself.
 
-    `variant_kind` is the VariantKind member NAME, matching what the Postgres enum stores. Still a
-    `str` here; `docs/type-safety-plan.md` stage 3 is where it becomes the enum itself.
-
-    An earlier version of this docstring justified the `str` by claiming `app/catalog/` must not
-    import the ORM. There was never such a rule — `invariants.py` imported it until the enum moved
-    into this package. What IS true is the direction: `app/models/orm.py` now imports
-    `app.catalog.variant_kind`, so that module has to stay a leaf.
+    `variant_kind` is the enum, not its member name. It was a `str` until stage 3 of
+    `docs/type-safety-plan.md`, on the theory that the catalog could not import it — a rule that
+    never existed, and is moot now the enum lives in this package. The string spelling bought
+    nothing and let `"PARMETER"` typecheck.
     """
 
     variants: frozenset[str]
-    variant_kind: str
+    variant_kind: VariantKind
 
 
 # Headings whose key strings encode a run PARAMETER rather than naming a distinct quantity.
@@ -106,7 +104,7 @@ class _Rule(NamedTuple):
 _VARIANT_RULES: Final[dict[tuple[str, str], _Rule]] = {
     ("evoprotgrad", "pseudolikelihood_ratio"): _Rule(
         variants=frozenset({"esm", "amplify"}),
-        variant_kind="PARAMETER",
+        variant_kind=VariantKind.PARAMETER,
     ),
 }
 
@@ -146,7 +144,7 @@ for (_module, _column_key), _rule in _VARIANT_RULES.items():
     _MATCHERS_PER_MODULE[_module] += ((_pattern_for(_column_key, _rule.variants), _rule),)
 
 
-def decomposable_kinds_for(module: str, column_key: str) -> frozenset[str]:
+def decomposable_kinds_for(module: str, column_key: str) -> frozenset[VariantKind]:
     """The variant kinds `decompose()` can recover from a key string FOR THIS HEADING.
 
     Everything else — INTERFACE, and any kind a future curator invents — has to come from somewhere
@@ -162,7 +160,7 @@ def decomposable_kinds_for(module: str, column_key: str) -> frozenset[str]:
     return frozenset({rule.variant_kind}) if rule is not None else frozenset()
 
 
-def declared_variants_for(module: str, column_key: str, variant_kind: str) -> frozenset[str]:
+def declared_variants_for(module: str, column_key: str, variant_kind: VariantKind) -> frozenset[str]:
     """Every variant this heading's key strings may carry ALONG THIS AXIS, or empty if none do.
 
     The companion to `decomposable_kinds_for`: that one says which axis the key encodes, this says
@@ -198,10 +196,13 @@ _NO_MODULE: Final[str] = "_export"
 
 
 # The catalog's natural key: (module_name, column_key, variant_kind, variant). Matches `metrics`'
-# UNIQUE constraint and the first four fields of `ScoreKey`. Note `variant_kind` is the member NAME
-# as a string ("INTERFACE", "PARAMETER") — that is what the Postgres enum stores and what
-# `decompose()` produces, so both sides already speak it.
-MetricIdentity = tuple[str, str, str | None, str | None]
+# UNIQUE constraint and the first four fields of `ScoreKey`.
+#
+# `variant_kind` is the enum. Postgres stores the member NAME and `_HEADINGS_SQL` reads it back as
+# text, so the string form is real — but it belongs at that boundary, not in an identity three
+# layers up. `metric_identity_from_db_metric` builds one from `Metric.variant_kind`, which is
+# already a VariantKind, so both producers now agree without either converting.
+MetricIdentity = tuple[str, str, VariantKind | None, str | None]
 
 
 class ScoreKey(NamedTuple):
@@ -214,7 +215,7 @@ class ScoreKey(NamedTuple):
 
     module: str
     column_key: str
-    variant_kind: str | None
+    variant_kind: VariantKind | None
     variant: str | None
     chain: db.ChainRole | None
 
@@ -239,7 +240,7 @@ def decompose(key: str) -> ScoreKey:
     if chain_match:
         rest = rest[: chain_match.start()]
 
-    variant_kind: str | None = None
+    variant_kind: VariantKind | None = None
     variant: str | None = None
     for pattern, rule in _MATCHERS_PER_MODULE.get(module, ()):
         if (m := pattern.match(rest)) is not None:

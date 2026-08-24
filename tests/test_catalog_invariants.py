@@ -439,7 +439,7 @@ class TestProblemsNeedsNoDatabase:
         assert Heading("boltz2", "ptm", (), (), 1).problems() == ()
 
     def test_every_applicable_reason_is_reported(self) -> None:
-        both = Heading("boltz2", "iptm", ("INTERFACE", "PARAMETER"), (), 2).problems()
+        both = Heading("boltz2", "iptm", (VariantKind.INTERFACE, VariantKind.PARAMETER), (), 2).problems()
 
         assert len(both) == 2
         assert any("2 axes" in reason for reason in both)
@@ -448,7 +448,7 @@ class TestProblemsNeedsNoDatabase:
     def test_coverage_is_only_asked_of_a_single_axis(self) -> None:
         """Two axes is already refused, and the query aggregates variants across the whole heading
         rather than per kind — so asking about coverage there would compare against the wrong set."""
-        mixed = Heading("boltz2", "iptm", ("INTERFACE", "PARAMETER"), ("esm",), 0).problems()
+        mixed = Heading("boltz2", "iptm", (VariantKind.INTERFACE, VariantKind.PARAMETER), ("esm",), 0).problems()
 
         assert not any("has no row for" in reason for reason in mixed)
 
@@ -456,7 +456,7 @@ class TestProblemsNeedsNoDatabase:
         partial = Heading(
             "boltz2",
             "protein_iptm",
-            ("INTERFACE",),
+            (VariantKind.INTERFACE,),
             ("antibody-target complex", "antibody only (H/L pairing)"),
             0,
         ).problems()
