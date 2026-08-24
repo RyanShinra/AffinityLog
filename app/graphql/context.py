@@ -47,17 +47,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
+from app.catalog.keys import MetricIdentity
 from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
-
-# The catalog's natural key: (module_name, column_key, variant_kind, variant). Matches `metrics`'
-# UNIQUE constraint and the first four fields of `ScoreKey`. Note `variant_kind` is the member NAME
-# as a string ("INTERFACE", "PARAMETER") — that is what the Postgres enum stores and what
-# `decompose()` produces, so both sides already speak it.
-#
-# This probably wants to live in `app/catalog/keys.py` beside `ScoreKey` once `ScoreKey.identity`
-# exists and returns one. Here for now so this file stands alone.
-MetricIdentity = tuple[str, str, str | None, str | None]
 
 
 def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:

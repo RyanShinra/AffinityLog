@@ -37,6 +37,24 @@ class TestPlainKeys:
         )
 
 
+class TestIdentity:
+    def test_it_is_the_first_four_fields_in_order(self) -> None:
+        # Pins the ORDER, which is the whole reason the property exists. `metric_by_identity` is
+        # keyed by this tuple, and a transposition typechecks, misses, and resolves to no metric
+        # with no exception and no log — see docs/type-safety-plan.md.
+        key = decompose("evoprotgrad.esm_pseudolikelihood_ratio.L")
+        assert key.identity == ("evoprotgrad", "pseudolikelihood_ratio", "PARAMETER", "esm")
+        assert key.identity == (key.module, key.column_key, key.variant_kind, key.variant)
+
+    def test_the_chain_is_not_in_it(self) -> None:
+        # The same metric measured on two chains has ONE identity. This is what collapses the
+        # corpus's 200 raw keys to 138 catalog rows.
+        heavy = decompose("temstapro.clash.H")
+        light = decompose("temstapro.clash.L")
+        assert heavy.identity == light.identity
+        assert heavy.chain != light.chain
+
+
 class TestChainSuffix:
     def test_the_chain_is_captured_and_stripped(self) -> None:
         assert decompose("temstapro.clash.H") == ScoreKey("temstapro", "clash", None, None, db.ChainRole.HEAVY)

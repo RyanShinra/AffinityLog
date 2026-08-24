@@ -67,7 +67,7 @@ class TestShapesItMustAccept:
         # ...and the reason it is not a violation: the bare row is genuinely reachable.
         catalog = await Context(session=session).catalog()
         key = decompose("fastdpe.SFvCSP")
-        resolved = catalog.metric_by_identity[(key.module, key.column_key, key.variant_kind, key.variant)]
+        resolved = catalog.metric_by_identity[key.identity]
         assert resolved.display_name == "SFvCSP (Fv charge symmetry)"
 
     async def test_a_bare_row_beside_a_transform_row_on_a_heading_that_has_a_variant_rule(self, session: AsyncSession) -> None:

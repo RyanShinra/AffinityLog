@@ -197,6 +197,13 @@ def declared_variants_for(module: str, column_key: str, variant_kind: str) -> fr
 _NO_MODULE: Final[str] = "_export"
 
 
+# The catalog's natural key: (module_name, column_key, variant_kind, variant). Matches `metrics`'
+# UNIQUE constraint and the first four fields of `ScoreKey`. Note `variant_kind` is the member NAME
+# as a string ("INTERFACE", "PARAMETER") — that is what the Postgres enum stores and what
+# `decompose()` produces, so both sides already speak it.
+MetricIdentity = tuple[str, str, str | None, str | None]
+
+
 class ScoreKey(NamedTuple):
     """One raw JSONB key, decomposed.
 
@@ -210,6 +217,16 @@ class ScoreKey(NamedTuple):
     variant_kind: str | None
     variant: str | None
     chain: db.ChainRole | None
+
+    @property
+    def identity(self) -> MetricIdentity:
+        """The catalog row this key names, without the chain it was measured on.
+
+        `metric_by_identity` is keyed by exactly this, so a caller with a `ScoreKey` in hand should
+        never rebuild the tuple by hand — which four fields, in which order, is the sort of thing
+        that is right until someone types it out a fifth time.
+        """
+        return (self.module, self.column_key, self.variant_kind, self.variant)
 
 
 def decompose(key: str) -> ScoreKey:

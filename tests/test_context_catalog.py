@@ -19,10 +19,10 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.catalog.keys import decompose
+from app.catalog.keys import MetricIdentity, decompose
 from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
-from app.graphql.context import Context, MetricIdentity
+from app.graphql.context import Context
 from app.graphql.schema import schema
 from app.models import orm as db
 
@@ -43,7 +43,7 @@ def _identity_for(key: str, catalog_kinds: frozenset[str], interface_kind: str |
             # to prevent, so it must not be removable by an interpreter flag.
             raise ValueError(f"{key!r} is interface-qualified; resolving it needs the candidate's interface kind")
         return (score_key.module, score_key.column_key, VariantKind.INTERFACE.name, interface_kind)
-    return (score_key.module, score_key.column_key, score_key.variant_kind, score_key.variant)
+    return score_key.identity
 
 
 class TestCatalogIsBuiltFromTheDatabase:
@@ -132,7 +132,7 @@ class TestTheIptmFinding:
         catalog = await Context(session=seeded_catalog).catalog()
         bare = decompose("boltz2.protein_iptm")
 
-        assert (bare.module, bare.column_key, bare.variant_kind, bare.variant) not in catalog.metric_by_identity
+        assert bare.identity not in catalog.metric_by_identity
 
     async def test_a_parameter_key_needs_no_second_tier(self, seeded_catalog: AsyncSession) -> None:
         """The asymmetry: a PARAMETER variant is in the key string, an INTERFACE variant is not."""
