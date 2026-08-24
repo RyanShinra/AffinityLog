@@ -35,8 +35,14 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scrape_input_parameters import scrape  # noqa: E402
+# The repo root, not `scripts/` — so the sibling below is imported as `scripts.<name>` and cannot
+# also be loaded as a bare top-level module. `scripts/` has an `__init__.py`, so a file reached both
+# ways becomes TWO module objects with two copies of every class, and `isinstance` across them is
+# False. That split is also what made a root-level `mypy .` refuse to run before the package marker
+# existed. Needed because `scripts` is deliberately NOT installed — `[tool.setuptools.packages.find]`
+# is `include = ["app*"]` — so running this file directly puts `scripts/` on the path, not the root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.scrape_input_parameters import scrape  # noqa: E402
 
 # The two ESM2 runs and their five per-property sub-experiments (captured as "<run>_<n> ov/res.html").
 _RUNS = ["ESM2 Prediction", "ESM2 Evolved"]
@@ -48,7 +54,7 @@ def _property_of(overview_html: Path) -> str | None:
     """The single 'Fine-tuned Regression Model' value from a sub-experiment's Overview page."""
     for param in scrape(overview_html)["input_parameters"]:
         if "Regression Model" in param["name"]:
-            return str(param["value"])
+            return param["value"]
     return None
 
 

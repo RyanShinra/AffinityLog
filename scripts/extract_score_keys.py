@@ -59,6 +59,22 @@ class MetricKey(NamedTuple):
     raw_keys: tuple[str, ...]  # the literal JSONB keys that collapsed into this row
 
 
+def _identity_sort_key(item: tuple[MetricIdentity, object]) -> tuple[str, str, str, str]:
+    """Order identities for display, without asking Python to compare an Enum or a None.
+
+    A bare `sorted(buckets.items())` compares the identity tuples element-wise, which is fine until
+    two share a heading and differ at `variant_kind` — then it reaches `None < VariantKind.PARAMETER`
+    and raises TypeError. That is reachable from DATA, not from a code change: one export emitting
+    both `evoprotgrad.pseudolikelihood_ratio` and `evoprotgrad.esm_pseudolikelihood_ratio` puts a
+    bare identity and a PARAMETER one under the same heading.
+
+    Neither `Enum` nor `None` defines `__lt__`, so every field is normalised to a string here. Sorting
+    the kind by `.name` also keeps the output order the same as it was when this was a `str`.
+    """
+    module, column_key, variant_kind, variant = item[0]
+    return (module, column_key, variant_kind.name if variant_kind is not None else "", variant or "")
+
+
 async def collect() -> list[MetricKey]:
     """Read every distinct score key from the corpus and collapse them into metric identities."""
     async with AsyncSessionLocal() as session:
@@ -78,7 +94,7 @@ async def collect() -> list[MetricKey]:
 
     return [
         MetricKey(module, column, vk, v, tuple(sorted(chains)), tuple(originals))
-        for (module, column, vk, v), (chains, originals) in sorted(buckets.items())
+        for (module, column, vk, v), (chains, originals) in sorted(buckets.items(), key=_identity_sort_key)
     ]
 
 

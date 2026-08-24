@@ -49,7 +49,21 @@ class _VisibleText(HTMLParser):
             self.chunks.append(text)
 
 
-def scrape(html_path: Path) -> dict[str, object]:
+class ScrapedPage(TypedDict):
+    """One saved Overview page, reduced to the three things anything downstream reads.
+
+    Named for the same reason as `RecipeDag` below, plus one it earned: while this returned
+    `dict[str, object]`, `rebuild_rosetta_stone._property_of` iterated `["input_parameters"]` — an
+    `object` — and mypy could not say so, because the cross-script import went through a `sys.path`
+    insert it could not resolve. Fixing that import surfaced the error immediately.
+    """
+
+    experiment: str | None  # the breadcrumb entry before "Overview"/"Results"
+    recipe: str | None
+    input_parameters: list[dict[str, str]]  # keys: name, value, description, module, config
+
+
+def scrape(html_path: Path) -> ScrapedPage:
     parser = _VisibleText()
     parser.feed(html_path.read_text(encoding="utf-8"))
     text = parser.chunks
@@ -81,7 +95,7 @@ def scrape(html_path: Path) -> dict[str, object]:
                 params.append(dict(zip(["name", "value", "description", "module", "config"], row, strict=True)))
                 row = []
 
-    return {"experiment": name, "recipe": value_after("Recipe"), "input_parameters": params}
+    return ScrapedPage(experiment=name, recipe=value_after("Recipe"), input_parameters=params)
 
 
 class _RowMap(HTMLParser):

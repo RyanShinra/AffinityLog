@@ -54,11 +54,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.catalog.invariants import find_heading_violations, raise_on_heading_violations
 from app.database import AsyncSessionLocal
 
-# scripts/ is on sys.path when a script here is run directly, but not when this module is imported
-# from elsewhere; make the sibling import work either way.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# The repo root, not `scripts/` — so the sibling below is imported as `scripts.<name>` and cannot
+# also be loaded as a bare top-level module. `scripts/` has an `__init__.py`, so a file reached both
+# ways becomes TWO module objects with two copies of every class, and `isinstance` across them is
+# False. That split is also what made a root-level `mypy .` refuse to run before the package marker
+# existed. Needed because `scripts` is deliberately NOT installed — `[tool.setuptools.packages.find]`
+# is `include = ["app*"]` — so running this file directly puts `scripts/` on the path, not the root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from extract_score_keys import MetricKey, collect  # noqa: E402  (needs the sys.path line above)
+from scripts.extract_score_keys import MetricKey, collect  # noqa: E402  (needs the sys.path line above)
 
 _PLACEHOLDER_MODULE_TYPE: Final[str] = "SCORE"
 _PLACEHOLDER_DESCRIPTION: Final[str] = (
