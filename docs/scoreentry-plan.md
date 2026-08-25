@@ -1,6 +1,6 @@
 # The ScoreEntry chapter — the plan for PR #16
 
-> **Status: the plan, written 2026-08-25 as PR #15 closed. Not started.** PR #15 typed the domain
+> **Status: the plan, written 2026-08-25 as PR #15 closed and merged. Not started.** PR #15 typed the domain
 > vocabulary specifically so this could be built on something internally consistent; this is the work
 > that was waiting. `docs/graphql-schema.md` is the committed contract and stays authoritative for
 > WHAT the types are — this file is the order to build them in and the decisions that order forces.
@@ -99,6 +99,45 @@ reviewable diff. That was PR #15 stage 1's entire purpose and this is where it p
 
 Stage 4's `Artifact` closes the last "for now" comment in the codebase (`app/models/orm.py:451`,
 "the placeholder hook for now"). Stage 2 closes the other (`tests/test_context_catalog.py:40`).
+
+---
+
+## Who writes what
+
+The last three PRs were heavy on supervision and light on the owner's own keystrokes. This chapter
+is the opposite by construction: the pieces below encode a JUDGEMENT, and per CLAUDE.md they are his
+to write. The right shape is a scaffold with the spot marked and the trade-offs named — not a
+finished function to review.
+
+**HIS — the decision-carrying code:**
+
+1. **The two-tier branch in the ScoreEntry resolver.** This is the ipTM finding turned into an `if`.
+   `tests/test_context_catalog.py::_identity_for` is the longhand version to move, and it already
+   contains the two judgements: that a missing `interface_kind` on an INTERFACE-qualified heading
+   RAISES rather than building an identity that resolves to nothing, and that it raises rather than
+   `assert`s, because `python -O` strips asserts and the silent failure is the exact thing the
+   design exists to prevent.
+2. **`numericValue`'s defensive parse.** What counts as parseable, and what a failure returns.
+   `docs/graphql-schema.md` §"numericValue parses defensively, even though nothing currently fails"
+   has the reasoning; the code is four lines and every one of them is a decision.
+3. **The `ScoreEntry.metric` null fallback.** 200 keys, 144 catalogued. What a key with no catalog
+   row surfaces as, and whether that is worth logging.
+4. **The `scores(module:, chain:, concept:)` filter semantics** — in particular whether `chain`
+   filters on the suffix `decompose()` stripped, which is the only place a ScoreEntry still knows it.
+
+**MINE — the scaffolding around it:**
+
+* `Context.interface_kinds()`: the query, the memo, `_interface_kinds_lock`, and the test that
+  collapses it into `_catalog_lock` and asserts the hang (the existing
+  `TestTheTwoLocksAreSeparate` is the pattern).
+* The Strawberry type declarations and their wiring into `Query`/`Candidate`.
+* Regenerating `schema.graphql` at each stage so every SDL change is a reviewable diff.
+* Tests around his logic once its shape is settled — including deleting `_identity_for` from the
+  test and repointing the assertions at the real resolver, so the test stops guarding a copy.
+
+**A fair warning about stage 1.** `interface_kinds()` is raw SQL against `candidate_summary`, which
+is doorway one below. The bind is an untyped dict and mypy will not check it. Worth an eyeball on
+the bind names before it runs, not after.
 
 ---
 

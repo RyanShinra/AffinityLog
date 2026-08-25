@@ -262,10 +262,11 @@ There is deliberately no `TEST_DATABASE_URL` escape hatch — see CLAUDE.md for 
 | path | what |
 |---|---|
 | `app/models/orm.py` | the schema, heavily commented with the reasoning behind each decision |
+| `app/catalog/` | what a score MEANS: the key decomposition, the write-time invariants, and the controlled vocabularies (`VariantKind`, `InterfaceKind`, the identifier aliases) |
 | `app/models/views.py` | read-only model over `candidate_summary` (deliberately excluded from Alembic autogenerate) |
 | `app/routers/demo.py` | the demo page and the path-validated structure endpoint |
 | `sql/candidate_summary.sql` | the view, annotated — the iterate-in-a-GUI copy |
-| `migrations/versions/` | 001–007 |
+| `migrations/versions/` | 001–008 |
 | `seed/catalog.json` | the curated meaning layer |
 | `scripts/` | loaders, the score-key extractor, and the HTML provenance scrapers |
 | `docs/schema-stress-log.md` | **the most interesting file in the repo** — a running log of what each experiment revealed about the schema, including the ipTM finding |

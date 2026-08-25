@@ -50,7 +50,8 @@ Both live on the same FastAPI app. CORS is open (`*`) — this is a local portfo
 ## Data model rationale
 
 Three layers. See `README.md` for the full explanation and `app/models/orm.py` for the commented
-schema.
+schema. The controlled vocabularies live in `app/catalog/` rather than beside the tables —
+`variant_kind.py`, `interface_kind.py`, `identifiers.py` — each for a reason its own docstring gives.
 
 1. **`candidates.scores` (JSONB, GIN-indexed)** — the bag. Keyed by the full export header
    (`boltz2.protein_iptm`), values stored as **text, uncoerced**. 200 distinct keys in the corpus;
@@ -113,7 +114,7 @@ representative of the schema.
 | Migrations | Alembic |
 | Tests | pytest + pytest-asyncio + testcontainers |
 | Lint/format | ruff + black |
-| Type-check | mypy (strict) |
+| Type-check | mypy (strict), over the WHOLE tree — CI runs `mypy .`, not `mypy app/` |
 | CI | GitHub Actions (lint → test → build) |
 
 ---
@@ -159,7 +160,7 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 
 - `candidates.scores` stores every CSV column as `dict[str, str]` (raw strings, not coerced).
   `scripts/seed_metric_skeleton.py` infers each metric's `value_type` from those strings.
-- Migrations run 001–007. `alembic upgrade head` before starting the server (docker-compose does it).
+- Migrations run 001–008. `alembic upgrade head` before starting the server (docker-compose does it).
   **Use `alembic revision -m "..."` to scaffold** — `env.py` has a hook that numbers revisions
   sequentially, and `revision_environment = true` makes it fire for plain revisions too. Do not
   hand-write migration files.
@@ -221,6 +222,20 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `testcontainers.core.config` reads it through a dataclass `default_factory` evaluated once when
   its singleton is built at import; and patching a *conditional* path (`if docker_host:`) asserts
   nothing on a machine where the condition never holds — which was this machine, and CI.
+- **Where a controlled vocabulary lives is decided by ONE question: is it truly part of the database
+  schema, or a free-floating concept?** `ChainRole` is schema — a native `chainrole` type behind
+  `candidate_chains.role` — so it stays in `app/models/orm.py` and the catalog imports it.
+  `InterfaceKind` is not: no such Postgres type exists, it is a string the view's `CASE` computes at
+  query time, so it lives in `app/catalog/`. `VariantKind` IS a Postgres type but moved to
+  `app/catalog/` anyway, because every rule that READS one is a catalog rule and the ORM's whole
+  interest is one column declaration.
+  A Python spelling can never reach the GraphQL contract: Strawberry names types from `__name__`,
+  the same rule `SAEnum` uses, so `db.ChainRole` still prints as `enum ChainRole`.
+  **`app/catalog/{__init__,variant_kind,identifiers}.py` must import nothing from `app`.** The ORM
+  imports them and `app/catalog/keys.py` imports the ORM back, so one first-party import there takes
+  the whole application down at import with an `AttributeError` about `ChainRole` raised from
+  `keys.py` — nowhere near the line at fault. `TYPE_CHECKING` cannot substitute: SQLAlchemy resolves
+  `Mapped[...]` at class creation. `tests/test_import_graph.py` enforces both halves.
 - **A literal list standing in for something the code already knows will go stale silently.**
   Three times on the `type-safety` branch: `_LEAVES` (should have been what `app/models/` imports
   from `app.catalog`), `_ENTRY_POINTS` (should have included what the server imports), `_MIRRORED`
@@ -255,6 +270,14 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   and `docs/pr-14-diary.md` records what each became. Read Act VI for the history, not as a work
   list — three of its items turned into design changes rather than the one-line fixes it described,
   so the entries no longer describe the code.
+- **Three doorways mypy does not cover, each having shipped a real bug on the `type-safety` branch.**
+  Raw SQL binds — `text()` parameters are an untyped dict, so a `VariantKind` where its `.name` was
+  needed reached asyncpg as a `DataError`. `sorted()` and friends — they accept anything and fail at
+  runtime, and an identity tuple containing an `Enum` or a `None` raises `TypeError` on comparison.
+  ORM construction — declarative `__init__` is `**kw: Any`, so `db.Module(name="literal")`
+  typechecks while `m.column_key = "literal"` does not. Also note that **converting a string to an
+  enum is never a local change**: every `sorted`, f-string and dict key downstream is a site the
+  type checker will not flag.
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image
