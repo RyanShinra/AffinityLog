@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 24 commits · all five stages, two review passes · 132 → 158 tests · `mypy .` clean, and CI now runs it
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 27 commits · all five stages, three review passes · 132 → 158 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -683,6 +683,57 @@ something else in the repository. That belongs in CLAUDE.md, not in a diary nobo
 The second lesson is procedural and duller: **the last commit before a review is not the last commit
 in the branch.** Two review passes had run, six findings were fixed, and everything after the second
 pass went out unexamined — including the only code commit among them.
+
+## Act XII — chasing it to the edges, and re-committing a bug I had just fixed
+
+A third review pass, scoped to what shipped after the second one. Two findings, both the same
+species: **a comment asserting something the code does not do.**
+
+The first was the branch's third invented justification, after `keys.py`'s "app/catalog must not
+import the ORM" and stage 4's two wrong plan facts. It said `name: str` was right because "this is
+where a raw name ENTERS the system from a CSV header". Grepping both seeders for "csv" returned
+exactly one hit each — the comment itself. `_register_module` is called only with `m.module` off a
+`MetricKey`, already through `decompose()`.
+
+The owner's steer settled what to do about it, and it is worth keeping verbatim:
+
+> In general, more type annotations, not fewer. [...] I realize it's "all `str` at some point", much
+> like how we're all naked under our clothes, but we want to chase that as far to the edges of the
+> project as we can.
+
+So the annotations followed the data rather than the comment being reworded, and the casts moved to
+where the values actually arrive — the SQL row, the same shape `invariants.py` already uses.
+`(m.module, m.column_key) not in curated` now compares two halves the type system can tell apart.
+
+### The part that stings
+
+Chasing it outward turned up `infer_value_type` returning bare `"CATEGORICAL"`/`"BOOL"` strings —
+MetricValueType member names, the exact `"PARMETER"` hazard 3c closed for `variant_kind`. Making it
+return the enum was right. It also **re-created the first review's bug, two hours after fixing it**:
+
+```
+sorted(tally.items())   ->  TypeError: '<' not supported between instances of 'MetricValueType'
+f"{t}={n}"              ->  "MetricValueType.FLOAT=12", not "FLOAT=12"
+```
+
+Invisible against this corpus, which is 100% curated, so the tally is empty and the line prints
+nothing. **Found by noticing the blank output, not by any test** — the dry run reported
+`inferred types:` followed by nothing, which is what an empty dict and a crash-in-waiting look like
+from the outside.
+
+Two lessons, and the second is the useful one. Converting a string to an enum is never a local
+change: every `sorted`, every f-string, every dict key downstream is a site the type checker will
+not flag. And a line of output that is *empty* on the real corpus is not a line that has been
+tested — it is one that has never run.
+
+### The self-refuting docstring
+
+The second finding was smaller and sharper: a docstring arguing "mypy cannot catch this", with a
+worked example labelled `# Success: no issues found` that had become an error. It was accurate about
+the bare-`str` `MetricKey` it described, and stopped being the moment stage 5 fixed that —
+`NamedTuple.__init__` IS typed. The claim survives; the demonstration did not. Replaced in all three
+places it had been copied, with the file now saying why the old one was wrong rather than quietly
+dropping it.
 
 ## Still open
 
