@@ -1,7 +1,7 @@
 # Type safety: making the domain vocabulary un-mistypeable
 
-> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1-4 SHIPPED; stage 5 landed as
-> fallout rather than as its own commit. Two of stage 4's stated facts turned out to be wrong and
+> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1-4 SHIPPED. STAGE 5 IS NOT DONE** —
+> an earlier revision of this file said it was, which was wrong; see its entry. Two of stage 4's stated facts turned out to be wrong and
 > are corrected in place below.** Supersedes the open-decision note
 > that lived at `stringly-typed-catalog-note.md`. Read this before writing any of it — the sequencing
 > is load-bearing, and several of the facts below took measuring rather than reasoning.
@@ -170,10 +170,37 @@ of the 11.
 
 ### 5 — The consumers
 
-> **DONE, as fallout.** Never landed as its own commit: mypy named every consumer the moment each
-> earlier stage changed a type, so they were fixed inside the stage that broke them. Worth recording
-> as a result — a five-stage plan where the last stage evaporates is one where the type checker did
-> the consumer-hunting a human would otherwise have done by grep.
+> **NOT DONE.** An earlier revision of this entry claimed it had landed "as fallout" from stages 3
+> and 4. That was wrong, and the correction is the useful part.
+>
+> mypy DID name every consumer where a change made something an error — a wide value arriving in a
+> narrow slot. It said nothing about the opposite direction, which is legal and lossy:
+>
+> ```python
+> def narrowing_is_silent(m: ModuleName) -> MetricKey:
+>     return MetricKey(m, "col", None, None, (), ())   # Success: no issues found
+> ```
+>
+> `ModuleName` IS a `str`, so a `str` slot accepts one and simply forgets. Almost all of stage 5 is
+> that shape, which is precisely why it was given its own stage rather than left to the compiler.
+
+**The drift the plan warned about has happened.** `scripts/extract_score_keys.MetricKey` is
+documented as mirroring `ScoreKey`, and three of its four identity fields no longer do:
+
+| field | `ScoreKey` | `MetricKey` |
+|---|---|---|
+| `module` | `ModuleName` | `str` |
+| `column_key` | `ColumnKey` | `str` |
+| `variant_kind` | `VariantKind \| None` | `VariantKind \| None` |
+| `variant` | `VariantName \| None` | `str \| None` |
+
+Nothing enforces the mirror, which is the second half of the problem.
+
+**Blocked on the open question below**, which was recorded and then not answered: do the aliases
+reach `scripts/`? They cannot half-reach — `MetricKey` mirrors an app-side type and should follow it,
+while `seed_recipes.recipe_name(modules: list[str])` and `_register_module(name: str)` are local
+plumbing where a raw string legitimately enters from a CSV. Deciding that is what unblocks this
+stage.
 
 `app/graphql/context.py` (`MetricIdentity` users), `scripts/extract_score_keys.py` (which mirrors
 `ScoreKey` and must not drift from it), the seeders, and the tests.
