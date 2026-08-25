@@ -1,0 +1,61 @@
+"""`MetricKey` must keep mirroring `ScoreKey`, and only a test can enforce that.
+
+WHY. `scripts/extract_score_keys.py` derives catalog identities from the corpus; `app/catalog/keys.py`
+derives them from a key string at query time. The same four fields, assembled two ways — and the
+script's docstring has always said the two must not drift. Nothing checked it, and they did: from
+stage 3 until stage 5 of `docs/type-safety-plan.md`, `ScoreKey` carried `ModuleName`/`ColumnKey`/
+`VariantName` while `MetricKey` still had bare `str` on all three.
+
+MYPY CANNOT CATCH THIS, WHICH IS THE WHOLE POINT. A `NewType` is a subtype, so a `str` field accepts
+a `ModuleName` and simply forgets it — legal, lossy, silent:
+
+    def narrowing_is_silent(m: ModuleName) -> MetricKey:
+        return MetricKey(m, "col", None, None, (), ())   # Success: no issues found
+
+The type checker reports a WIDE value in a NARROW slot. This is the other direction, and stage 5
+existed precisely because the compiler is blind to it. Assuming otherwise is what let the drift
+happen — see `docs/pr-15-diary.md`, Act X.
+
+`get_type_hints` rather than `__annotations__`: both modules use `from __future__ import
+annotations`, so the raw annotations are STRINGS and would compare equal on spelling alone —
+`"ModuleName"` from two different imports, or two different aliases that happen to share a name,
+would pass. Resolving them compares the objects, and `NewType` instances are singletons.
+"""
+
+from __future__ import annotations
+
+from typing import Final, get_type_hints
+
+import pytest
+
+from app.catalog.keys import ScoreKey
+from scripts.extract_score_keys import MetricKey
+
+# The catalog's natural key. `chain`/`chains` and `raw_keys` are deliberately outside it: one metric
+# measured on the heavy and light chains has ONE identity, which is the collapse from 200 raw keys
+# to 138 catalog rows that this script exists to show.
+_MIRRORED: Final[tuple[str, ...]] = ("module", "column_key", "variant_kind", "variant")
+
+
+@pytest.mark.parametrize("field", _MIRRORED)
+def test_the_identity_fields_carry_the_same_type(field: str) -> None:
+    score = get_type_hints(ScoreKey)
+    metric = get_type_hints(MetricKey)
+
+    assert metric[field] == score[field], (
+        f"MetricKey.{field} is {metric[field]}, but ScoreKey.{field} is {score[field]}.\n"
+        "The two build the same identity from different sources and must not drift. mypy will not "
+        "tell you: a NewType is a subtype, so the wider of the two accepts the narrower and forgets."
+    )
+
+
+def test_the_mirror_is_the_first_four_fields_of_each() -> None:
+    """Guards the guard: if either tuple is reordered, the test above compares the wrong things."""
+    assert ScoreKey._fields[:4] == _MIRRORED
+    assert MetricKey._fields[:4] == _MIRRORED
+
+
+def test_what_deliberately_does_not_mirror() -> None:
+    """`chains` is plural and informational, and `raw_keys` has no counterpart at all."""
+    assert ScoreKey._fields[4:] == ("chain",)
+    assert MetricKey._fields[4:] == ("chains", "raw_keys")

@@ -1,7 +1,8 @@
 # Type safety: making the domain vocabulary un-mistypeable
 
-> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1-4 SHIPPED. STAGE 5 IS NOT DONE** —
-> an earlier revision of this file said it was, which was wrong; see its entry. Two of stage 4's stated facts turned out to be wrong and
+> **Status: the plan for PR #15, agreed 2026-08-24. ALL FIVE STAGES SHIPPED.** An earlier revision
+> claimed stage 5 had landed "as fallout" before it had; that entry now records why the compiler
+> could not have done it, because the reason generalises. Two of stage 4's stated facts turned out to be wrong and
 > are corrected in place below.** Supersedes the open-decision note
 > that lived at `stringly-typed-catalog-note.md`. Read this before writing any of it — the sequencing
 > is load-bearing, and several of the facts below took measuring rather than reasoning.
@@ -170,8 +171,8 @@ of the 11.
 
 ### 5 — The consumers
 
-> **NOT DONE.** An earlier revision of this entry claimed it had landed "as fallout" from stages 3
-> and 4. That was wrong, and the correction is the useful part.
+> **SHIPPED** (`5be2e74`). An earlier revision of this entry claimed it had landed "as fallout"
+> from stages 3 and 4, before it had. That was wrong, and the correction is the useful part.
 >
 > mypy DID name every consumer where a change made something an error — a wide value arriving in a
 > narrow slot. It said nothing about the opposite direction, which is legal and lossy:
@@ -196,11 +197,20 @@ documented as mirroring `ScoreKey`, and three of its four identity fields no lon
 
 Nothing enforces the mirror, which is the second half of the problem.
 
-**Blocked on the open question below**, which was recorded and then not answered: do the aliases
-reach `scripts/`? They cannot half-reach — `MetricKey` mirrors an app-side type and should follow it,
-while `seed_recipes.recipe_name(modules: list[str])` and `_register_module(name: str)` are local
-plumbing where a raw string legitimately enters from a CSV. Deciding that is what unblocks this
-stage.
+**THE ANSWER TO "DO THE ALIASES REACH `scripts/`?" IS: BY ROLE, NOT BY DIRECTORY.**
+
+* A script type that MIRRORS an app-side type follows it. `MetricKey` now carries `ModuleName`,
+  `ColumnKey` and `VariantName`, and `tests/test_extract_score_keys.py` pins the mirror with
+  `get_type_hints` — resolved objects, not the raw string annotations, which would compare equal on
+  spelling alone.
+* Local seeder plumbing stays `str`. `recipe_name(modules: list[str])` and
+  `_register_module(name: str)` are where a raw name ENTERS from a CSV header or a seed file, which
+  is the boundary the aliases exist to have. Both now say so at the signature, because a reader who
+  has seen `ModuleName` everywhere else will otherwise assume it was missed.
+
+The mirror test was the missing half. Reverting `MetricKey` to bare `str` — the exact drift that
+shipped — leaves `mypy .` reporting *"Success: no issues found in 70 source files"* and turns three
+of its assertions red.
 
 `app/graphql/context.py` (`MetricIdentity` users), `scripts/extract_score_keys.py` (which mirrors
 `ScoreKey` and must not drift from it), the seeders, and the tests.
@@ -220,8 +230,6 @@ stage.
   `__init__` is `**kw: Any`, so `db.Module(name="literal")` typechecks while
   `m.column_key = "literal"` does not). Every one is a value crossing into something dynamically
   typed. Nothing here closes them.
-* Do the identifier aliases reach `scripts/`, or stop at the `app/` boundary? Scripts are where a
-  raw string legitimately enters the system from a CSV.
 * `Concept.name`, `Experiment.name`, `Module.name` are all `Mapped[str]` and all mean different
   things. One `Name` alias is useless; three is fussy. Undecided.
 * Whether `strawberry.scalar` for the GraphQL surface is ever worth the SDL churn. Deliberately not

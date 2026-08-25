@@ -43,18 +43,31 @@ from sqlalchemy import text
 # GraphQL ScoreEntry resolver needs the SAME decomposition in the opposite direction — key in,
 # catalog row out — and two copies would drift silently. See app/catalog/keys.py for the full
 # reasoning and the key anatomy. This script is now one of its two callers, not its owner.
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.keys import MetricIdentity, decompose
 from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
 
 
 class MetricKey(NamedTuple):
-    """One row of the metric catalog's identity, as derived from observed data."""
+    """One row of the metric catalog's identity, as derived from observed data.
 
-    module: str
-    column_key: str
+    THE FIRST FOUR FIELDS MIRROR `ScoreKey`, and carry its types for the same reason it has them:
+    they are `MetricIdentity` in a different order of assembly, and a transposition among them
+    typechecks, misses the catalog, and resolves to nothing. `tests/test_extract_score_keys.py`
+    pins the mirror, because nothing else can — a `str` field happily accepts a `ModuleName` and
+    silently forgets it, so mypy stays quiet while the two drift. It already had: these three were
+    bare `str` from stage 3 until stage 5 caught up.
+
+    The last two fields deliberately do NOT mirror `ScoreKey`. `chains` is plural and informational
+    — one metric is measured on several chains and keeps ONE identity, which is the collapse this
+    script exists to demonstrate — and `raw_keys` has no counterpart at all.
+    """
+
+    module: ModuleName
+    column_key: ColumnKey
     variant_kind: VariantKind | None
-    variant: str | None
+    variant: VariantName | None
     chains: tuple[str, ...]  # which chain suffixes were seen for this metric (informational)
     raw_keys: tuple[str, ...]  # the literal JSONB keys that collapsed into this row
 

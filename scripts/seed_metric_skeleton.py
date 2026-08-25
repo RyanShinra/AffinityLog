@@ -134,6 +134,10 @@ async def _curated_column_keys(session: AsyncSession) -> set[tuple[str, str]]:
 
 
 async def _register_module(session: AsyncSession, name: str) -> str:
+    # `str`, not `ModuleName`, on purpose. This is where a raw name ENTERS the system from a
+    # CSV header or a seed file, which is the boundary the aliases exist to have — see stage 5
+    # of docs/type-safety-plan.md. `MetricKey` mirrors an app-side type and does carry them;
+    # local seeder plumbing does not.
     created = await session.execute(
         text("""
             INSERT INTO modules (id, name, module_type, functions, description)
