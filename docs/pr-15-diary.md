@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 20 commits · all five stages, two review passes · 132 → 152 tests · `mypy .` clean, and CI now runs it
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 24 commits · all five stages, two review passes · 132 → 158 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -590,6 +590,68 @@ Worth recording, because both looked like passing evidence:
 
 Neither was evidence of anything until it was rebuilt. A probe that produces the expected output for
 the wrong reason is worse than no probe, because it ends the investigation.
+
+## Act X — the stage I reported as done, and had not done
+
+Updating the plan after stage 4, I marked stage 5 **"DONE, as fallout"** — mypy had named every
+consumer as each earlier stage broke it, `mypy .` was clean, and there seemed to be nothing left.
+The owner's question was two words long and correct:
+
+> Wait, when did we do step 4? Let alone, step 5?
+
+Stage 4 was real. Stage 5 was not, and the mechanism I missed is worth more than the fix.
+
+**mypy reports a WIDE value arriving in a NARROW slot. The opposite direction is legal and silent.**
+
+```python
+def narrowing_is_silent(m: ModuleName) -> MetricKey:
+    return MetricKey(m, "col", None, None, (), ())   # Success: no issues found
+```
+
+`ModuleName` *is* a `str`, so a `str` field accepts one and simply forgets it. Nothing is wrong
+enough to report. Almost the whole of stage 5 is that shape — which is exactly why the plan gave the
+consumers their own stage rather than trusting the compiler, a sentence I had written and then
+argued myself out of by reading a green `mypy .` as an empty worklist.
+
+**The drift the plan warned about had already shipped.** `MetricKey` is documented as mirroring
+`ScoreKey`. Three of its four identity fields had been bare `str` since stage 3:
+
+| field | `ScoreKey` | `MetricKey`, before |
+|---|---|---|
+| `module` | `ModuleName` | `str` |
+| `column_key` | `ColumnKey` | `str` |
+| `variant_kind` | `VariantKind \| None` | same |
+| `variant` | `VariantName \| None` | `str \| None` |
+
+### The answer to a question the plan had been carrying
+
+*"Do the identifier aliases reach `scripts/`, or stop at the `app/` boundary?"* — recorded as open,
+then ignored, which is the real reason stage 5 could not have happened by accident. The answer is
+**by role, not by directory**: a script type that MIRRORS an app-side type follows it, and local
+seeder plumbing stays `str` because that is where a raw name enters from a CSV header — the boundary
+the aliases exist to have. Both seeder signatures now say so, since a reader who has seen
+`ModuleName` everywhere else would otherwise read a bare `str` as an oversight.
+
+### The half that was actually missing
+
+Not the retype — the enforcement. `tests/test_extract_score_keys.py` compares *resolved* type hints
+(`get_type_hints`, not `__annotations__`: both modules use postponed annotations, so the raw values
+are strings that would compare equal on spelling alone). Reverting `MetricKey` to bare `str` — the
+exact drift that shipped — produces:
+
+```
+mypy .   ->  Success: no issues found in 70 source files
+pytest   ->  3 failed
+```
+
+That contrast is the whole lesson of the act, in two lines.
+
+### And the sha that pointed at nothing
+
+The stage 5 commit cited its own hash in the plan; an `--amend` immediately after moved it, leaving
+a reference to a commit that never existed on the branch. Caught by checking every hash the document
+cites against `git cat-file`, which is now the obvious thing to have been doing all along. Fixed
+forward rather than by amending again, which would have moved it a third time.
 
 ## Still open
 
