@@ -1,7 +1,8 @@
 # Type safety: making the domain vocabulary un-mistypeable
 
-> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1-3 SHIPPED. Stages 4 and 5 are
-> open, and stage 3 produced the evidence for deciding them — see below.** Supersedes the open-decision note
+> **Status: the plan for PR #15, agreed 2026-08-24. Stages 1-4 SHIPPED; stage 5 landed as
+> fallout rather than as its own commit. Two of stage 4's stated facts turned out to be wrong and
+> are corrected in place below.** Supersedes the open-decision note
 > that lived at `stringly-typed-catalog-note.md`. Read this before writing any of it — the sequencing
 > is load-bearing, and several of the facts below took measuring rather than reasoning.
 
@@ -122,14 +123,33 @@ ORM imports it and keeps `SAEnum(VariantKind)`, so the database is untouched.
 
 ### 4 — `app/models/orm.py`
 
-> **OPEN. Stage 3 measured what this is worth**, so it is no longer a prediction. Retyping the whole
-> `app/` needed five fixes, and three of them are the casts below. Everything else — 49 of 54
-> errors — was test literals, which one helper per file absorbed.
+> **SHIPPED** (`d1f51e0`). It was worth doing, and cost three annotations. Two things this entry
+> said were wrong; both are corrected below rather than deleted, because the corrections are the
+> useful part.
 
-`Mapped[ColumnKey]`, `Mapped[ModuleName]`, plus the `type_annotation_map` entries. **This is the
-stage that decides whether the exercise is worth doing.** Leave the ORM as `Mapped[str]` and every
-read needs `ColumnKey(metric.column_key)` at the boundary — the friction that gets `NewType`
-abandoned six months later. Retype it and the alias flows outward for free.
+`Mapped[ColumnKey]`, `Mapped[ModuleName]`, `Mapped[VariantName | None]`. **This is the stage that
+decides whether the exercise is worth doing.** Leave the ORM as `Mapped[str]` and every read needs
+`ColumnKey(metric.column_key)` at the boundary — the friction that gets `NewType` abandoned six
+months later. Retype it and the alias flows outward for free. It does: `metric_identity_from_db_metric`
+is now four reads and no conversion.
+
+**CORRECTION 1 — this cannot import the aliases from `keys.py`.** That closes a cycle, because
+`keys.py` imports the ORM back for `ChainRole`, and the application stops importing entirely. The
+three aliases therefore live in `app/catalog/identifiers.py`, a leaf, exactly as `variant_kind.py`
+does. `TYPE_CHECKING` does NOT rescue it — SQLAlchemy resolves `Mapped[...]` at class creation and
+raises `MappedAnnotationError`; the full elimination is in that file's docstring.
+`tests/test_import_graph.py` now guards the whole graph.
+
+**CORRECTION 2 — no `type_annotation_map` entries are needed.** `Mapped[NewType]` is deprecated only
+on a BARE annotation, where it also silently drops the length:
+
+```
+Mapped[ColumnKey] + mapped_column(String(128))  ->  VARCHAR(128), no warning
+Mapped[ColumnKey] bare                          ->  VARCHAR, SADeprecationWarning
+```
+
+Every column here is explicit. `views.py` uses bare annotations, which is the one place the map
+would be needed — and it is out of scope (below).
 
 The concrete case, as it stands in `app/graphql/context.py` today:
 
@@ -150,6 +170,11 @@ of the 11.
 
 ### 5 — The consumers
 
+> **DONE, as fallout.** Never landed as its own commit: mypy named every consumer the moment each
+> earlier stage changed a type, so they were fixed inside the stage that broke them. Worth recording
+> as a result — a five-stage plan where the last stage evaporates is one where the type checker did
+> the consumer-hunting a human would otherwise have done by grep.
+
 `app/graphql/context.py` (`MetricIdentity` users), `scripts/extract_score_keys.py` (which mirrors
 `ScoreKey` and must not drift from it), the seeders, and the tests.
 
@@ -157,6 +182,17 @@ of the 11.
 
 ## Still open
 
+* **`app/models/views.py`'s `interface_kind` is still `Mapped[str]`**, and it is an `InterfaceKind`
+  value. Deliberately left: `app/routers/demo.py` reads it as a grouping key and as template data,
+  so typing it would coerce reads to enum members and change a working page. It is also an *enum*
+  question rather than a `NewType` one, and it is the one place a `type_annotation_map` entry would
+  actually be required.
+* **The type system does not cover three specific doorways**, all found by measuring during this
+  work rather than by reasoning: raw SQL binds (`text()` parameters are an untyped dict), `sorted()`
+  and friends (which accept anything and fail at runtime), and ORM construction (declarative
+  `__init__` is `**kw: Any`, so `db.Module(name="literal")` typechecks while
+  `m.column_key = "literal"` does not). Every one is a value crossing into something dynamically
+  typed. Nothing here closes them.
 * Do the identifier aliases reach `scripts/`, or stop at the `app/` boundary? Scripts are where a
   raw string legitimately enters the system from a CSV.
 * `Concept.name`, `Experiment.name`, `Module.name` are all `Mapped[str]` and all mean different
