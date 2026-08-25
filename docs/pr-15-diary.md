@@ -604,11 +604,11 @@ Stage 4 was real. Stage 5 was not, and the mechanism I missed is worth more than
 **mypy reports a WIDE value arriving in a NARROW slot. The opposite direction is legal and silent.**
 
 ```python
-def narrowing_is_silent(m: ModuleName) -> MetricKey:
-    return MetricKey(m, "col", None, None, (), ())   # Success: no issues found
+def narrowing_is_silent(m: ModuleName) -> tuple[str, ...]:
+    return (m,)          # Success: no issues found — the ModuleName is gone
 ```
 
-`ModuleName` *is* a `str`, so a `str` field accepts one and simply forgets it. Nothing is wrong
+`ModuleName` *is* a `str`, so a `str` slot accepts one and simply forgets it. Nothing is wrong
 enough to report. Almost the whole of stage 5 is that shape — which is exactly why the plan gave the
 consumers their own stage rather than trusting the compiler, a sentence I had written and then
 argued myself out of by reading a green `mypy .` as an empty worklist.

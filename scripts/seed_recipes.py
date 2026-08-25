@@ -49,6 +49,7 @@ from typing import Any, Final, cast
 from sqlalchemy import CursorResult, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.identifiers import ModuleName
 from app.database import AsyncSessionLocal
 
 # Stamped on every derived recipe so the provenance is queryable, not just documented.
@@ -57,22 +58,18 @@ RECIPE_TYPE: Final[str] = "derived-from-emitted-columns"
 # Modules that characterise a pipeline, most distinctive first. Used only to build a readable name;
 # the recipe's IDENTITY is always the full module set. A fixed list (rather than "whatever is not
 # common to all recipes") keeps names stable when new experiments are loaded.
-_HEADLINE_MODULES: Final[list[tuple[str, str]]] = [
-    ("rfantibody", "RFantibody"),
-    ("evoprotgrad", "EvoProtGrad"),
-    ("biophi", "BioPhi"),
-    ("humatchclassify", "Humatch"),
-    ("nanobodypolyreactivityscorer", "Polyreactivity"),
-    ("esm2pseudo_log_likelihood", "ESM2"),
+_HEADLINE_MODULES: Final[list[tuple[ModuleName, str]]] = [
+    (ModuleName("rfantibody"), "RFantibody"),
+    (ModuleName("evoprotgrad"), "EvoProtGrad"),
+    (ModuleName("biophi"), "BioPhi"),
+    (ModuleName("humatchclassify"), "Humatch"),
+    (ModuleName("nanobodypolyreactivityscorer"), "Polyreactivity"),
+    (ModuleName("esm2pseudo_log_likelihood"), "ESM2"),
 ]
 
 
-def recipe_name(modules: list[str]) -> str:
+def recipe_name(modules: list[ModuleName]) -> str:
     """A readable, deterministic label derived from which headline modules are present."""
-    # `str`, not `ModuleName`, on purpose. This is where a raw name ENTERS the system from a
-    # CSV header or a seed file, which is the boundary the aliases exist to have — see stage 5
-    # of docs/type-safety-plan.md. `MetricKey` mirrors an app-side type and does carry them;
-    # local seeder plumbing does not.
     present = [label for key, label in _HEADLINE_MODULES if key in modules]
     if not present:
         # No design or humanisation module at all — a fold-and-score-only pipeline.
@@ -80,7 +77,7 @@ def recipe_name(modules: list[str]) -> str:
     return f"{' + '.join(present)} ({len(modules)} modules)"
 
 
-async def _experiment_module_sets(session: AsyncSession) -> list[tuple[str, str, list[str]]]:
+async def _experiment_module_sets(session: AsyncSession) -> list[tuple[str, str, list[ModuleName]]]:
     """(experiment_id, experiment_name, sorted module list) for every experiment with candidates."""
     result = await session.execute(text("""
             SELECT e.id::text, e.name,
@@ -99,10 +96,14 @@ async def _experiment_module_sets(session: AsyncSession) -> list[tuple[str, str,
              GROUP BY e.id, e.name
              ORDER BY e.name
             """))
-    return [(row[0], row[1], list(row[2])) for row in result.all()]
+    # THE STRING BOUNDARY IS THE SQL READ, not this signature. Module names arrive here already
+    # decomposed — `split_part(k, '.', 1)` over the JSONB keys — so they are `ModuleName` by the
+    # time anything Python-side sees them, and the cast belongs at the row, the way
+    # `app/catalog/invariants.py` does it.
+    return [(row[0], row[1], [ModuleName(m) for m in row[2]]) for row in result.all()]
 
 
-async def _resolve_modules(session: AsyncSession, names: list[str]) -> list[str]:
+async def _resolve_modules(session: AsyncSession, names: list[ModuleName]) -> list[str]:
     """Map module names to ids, warning about any the catalog does not know.
 
     Resolving up front means the SAME set drives both identity lookup and linking. If a name had no
@@ -178,7 +179,7 @@ async def seed(dry_run: bool = False) -> None:
         experiments = await _experiment_module_sets(session)
 
         # Group by the module set — this is what makes one reusable recipe serve several runs.
-        groups: dict[tuple[str, ...], list[tuple[str, str]]] = {}
+        groups: dict[tuple[ModuleName, ...], list[tuple[str, str]]] = {}
         for exp_id, exp_name, modules in experiments:
             groups.setdefault(tuple(modules), []).append((exp_id, exp_name))
 

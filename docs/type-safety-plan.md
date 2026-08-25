@@ -178,8 +178,8 @@ of the 11.
 > narrow slot. It said nothing about the opposite direction, which is legal and lossy:
 >
 > ```python
-> def narrowing_is_silent(m: ModuleName) -> MetricKey:
->     return MetricKey(m, "col", None, None, (), ())   # Success: no issues found
+> def narrowing_is_silent(m: ModuleName) -> tuple[str, ...]:
+>     return (m,)          # Success: no issues found — the ModuleName is gone
 > ```
 >
 > `ModuleName` IS a `str`, so a `str` slot accepts one and simply forgets. Almost all of stage 5 is

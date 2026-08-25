@@ -6,15 +6,21 @@ script's docstring has always said the two must not drift. Nothing checked it, a
 stage 3 until stage 5 of `docs/type-safety-plan.md`, `ScoreKey` carried `ModuleName`/`ColumnKey`/
 `VariantName` while `MetricKey` still had bare `str` on all three.
 
-MYPY CANNOT CATCH THIS, WHICH IS THE WHOLE POINT. A `NewType` is a subtype, so a `str` field accepts
+MYPY CANNOT CATCH THIS, WHICH IS THE WHOLE POINT. A `NewType` is a subtype, so a `str` slot accepts
 a `ModuleName` and simply forgets it — legal, lossy, silent:
 
-    def narrowing_is_silent(m: ModuleName) -> MetricKey:
-        return MetricKey(m, "col", None, None, (), ())   # Success: no issues found
+    def narrowing_is_silent(m: ModuleName) -> tuple[str, ...]:
+        return (m,)          # Success: no issues found — the ModuleName is gone
 
 The type checker reports a WIDE value in a NARROW slot. This is the other direction, and stage 5
 existed precisely because the compiler is blind to it. Assuming otherwise is what let the drift
 happen — see `docs/pr-15-diary.md`, Act X.
+
+An earlier version of this docstring demonstrated the point with `MetricKey(m, "col", ...)`, which
+was true of the bare-`str` MetricKey it described and became FALSE the moment stage 5 fixed it:
+`NamedTuple.__init__` IS typed, so that line is now an error. The silent case needs a slot that is
+genuinely `str` — which is why the example above uses one, and why SQLAlchemy's declarative
+`__init__` (`**kw: Any`) is the place this really bites.
 
 `get_type_hints` rather than `__annotations__`: both modules use `from __future__ import
 annotations`, so the raw annotations are STRINGS and would compare equal on spelling alone —
