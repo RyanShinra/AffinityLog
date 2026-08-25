@@ -24,17 +24,24 @@ would pass. Resolving them compares the objects, and `NewType` instances are sin
 
 from __future__ import annotations
 
-from typing import Final, get_type_hints
+from typing import Final, get_args, get_type_hints
 
 import pytest
 
-from app.catalog.keys import ScoreKey
+from app.catalog.keys import MetricIdentity, ScoreKey, decompose
 from scripts.extract_score_keys import MetricKey
 
 # The catalog's natural key. `chain`/`chains` and `raw_keys` are deliberately outside it: one metric
 # measured on the heavy and light chains has ONE identity, which is the collapse from 200 raw keys
 # to 138 catalog rows that this script exists to show.
-_MIRRORED: Final[tuple[str, ...]] = ("module", "column_key", "variant_kind", "variant")
+#
+# DERIVED, NOT LISTED. The first draft wrote these four names out, and `_fields[:4] == _MIRRORED` is
+# blind to anything past index 4 — so an identity that grew a fifth field would leave the new field
+# unchecked while all three assertions still passed. Verified with a simulated fifth field: every
+# check green, the fifth drifted. `MetricIdentity` is what actually defines the arity, so it decides
+# here too.
+_IDENTITY_ARITY: Final[int] = len(get_args(MetricIdentity))
+_MIRRORED: Final[tuple[str, ...]] = ScoreKey._fields[:_IDENTITY_ARITY]
 
 
 @pytest.mark.parametrize("field", _MIRRORED)
@@ -49,13 +56,19 @@ def test_the_identity_fields_carry_the_same_type(field: str) -> None:
     )
 
 
-def test_the_mirror_is_the_first_four_fields_of_each() -> None:
-    """Guards the guard: if either tuple is reordered, the test above compares the wrong things."""
-    assert ScoreKey._fields[:4] == _MIRRORED
-    assert MetricKey._fields[:4] == _MIRRORED
+def test_the_mirrored_fields_really_are_the_identity() -> None:
+    """Guards the guard. If this is wrong, the test above compares the wrong things and says nothing.
+
+    The arity comes from `MetricIdentity`; `ScoreKey.identity` must actually produce that many, and
+    `MetricKey` must name the same fields in the same order over the same span. An identity that
+    grows a field therefore widens `_MIRRORED` on its own, rather than leaving the new one silently
+    outside the comparison.
+    """
+    assert len(decompose("boltz2.protein_iptm").identity) == _IDENTITY_ARITY
+    assert MetricKey._fields[:_IDENTITY_ARITY] == _MIRRORED
 
 
 def test_what_deliberately_does_not_mirror() -> None:
     """`chains` is plural and informational, and `raw_keys` has no counterpart at all."""
-    assert ScoreKey._fields[4:] == ("chain",)
-    assert MetricKey._fields[4:] == ("chains", "raw_keys")
+    assert ScoreKey._fields[_IDENTITY_ARITY:] == ("chain",)
+    assert MetricKey._fields[_IDENTITY_ARITY:] == ("chains", "raw_keys")
