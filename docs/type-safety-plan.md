@@ -171,7 +171,7 @@ of the 11.
 
 ### 5 — The consumers
 
-> **SHIPPED** (`5be2e74`). An earlier revision of this entry claimed it had landed "as fallout"
+> **SHIPPED** (`3945b59`). An earlier revision of this entry claimed it had landed "as fallout"
 > from stages 3 and 4, before it had. That was wrong, and the correction is the useful part.
 >
 > mypy DID name every consumer where a change made something an error — a wide value arriving in a
