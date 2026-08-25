@@ -653,6 +653,37 @@ a reference to a commit that never existed on the branch. Caught by checking eve
 cites against `git cat-file`, which is now the obvious thing to have been doing all along. Fixed
 forward rather than by amending again, which would have moved it a third time.
 
+## Act XI — the same mistake a third time
+
+A question after the branch was declared finished: *are the code review lines sufficiently covered?*
+
+All six findings from the two passes verified fixed in the live tree. But the audit turned up
+something the checklist could not: **stage 5 shipped after the second review pass, so it had never
+been reviewed at all.** Reviewing it found the mistake from Act IX, again.
+
+`tests/test_extract_score_keys.py` pinned the ScoreKey/MetricKey mirror against a hand-written
+`_MIRRORED = ("module", "column_key", "variant_kind", "variant")`, and `_fields[:4] == _MIRRORED`
+cannot see past index 4. Simulated before touching anything:
+
+```
+_fields[:4] == _MIRRORED   -> True for both
+per-field checks           -> all pass
+the fifth field            -> ScoreKey=int, MetricKey=str, UNCHECKED
+```
+
+`MetricIdentity` defines the arity, so it decides now. The guard-the-guard test also got stronger
+rather than merely adapted: it asserts `ScoreKey.identity` actually RETURNS that many values, tying
+the arity to behaviour instead of to a second annotation that could drift from the first.
+
+**Three times is a pattern, not an accident.** `_LEAVES`, `_ENTRY_POINTS`, `_MIRRORED` — each one a
+literal list standing in for something the code already knew, each failing by silence rather than by
+a red test. The tell is identical every time: a constant whose correct value is derivable from
+something else in the repository. That belongs in CLAUDE.md, not in a diary nobody greps.
+
+The second lesson is procedural and duller: **the last commit before a review is not the last commit
+in the branch.** Two review passes had run, six findings were fixed, and everything after the second
+pass went out unexamined — including the only code commit among them.
+
 ## Still open
 
 * ~~Should CI run `mypy .`?~~ **Done.** The narrow scope existed because the rest of the tree had
