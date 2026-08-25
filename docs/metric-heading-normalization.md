@@ -48,7 +48,7 @@ by making the axis a property of the heading rather than of the row:
 CREATE TABLE metric_headings (
     module_id   uuid         NOT NULL REFERENCES modules (id) ON DELETE CASCADE,
     column_key  varchar(128) NOT NULL,
-    variant_kind variant_kind_enum,          -- NULL = this heading has exactly one metric
+    variant_kind variantkind,                -- NULL = this heading has exactly one metric
     PRIMARY KEY (module_id, column_key),     -- <- one axis per heading, by construction
     UNIQUE      (module_id, column_key, variant_kind)   -- FK target below
 );

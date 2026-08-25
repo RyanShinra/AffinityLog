@@ -29,6 +29,7 @@ import re
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import TypedDict
 
 _PARAM_HEADERS = ["Name", "Value", "Description", "Module", "Parameter configuration"]
 # Visible text that marks the end of the parameters table (unrelated page chrome / next section).
@@ -48,7 +49,21 @@ class _VisibleText(HTMLParser):
             self.chunks.append(text)
 
 
-def scrape(html_path: Path) -> dict[str, object]:
+class ScrapedPage(TypedDict):
+    """One saved Overview page, reduced to the three things anything downstream reads.
+
+    Named for the same reason as `RecipeDag` below, plus one it earned: while this returned
+    `dict[str, object]`, `rebuild_rosetta_stone._property_of` iterated `["input_parameters"]` — an
+    `object` — and mypy could not say so, because the cross-script import went through a `sys.path`
+    insert it could not resolve. Fixing that import surfaced the error immediately.
+    """
+
+    experiment: str | None  # the breadcrumb entry before "Overview"/"Results"
+    recipe: str | None
+    input_parameters: list[dict[str, str]]  # keys: name, value, description, module, config
+
+
+def scrape(html_path: Path) -> ScrapedPage:
     parser = _VisibleText()
     parser.feed(html_path.read_text(encoding="utf-8"))
     text = parser.chunks
@@ -80,7 +95,7 @@ def scrape(html_path: Path) -> dict[str, object]:
                 params.append(dict(zip(["name", "value", "description", "module", "config"], row, strict=True)))
                 row = []
 
-    return {"experiment": name, "recipe": value_after("Recipe"), "input_parameters": params}
+    return ScrapedPage(experiment=name, recipe=value_after("Recipe"), input_parameters=params)
 
 
 class _RowMap(HTMLParser):
@@ -129,7 +144,19 @@ def scrape_candidate_map(results_html_path: Path) -> list[dict[str, str]]:
     return [{"candidate": c, "subexperiment": s} for c, s in dict.fromkeys(parser.rows)]
 
 
-def scrape_recipe_dag(diagram_html_path: Path) -> dict[str, list]:
+class RecipeDag(TypedDict):
+    """A recipe's wiring, as recovered from a saved React Flow canvas.
+
+    Named rather than left as a bare dict because nothing in Python calls this yet — the
+    consumer is the deferred work in `docs/recipe-topology-note.md`, and the shape is the
+    part that note needs to know.
+    """
+
+    nodes: list[str]  # module names, sorted
+    edges: list[dict[str, str]]  # {"from": <module>, "to": <module>}
+
+
+def scrape_recipe_dag(diagram_html_path: Path) -> RecipeDag:
     """Recover a recipe's node/edge topology from a saved recipe-builder *Diagram* page.
 
     The recipe canvas is a React Flow (xyflow) graph rendered to the DOM: module nodes carry
@@ -145,7 +172,7 @@ def scrape_recipe_dag(diagram_html_path: Path) -> dict[str, list]:
     raw = diagram_html_path.read_text(encoding="utf-8")
     nodes = sorted(set(re.findall(r'react-flow__node[^"]*"[^>]*data-id="([^"]+)"', raw)))
     edges = [{"from": m.group(1), "to": m.group(2)} for m in re.finditer(r'aria-label="Edge from (\S+) to (\S+)"', raw)]
-    return {"nodes": nodes, "edges": edges}
+    return RecipeDag(nodes=nodes, edges=edges)
 
 
 def main() -> None:

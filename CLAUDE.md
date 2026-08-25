@@ -165,6 +165,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   hand-write migration files.
 - **`app/models/views.py` is deliberately NOT imported by `migrations/env.py`** — it maps the
   `candidate_summary` VIEW, and importing it would make autogenerate emit CREATE/DROP TABLE for it.
+- **`schema.graphql` is generated — regenerate it, never hand-edit it.**
+  `python scripts/dump_schema.py`. It is a SNAPSHOT of what the code serves, not a specification:
+  `docs/graphql-schema.md` is the design and still describes types (`Metric`, `ScoreEntry`,
+  `Mutation`) that are not built, so the two are deliberately not the same file.
+  `tests/test_schema_snapshot.py` fails when the snapshot drifts from Strawberry's output, which
+  makes changing the public GraphQL contract a deliberate act with a reviewable diff. It exists
+  because the schema is code-first — a changed annotation three layers down can alter the API with
+  no diff to see. Verified to catch both an accidentally-added field and a `strawberry.scalar`, the
+  latter being exactly what `docs/type-safety-plan.md` could trigger.
 - The view is created by migration 004 and duplicated in `sql/candidate_summary.sql` (the
   iterate-in-TablePlus copy). `scripts/check_view_migration.py` runs in CI and fails the build if
   the two define different columns.
@@ -212,6 +221,23 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `testcontainers.core.config` reads it through a dataclass `default_factory` evaluated once when
   its singleton is built at import; and patching a *conditional* path (`if docker_host:`) asserts
   nothing on a machine where the condition never holds — which was this machine, and CI.
+- **A literal list standing in for something the code already knows will go stale silently.**
+  Three times on the `type-safety` branch: `_LEAVES` (should have been what `app/models/` imports
+  from `app.catalog`), `_ENTRY_POINTS` (should have included what the server imports), `_MIRRORED`
+  (should have been `MetricIdentity`'s arity). Every one failed the same way — a green test covering
+  less than it claimed, never a red one. The tell is a constant whose correct value is derivable
+  from elsewhere in the repo. Derive it, and give the derivation its own assertion, because an empty
+  derivation silently covers nothing: `tests/test_import_graph.py::test_the_derivations_found_something`
+  and the collector tests in `tests/test_postgres_enum_labels.py` are the shape.
+- **Adding a member to a Postgres-backed enum is a migration, and `tests/test_postgres_enum_labels.py`
+  enforces it.** `SAEnum` binds the member NAME, so the Python class and the Postgres type are two
+  copies of one vocabulary; a new member needs `op.execute("ALTER TYPE <name> ADD VALUE '...'")` in
+  its own transaction (003 and 005 are the worked examples). The test reads `pg_enum` from the live
+  schema and compares, for all seven enums — including `modules.functions`, which is
+  `ARRAY(Enum(ModuleFunction))` and invisible to a plain `isinstance` check on the column type. It
+  compares labels as SETS, deliberately: `ADD VALUE` appends, so Postgres order and Python order may
+  legitimately differ. Before this existed, a member added with no migration left all 132 tests
+  green and failed later as a `DataError` against real data.
 - **A new seeder must call `raise_on_heading_violations(session, source=...)` before `commit()`.**
   `app/catalog/invariants.py` enforces `(module_id, column_key) -> variant_kind`, a functional
   dependency the schema cannot express and the ScoreEntry lookup depends on. Breaking it makes score

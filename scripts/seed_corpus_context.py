@@ -36,9 +36,9 @@ import argparse
 import asyncio
 import re
 from pathlib import Path
-from typing import Final
+from typing import Any, Final, cast
 
-from sqlalchemy import text
+from sqlalchemy import CursorResult, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
@@ -116,7 +116,8 @@ async def _link_experiments(session: AsyncSession, target_id: str, project_id: s
             """),
         {"target_id": target_id, "project_id": project_id},
     )
-    return result.rowcount or 0
+    # `rowcount` is a CursorResult attribute; `session.execute()` is typed as Result.
+    return cast("CursorResult[Any]", result).rowcount or 0
 
 
 def discover_structures() -> list[tuple[str, str, str]]:

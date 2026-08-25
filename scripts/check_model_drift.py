@@ -81,7 +81,7 @@ async def collect_differences() -> list[Any]:
                     sync_connection,
                     opts={"include_object": _include_object},
                 )
-                return compare_metadata(context, ModelBase.metadata)
+                return list(compare_metadata(context, ModelBase.metadata))
 
             return await connection.run_sync(_compare)
     finally:

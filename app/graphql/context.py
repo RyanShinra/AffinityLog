@@ -39,7 +39,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Annotated, Final
+from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy import Result, Select, select
@@ -47,22 +47,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
+from app.catalog.identifiers import ColumnKey, ModuleName
+from app.catalog.keys import MetricIdentity
+from app.catalog.variant_kind import VariantKind
 from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
 
-# The catalog's natural key: (module_name, column_key, variant_kind, variant). Matches `metrics`'
-# UNIQUE constraint and the first four fields of `ScoreKey`. Note `variant_kind` is the member NAME
-# as a string ("INTERFACE", "PARAMETER") — that is what the Postgres enum stores and what
-# `decompose()` produces, so both sides already speak it.
-#
-# This probably wants to live in `app/catalog/keys.py` beside `ScoreKey` once `ScoreKey.identity`
-# exists and returns one. Here for now so this file stands alone.
-MetricIdentity = tuple[str, str, str | None, str | None]
-
 
 def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
-    metric_variant_kind: Final[str | None] = metric.variant_kind.name if metric.variant_kind is not None else None
-    return (metric.module.name, metric.column_key, metric_variant_kind, metric.variant)
+    """The catalog identity of one ORM row — four reads, no conversion.
+
+    This is what stage 4 bought. Until the ORM was retyped, three of these four fields needed
+    re-wrapping at the boundary to say what they already were — `ModuleName(metric.module.name)` and
+    two more — which is the friction that gets `NewType` quietly abandoned. `Mapped[ModuleName]`,
+    `Mapped[ColumnKey]` and `Mapped[VariantName | None]` cost nothing to declare (the columns are
+    still `String(128)`, unchanged) and the aliases now flow outward for free.
+    """
+    return (metric.module.name, metric.column_key, metric.variant_kind, metric.variant)
 
 
 @dataclass(frozen=True, eq=False)
@@ -120,7 +121,7 @@ class MetricCatalog:
     """
 
     metric_by_identity: Mapping[MetricIdentity, db.Metric]
-    variant_kinds_per_heading: Mapping[tuple[str, str], frozenset[str]]
+    variant_kinds_per_heading: Mapping[tuple[ModuleName, ColumnKey], frozenset[VariantKind]]
     # End MetricCatalog Class
 
 
@@ -282,7 +283,7 @@ class Context(BaseContext):
         #     InterfaceKind enum, and the INTERFACE variants in seed/catalog.json against it too,
         #     all without a database. What is unguarded is the SHAPE above, not the spelling.)
         metric_by_identity: dict[MetricIdentity, db.Metric] = dict()
-        kinds_seen_per_heading: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
+        kinds_seen_per_heading: defaultdict[tuple[ModuleName, ColumnKey], set[VariantKind]] = defaultdict(set)
 
         stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
             selectinload(db.Metric.module),
@@ -303,11 +304,11 @@ class Context(BaseContext):
             metric_by_identity[metric_identity] = metric
 
             if metric.variant_kind is not None:
-                kinds_seen_per_heading[(metric.module.name, metric.column_key)].add(metric.variant_kind.name)
+                kinds_seen_per_heading[(metric.module.name, metric.column_key)].add(metric.variant_kind)
 
         # Now we need to freeze the sets; recreating it is the easiest way
         # (I'm specifically not doing the dict comprehension for future readability)
-        variant_kinds_per_heading: dict[tuple[str, str], frozenset[str]] = dict()
+        variant_kinds_per_heading: dict[tuple[ModuleName, ColumnKey], frozenset[VariantKind]] = dict()
 
         for heading, seen_kinds in kinds_seen_per_heading.items():
             variant_kinds_per_heading[heading] = frozenset(seen_kinds)

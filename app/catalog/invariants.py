@@ -116,18 +116,19 @@ from typing import NamedTuple
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.interface_kind import InterfaceKind
 from app.catalog.keys import declared_variants_for, decomposable_kinds_for
-from app.models import orm as db
+from app.catalog.variant_kind import VariantKind
 
 
 class Heading(NamedTuple):
     """One `(module, column_key)` and the shape of its catalog rows."""
 
-    module: str
-    column_key: str
-    variant_kinds: tuple[str, ...]  # the distinct non-NULL axes found, sorted
-    variants: tuple[str, ...]  # the distinct non-NULL variant values found, sorted
+    module: ModuleName
+    column_key: ColumnKey
+    variant_kinds: tuple[VariantKind, ...]  # the distinct non-NULL axes found, sorted by name
+    variants: tuple[VariantName, ...]  # the distinct non-NULL variant values found, sorted
     bare_rows: int  # rows with variant_kind IS NULL under the same heading
 
     def problems(self) -> tuple[str, ...]:
@@ -139,10 +140,10 @@ class Heading(NamedTuple):
         loop once per problem.
         """
         reasons: list[str] = []
-        interface = db.VariantKind.INTERFACE.name
+        interface = VariantKind.INTERFACE
 
         if len(self.variant_kinds) > 1:
-            reasons.append(f"catalogued along {len(self.variant_kinds)} axes {list(self.variant_kinds)}")
+            reasons.append(f"catalogued along {len(self.variant_kinds)} axes {[k.name for k in self.variant_kinds]}")
 
         if self.bare_rows and interface in self.variant_kinds:
             reasons.append(f"has {self.bare_rows} variant-less row(s) beside INTERFACE rows, which can never be reached")
@@ -156,9 +157,9 @@ class Heading(NamedTuple):
             # a KIND is decomposable — which this did until 2026-08-23 — passes any heading whose
             # axis happens to be spelled PARAMETER while nothing can resolve it.
             recoverable = decomposable_kinds_for(self.module, self.column_key)
-            unsatisfiable = [k for k in self.variant_kinds if k not in recoverable]
+            unsatisfiable = [k.name for k in self.variant_kinds if k not in recoverable]
             if unsatisfiable:
-                readable = sorted(recoverable) if recoverable else "nothing"
+                readable = sorted(k.name for k in recoverable) if recoverable else "nothing"
                 reasons.append(
                     f"is qualified along {unsatisfiable}, which nothing can supply — not the key "
                     f"string (decompose recovers {readable} for this heading), not tier two "
@@ -178,7 +179,7 @@ class Heading(NamedTuple):
             missing = sorted(expected - set(self.variants))
             if missing:
                 reasons.append(
-                    f"is qualified along {kind} but has no row for {missing} — a candidate whose "
+                    f"is qualified along {kind.name} but has no row for {missing} — a candidate whose "
                     f"variant is one of those resolves to no metric, while every other candidate "
                     f"under this heading resolves fine"
                 )
@@ -221,10 +222,14 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
     result = await session.execute(_HEADINGS_SQL)
     headings = [
         Heading(
-            module=row.module,
-            column_key=row.column_key,
-            variant_kinds=tuple(sorted(row.variant_kinds or ())),
-            variants=tuple(sorted(row.variants or ())),
+            module=ModuleName(row.module),
+            column_key=ColumnKey(row.column_key),
+            # THE STRING BOUNDARY. `_HEADINGS_SQL` casts the enum column to text, so this is the
+            # one place a label becomes a member. `VariantKind[...]` raises KeyError on a label no
+            # Python member declares — which cannot happen, because
+            # `tests/test_postgres_enum_labels.py` refuses a database whose type carries one.
+            variant_kinds=tuple(sorted((VariantKind[label] for label in row.variant_kinds or ()), key=lambda k: k.name)),
+            variants=tuple(VariantName(v) for v in sorted(row.variants or ())),
             bare_rows=row.bare_rows,
         )
         for row in result

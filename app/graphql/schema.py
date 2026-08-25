@@ -131,6 +131,8 @@ class Query:
 
 # Building this object is what generates the SDL — there is no schema file to keep in sync, which is
 # the code-first bargain: one definition, but the contract only becomes visible once the code runs.
-# TODO: no test asserts on the printed SDL yet, so nothing currently checks this against the spec in
-# docs/graphql-schema.md. `schema.as_str()` is the hook for one.
+# tests/test_schema_snapshot.py now pins this against schema.graphql, so an annotation change that
+# altered the public contract shows up as a diff rather than as nothing. Still NOT checked against
+# the spec in docs/graphql-schema.md: that describes Metric, ScoreEntry and Mutation, which do not
+# exist here yet, so the live schema is a strict subset and equality would fail on absence.
 schema = strawberry.Schema(query=Query, extensions=[MaskInternalErrors])

@@ -35,8 +35,14 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scrape_input_parameters import scrape  # noqa: E402
+# The repo root, not `scripts/` — so the sibling below is imported as `scripts.<name>` and cannot
+# also be loaded as a bare top-level module. `scripts/` has an `__init__.py`, so a file reached both
+# ways becomes TWO module objects with two copies of every class, and `isinstance` across them is
+# False. That split is also what made a root-level `mypy .` refuse to run before the package marker
+# existed. Needed because `scripts` is deliberately NOT installed — `[tool.setuptools.packages.find]`
+# is `include = ["app*"]` — so running this file directly puts `scripts/` on the path, not the root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.scrape_input_parameters import scrape  # noqa: E402
 
 # The two ESM2 runs and their five per-property sub-experiments (captured as "<run>_<n> ov/res.html").
 _RUNS = ["ESM2 Prediction", "ESM2 Evolved"]
@@ -82,7 +88,8 @@ def xlsx_property_map(xlsx_path: Path) -> dict[str, str]:
         cells = []
         for c in row.findall(f"{_XLSX_NS}c"):
             v = c.find(f"{_XLSX_NS}v")
-            cells.append(shared[int(v.text)] if c.get("t") == "s" and v is not None else "")
+            shared_index = v.text if c.get("t") == "s" and v is not None else None
+            cells.append(shared[int(shared_index)] if shared_index else "")
         if len(cells) >= 6 and re.fullmatch(r"[0-9a-f]{32}", cells[3] or ""):
             out[cells[3]] = cells[5]
     return out

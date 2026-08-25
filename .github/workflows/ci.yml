@@ -22,8 +22,12 @@ jobs:
         run: ruff check .
       - name: black
         run: black --check .
+      # Everything, not just app/. It was `mypy app/` while the rest of the tree had errors
+      # nobody had triaged; those are now cleared, so the narrower scope only bought us a gap
+      # between what CI checks and what is true. `scripts/__init__.py` is what makes a root run
+      # possible at all — without it mypy meets scripts/dump_schema.py under two module names.
       - name: mypy
-        run: mypy app/
+        run: mypy .
       # The candidate_summary view is written down twice on purpose: sql/ is the copy you iterate
       # on, the migration is what actually runs. This fails the build if they define different
       # columns — i.e. the .sql changed without a new migration. Comments are ignored.

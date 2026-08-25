@@ -51,14 +51,20 @@ from typing import Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalog.identifiers import ColumnKey, ModuleName
 from app.catalog.invariants import find_heading_violations, raise_on_heading_violations
 from app.database import AsyncSessionLocal
+from app.models import orm as db
 
-# scripts/ is on sys.path when a script here is run directly, but not when this module is imported
-# from elsewhere; make the sibling import work either way.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# The repo root, not `scripts/` — so the sibling below is imported as `scripts.<name>` and cannot
+# also be loaded as a bare top-level module. `scripts/` has an `__init__.py`, so a file reached both
+# ways becomes TWO module objects with two copies of every class, and `isinstance` across them is
+# False. That split is also what made a root-level `mypy .` refuse to run before the package marker
+# existed. Needed because `scripts` is deliberately NOT installed — `[tool.setuptools.packages.find]`
+# is `include = ["app*"]` — so running this file directly puts `scripts/` on the path, not the root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from extract_score_keys import MetricKey, collect  # noqa: E402  (needs the sys.path line above)
+from scripts.extract_score_keys import MetricKey, collect  # noqa: E402  (needs the sys.path line above)
 
 _PLACEHOLDER_MODULE_TYPE: Final[str] = "SCORE"
 _PLACEHOLDER_DESCRIPTION: Final[str] = (
@@ -66,7 +72,7 @@ _PLACEHOLDER_DESCRIPTION: Final[str] = (
 )
 
 
-def infer_value_type(values: list[str]) -> str:
+def infer_value_type(values: list[str]) -> db.MetricValueType:
     """Infer a MetricValueType from the values a key actually holds in the corpus.
 
     Everything in `candidates.scores` is stored as text (the loader does not coerce), so the type
@@ -82,25 +88,30 @@ def infer_value_type(values: list[str]) -> str:
 
     Falls back to CATEGORICAL, which is the safe direction: a consumer that treats a number as a
     label renders it correctly, while one that treats a label as a number raises.
+
+    Returns the ENUM, not its name. It returned bare strings until stage 5, which is the same hazard
+    `variant_kind` had before stage 3c: `"CATEGORCAL"` typechecks, matches no member, and fails at
+    `CAST(:value_type AS metricvaluetype)` against a real database rather than here. `values` stays
+    `list[str]` because those genuinely are raw text — the loader does not coerce.
     """
     present = [v for v in values if v is not None and v.strip() != ""]
     if not present:
-        return "CATEGORICAL"
+        return db.MetricValueType.CATEGORICAL
     if all(v.strip().lower() in ("true", "false") for v in present):
-        return "BOOL"
+        return db.MetricValueType.BOOL
     try:
         for v in present:
             int(v.strip())
-        return "INT"
+        return db.MetricValueType.INT
     except ValueError:
         pass
     try:
         for v in present:
             float(v.strip())
-        return "FLOAT"
+        return db.MetricValueType.FLOAT
     except ValueError:
         pass
-    return "CATEGORICAL"
+    return db.MetricValueType.CATEGORICAL
 
 
 async def _values_by_key(session: AsyncSession) -> dict[str, list[str]]:
@@ -112,12 +123,13 @@ async def _values_by_key(session: AsyncSession) -> dict[str, list[str]]:
     return values
 
 
-async def _existing_module_ids(session: AsyncSession) -> dict[str, str]:
+async def _existing_module_ids(session: AsyncSession) -> dict[ModuleName, str]:
+    """Module name -> id. The VALUE is a uuid string and stays one; only the key is an identifier."""
     result = await session.execute(text("SELECT name, id FROM modules"))
-    return {name: str(mid) for name, mid in result.all()}
+    return {ModuleName(name): str(mid) for name, mid in result.all()}
 
 
-async def _curated_column_keys(session: AsyncSession) -> set[tuple[str, str]]:
+async def _curated_column_keys(session: AsyncSession) -> set[tuple[ModuleName, ColumnKey]]:
     """(module_name, column_key) pairs that already have at least one metric row.
 
     Compared at this level rather than on the full identity so that a column already stored as
@@ -126,10 +138,20 @@ async def _curated_column_keys(session: AsyncSession) -> set[tuple[str, str]]:
     result = await session.execute(
         text("SELECT mo.name, me.column_key FROM metrics me JOIN modules mo ON mo.id = me.module_id")
     )
-    return {(name, column_key) for name, column_key in result.all()}
+    # THE STRING BOUNDARY IS HERE, at the row — the same shape `app/catalog/invariants.py` uses.
+    # Past this line the pair is comparable to a `MetricKey`'s identity without either side
+    # widening to `str` and forgetting which half is which.
+    return {(ModuleName(name), ColumnKey(column_key)) for name, column_key in result.all()}
 
 
-async def _register_module(session: AsyncSession, name: str) -> str:
+async def _register_module(session: AsyncSession, name: ModuleName) -> str:
+    """Insert a placeholder module row and return its id. The id is a uuid string, not a name.
+
+    `name` is a `ModuleName` because that is what it always was: every caller passes `m.module`
+    off a `MetricKey`, which `decompose()` typed. An earlier version of this signature said `str`
+    and justified it as "where a raw name enters from a CSV header" — nothing here reads a CSV,
+    and the value had already been through `decompose()` two calls earlier.
+    """
     created = await session.execute(
         text("""
             INSERT INTO modules (id, name, module_type, functions, description)
@@ -146,7 +168,9 @@ async def _register_module(session: AsyncSession, name: str) -> str:
     return str(found.scalar_one())
 
 
-async def _insert_skeleton_metric(session: AsyncSession, module_id: str, metric: MetricKey, value_type: str) -> bool:
+async def _insert_skeleton_metric(
+    session: AsyncSession, module_id: str, metric: MetricKey, value_type: db.MetricValueType
+) -> bool:
     result = await session.execute(
         text("""
             INSERT INTO metrics (
@@ -171,8 +195,14 @@ async def _insert_skeleton_metric(session: AsyncSession, module_id: str, metric:
             # Inferred from the values, not assumed. Typing everything FLOAT would mislabel the
             # text columns (protein_id, structureFile, the _export.recommendation prose) and any
             # consumer trusting value_type to parse them would raise.
-            "value_type": value_type,
-            "variant_kind": metric.variant_kind,
+            # `.name` for the same reason `variant_kind` needs it below: the bind feeds
+            # CAST(... AS metricvaluetype) and Postgres enum labels ARE the member names.
+            "value_type": value_type.name,
+            # `.name` because the bind feeds `CAST(:variant_kind AS variantkind)`, and Postgres
+            # enum labels ARE the member names. Passing the member itself raises asyncpg's
+            # DataError — checked, not assumed. This is the other end of the boundary that
+            # `app/catalog/invariants.py` reads back with `VariantKind[label]`.
+            "variant_kind": metric.variant_kind.name if metric.variant_kind is not None else None,
             "variant": metric.variant,
         },
     )
@@ -208,10 +238,14 @@ async def seed(dry_run: bool = False) -> None:
             print(f"{len(metrics)} identities in the corpus, {len(metrics) - len(pending)} already curated")
             print(f"would register {len(pending)} skeleton metrics")
             print(f"would auto-create {len(new_modules)} modules: {', '.join(new_modules) or '(none)'}")
-            tally: dict[str, int] = {}
+            tally: dict[db.MetricValueType, int] = {}
             for value_type in types.values():
                 tally[value_type] = tally.get(value_type, 0) + 1
-            print("inferred types: " + ", ".join(f"{t}={n}" for t, n in sorted(tally.items())))
+            # `.name` twice, both load-bearing. Sorting: neither `Enum` nor `None` defines `__lt__`,
+            # so `sorted(tally.items())` raises TypeError the first time this line has more than
+            # one type to report — invisible against a fully curated corpus, where `types` is
+            # empty. Printing: `f"{t}"` on an enum renders "MetricValueType.FLOAT", not "FLOAT".
+            print("inferred types: " + ", ".join(f"{t.name}={n}" for t, n in sorted(tally.items(), key=lambda kv: kv[0].name)))
 
             # The dry run APPLIES the inserts and then does not commit. Reporting on the database
             # as it stands would answer a question nobody asked — what matters is whether the real
