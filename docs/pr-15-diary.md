@@ -5,7 +5,7 @@
 > the earlier ones until they are done. `docs/type-safety-plan.md` is the plan and stays
 > authoritative for *what* is going to happen; this file records *why it keeps changing shape*.
 
-**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 17 commits · stages 1-4 done, reviewed · 132 → 151 tests · `mypy .` clean, and CI now runs it
+**Span:** 2026-08-24 → · **branch:** `type-safety` · 3 of 5 stages · 20 commits · all five stages, two review passes · 132 → 152 tests · `mypy .` clean, and CI now runs it
 
 ---
 
@@ -552,6 +552,44 @@ without using it, while one in `__init__.py` trips both.
 Writing it also caught the first version forbidding ALL imports, which would have forbidden the leaf
 files themselves — `enum` and `typing` are what they are made of. Stdlib is not the hazard; a cycle
 needs two of our own modules.
+
+## Act IX — the second review, which found nothing in the code
+
+Three findings, all three in `tests/test_import_graph.py` — the guard written one commit earlier to
+prevent this exact class of bug. Stage 4's retype came through clean.
+
+**Relative imports were invisible.** The leaf check tested `node.module.startswith("app")`, and
+`from . import keys` has `module=None` while `from ..models import orm` has `module="models"`.
+Neither matches. Worse, a relative import that is only BOUND evaded both checks at once — the static
+one on the name, the dynamic one because nothing used it at import time. That is precisely the
+loaded-but-not-fired state the static check was added for, so the guard had a hole shaped like its
+own justification.
+
+**Two of the three were the same mistake twice: enumerating by hand what should have been derived.**
+`_LEAVES` was a hardcoded tuple, though the set that must be leaves is whatever `app/models/`
+imports from `app.catalog`. `_ENTRY_POINTS` named `app.graphql.schema` as "what the server builds",
+but the server imports `app.main` — and `app.models.views` plus all three routers were reached by
+none of the three entry points. Measured: a firing cycle between `views.py` and `routers/demo.py`
+leaves both other entry points importing fine.
+
+Both fail by SILENCE. Green test, unenforced constraint. Which is the thing
+`test_postgres_enum_labels.py` had already grown collector tests to avoid, one act earlier in this
+same diary — the lesson was written down and then not applied to the next guard. Both sets are
+derived now, and `test_the_derivations_found_something` is the collector test applied properly.
+
+### Two probes that lied
+
+Worth recording, because both looked like passing evidence:
+
+* The first probe for the `_LEAVES` fix introduced a cycle so severe it broke pytest **collection** —
+  conftest imports the ORM — so `grep FAILED` found nothing and the fix appeared not to work. It
+  did; the probe was measuring an empty output.
+* The first probe for the `app.main` fix imported a module without using it, so nothing fired and
+  every entry point passed. Rebuilt to import a NAME rather than a module, it failed exactly one
+  test — the right one.
+
+Neither was evidence of anything until it was rebuilt. A probe that produces the expected output for
+the wrong reason is worse than no probe, because it ends the investigation.
 
 ## Still open
 
