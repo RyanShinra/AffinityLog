@@ -42,16 +42,19 @@ from types import MappingProxyType
 from typing import Annotated
 
 from fastapi import Depends
+from graphql import GraphQLError
 from sqlalchemy import Result, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
-from app.catalog.identifiers import ColumnKey, ModuleName
+from app.catalog.identifiers import ColumnKey, ModuleName, SequenceId
+from app.catalog.interface_kind import InterfaceKind
 from app.catalog.keys import MetricIdentity
 from app.catalog.variant_kind import VariantKind
 from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
+from app.models.views import CandidateSummary
 
 
 def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
@@ -169,6 +172,19 @@ class Context(BaseContext):
         # unseeded database), so the sentinel has to be distinguishable from the real thing or a
         # fresh install would query once per ScoreEntry forever.
         self._catalog: MetricCatalog | None = None
+
+        # A THIRD lock, for the same reason there is a second one. `_load_interface_kinds()` issues
+        # its statement through `execute_statement()` exactly as `_load_catalog()` does, so it needs
+        # a lock that is not the session's. It is also not `_catalog_lock`: the two builds never
+        # nest, so sharing would not deadlock — but it would serialise two unrelated memos against
+        # each other, and would put one object back in charge of two invariants, which is the shape
+        # that deadlocked before. One lock per invariant is the rule; this is the third invariant.
+        self._interface_kinds_lock = asyncio.Lock()
+
+        # `None` rather than `{}`, for `_catalog`'s reason: a database with no candidates
+        # legitimately produces an empty map, so the sentinel must be distinguishable from a real,
+        # empty answer or an empty corpus would re-query once per ScoreEntry forever.
+        self._interface_kinds: Mapping[SequenceId, InterfaceKind] | None = None
 
     async def execute_statement(self, statement: Select[RowTuple]) -> Result[RowTuple]:
         """Run one SQL statement against this request's session. What every resolver calls.
@@ -321,6 +337,113 @@ class Context(BaseContext):
         )
 
     # End def catalog
+
+    async def interface_kinds(self) -> Mapping[SequenceId, InterfaceKind]:
+        """What each candidate's ipTM-style scores are actually measuring. Loaded once per request.
+
+        TIER TWO of the two-tier lookup. `catalog().variant_kinds_per_heading` answers "is this
+        heading INTERFACE-qualified?"; this answers "and what did THIS candidate fold?". Neither is
+        sufficient alone, which is the whole shape of the 2026-07-31 finding: `boltz2.protein_iptm`
+        is one key meaning three different physical quantities, and the discriminator lives on the
+        candidate rather than in the key or the value.
+
+        ONE QUERY FOR EVERY CANDIDATE, not one per candidate. `{ candidates { scores } }` gathers
+        the score resolver across the whole list, so a per-candidate read would be 14 round trips on
+        today's corpus and one per row forever after — the same argument that makes `catalog()` load
+        all 144 metrics at once.
+
+        Keyed by `candidates.sequence_id`, because that is what `candidate_summary` publishes (as
+        `candidate_id`). See `_load_interface_kinds` for what that key costs and what guards it.
+        """
+        if self._interface_kinds is not None:
+            return self._interface_kinds
+
+        async with self._interface_kinds_lock:
+            # Double-checked inside the lock, for `catalog()`'s measured reason: without this the
+            # lock serialises the queries but still runs one per waiting caller.
+            if self._interface_kinds is not None:
+                return self._interface_kinds
+            self._interface_kinds = await self._load_interface_kinds()
+
+        return self._interface_kinds
+
+    # End def interface_kinds
+
+    async def _load_interface_kinds(self) -> Mapping[SequenceId, InterfaceKind]:
+        """Build the interface-kind map. Call only from `interface_kinds()`, holding its lock.
+
+        WHY THIS CAN FAIL IN THE MIDDLE OF A REQUEST, AND WHAT THAT COSTS
+        ----------------------------------------------------------------
+        Both failures below are NON-TRANSIENT. Neither is a blip to retry: once the data or the code
+        is in the failing state, every query that touches scores fails identically until a human
+        changes something. So the failure has two audiences at once — the operator, who has to go
+        fix it, and the client, who needs to be told something more useful than "it broke".
+
+        A bare `ValueError` serves neither. `MaskInternalErrors` (app/graphql/errors.py) replaces the
+        message of any error NOT carrying a deliberate `code`, so the caller would receive
+        "Internal server error." and have nothing to report. `GraphQLError` with a code is this
+        project's existing shape for an error meant to be read — `_as_uuid` in schema.py is the
+        precedent — and carrying the code is precisely what survives masking.
+
+        The operator half is thinner than it should be, and this says so rather than implying
+        otherwise: Strawberry logs the original to the `strawberry.execution` logger, and errors.py
+        notes there is no aggregation to alert from yet. Today "alarm" means a line in the server
+        log. If this project grows monitoring, these are two of the errors worth paging on.
+
+        Each message therefore names its own remedy, because whoever reads it will not be holding
+        this context.
+        """
+        stmt: Select[tuple[SequenceId, str]] = select(CandidateSummary.candidate_id, CandidateSummary.interface_kind)
+        result: Result[tuple[SequenceId, str]] = await self.execute_statement(stmt)
+
+        interface_kind_per_candidate: dict[SequenceId, InterfaceKind] = dict()
+
+        for candidate_id, label in result.all():
+            # THE KEY IS THE VENDOR'S, AND IT IS ONLY UNIQUE PER EXPERIMENT.
+            # `candidate_summary.candidate_id` is `candidates.sequence_id` — the `id` column of the
+            # Bio Discovery export — and `uq_candidate_seq` constrains `(experiment_id,
+            # sequence_id)`, not `sequence_id` alone. This map spans all nine experiments, so two
+            # colliding rows would silently fold into one entry and hand one candidate the OTHER's
+            # interface kind: an antibody's heavy-light pairing confidence (~0.95) reported as HER2
+            # binding, which is the precise inversion the two-tier design exists to prevent.
+            #
+            # No collision exists in the corpus (14 candidates, 14 distinct ids, measured), and the
+            # ids look like real UUIDs — so this is belt-and-braces against a guarantee the schema
+            # does not actually make, not against an observed fault.
+            if candidate_id in interface_kind_per_candidate:
+                raise GraphQLError(
+                    f"candidate id {candidate_id!r} appears in more than one experiment, so this "
+                    "request cannot tell which candidate's chains each score belongs to. Remedy: "
+                    "key this map by candidates.id, which means publishing it from the "
+                    "candidate_summary view (a migration).",
+                    extensions={"code": "AMBIGUOUS_CANDIDATE_ID"},
+                )
+
+            # str -> enum AT THE SQL BOUNDARY, the way app/catalog/invariants.py does it, so nothing
+            # downstream ever handles the raw CASE string. The enum is the shared vocabulary: the
+            # same four strings are the view's CASE arms and the `variant` of the nine INTERFACE
+            # catalog rows, and `InterfaceKind` is what makes them one definition instead of three.
+            #
+            # A label with no member means sql/candidate_summary.sql and
+            # app/catalog/interface_kind.py have drifted. tests/test_interface_kind.py already
+            # catches that in CI without a database, so this is the belt to that suspenders — but it
+            # is raised the same deliberate way rather than left to a bare ValueError, because the
+            # audience argument above does not change just because the cause is our bug.
+            try:
+                interface_kind_per_candidate[candidate_id] = InterfaceKind(label)
+            except ValueError as exc:
+                raise GraphQLError(
+                    f"the candidate_summary view produced interface kind {label!r}, which is not a "
+                    "member of InterfaceKind. Remedy: sql/candidate_summary.sql (and migration 004) "
+                    "have drifted from app/catalog/interface_kind.py — reconcile the CASE arms.",
+                    extensions={"code": "UNKNOWN_INTERFACE_KIND"},
+                ) from exc
+
+        # Wrapped on the way out, for MetricCatalog's reason: this map is handed to every ScoreEntry
+        # in the request and must not be mutable by any of them.
+        return MappingProxyType(interface_kind_per_candidate)
+
+    # End def _load_interface_kinds
 
 
 # End Context class

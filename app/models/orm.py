@@ -39,7 +39,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
+from app.catalog.identifiers import ColumnKey, ModuleName, SequenceId, VariantName
 from app.catalog.variant_kind import VariantKind
 from app.database import ModelBase
 
@@ -475,7 +475,9 @@ class Candidate(ModelBase):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     experiment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE"))
 
-    sequence_id: Mapped[str] = mapped_column(String(255))  # Bio Discovery's per-candidate id
+    # `Mapped[SequenceId]` needs no `type_annotation_map`: `mapped_column()` gives the column type
+    # explicitly, so the alias is only ever read as an annotation. Still VARCHAR(255), unchanged.
+    sequence_id: Mapped[SequenceId] = mapped_column(String(255))  # Bio Discovery's per-candidate id
     # The raw {column_key: value} bag — every export column lands here untyped (default=dict → '{}').
     # GIN-indexed above so we can query INSIDE it, e.g. WHERE (scores->>'pseudo_perplexity')::float < 10
     scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict, server_default=text("'{}'"))

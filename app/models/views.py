@@ -13,23 +13,40 @@ carrying that flag.
 
 from __future__ import annotations
 
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.catalog.identifiers import SequenceId
 from app.database import ModelBase
 
 
 class CandidateSummary(ModelBase):
     """Read-only mapping onto the ``candidate_summary`` view. Do not insert/update through it.
 
-    A view has no primary key, so we nominate ``candidate_id`` (the full, unique sequence id) as the
-    mapper's PK — the ORM requires one, and it's conveniently the value used to locate the PDB file.
-    Bare ``Mapped[...]`` annotations become read columns (SQLAlchemy 2.0 infers type + nullability).
+    A view has no primary key, so we nominate ``candidate_id`` as the mapper's PK — the ORM requires
+    one, and it's conveniently the value used to locate the PDB file. Bare ``Mapped[...]`` annotations
+    become read columns (SQLAlchemy 2.0 infers type + nullability).
+
+    ``candidate_id`` IS ``candidates.sequence_id`` (see ``sql/candidate_summary.sql``), and this
+    docstring used to call it "the full, unique sequence id". Unique is too strong: ``uq_candidate_seq``
+    is the composite ``(experiment_id, sequence_id)``, so the guarantee is per experiment, while this
+    view spans all of them. Nominating it as the mapper's PK is still fine — the ORM only needs
+    something to identify a row by — but anything building a corpus-wide map keyed on it has to decide
+    what two colliding rows mean. ``Context._load_interface_kinds`` is the one that does.
     """
 
     __tablename__ = "candidate_summary"
     __table_args__ = {"info": {"skip_autogenerate": True}}  # it's a VIEW — keep Alembic autogen off it
 
-    candidate_id: Mapped[str] = mapped_column(primary_key=True)
+    # `String(255)` is given EXPLICITLY, unlike every bare annotation below, and that is required
+    # rather than stylistic: a bare `Mapped[SequenceId]` raises
+    #   SADeprecationWarning: Matching the provided NewType ... on its resolved value without
+    #   matching it in the type_annotation_map is deprecated
+    # because SQLAlchemy has to infer the column type from the annotation and a NewType is not in
+    # the map. Naming the type means the alias is only ever read as an annotation. Measured, not
+    # assumed. The value is inert here — a view is never created from this metadata — but it mirrors
+    # `candidates.sequence_id`, which is what this column IS.
+    candidate_id: Mapped[SequenceId] = mapped_column(String(255), primary_key=True)
     candidate: Mapped[str]
     experiment: Mapped[str]
     chains: Mapped[str | None]

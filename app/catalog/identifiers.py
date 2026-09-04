@@ -61,3 +61,12 @@ from typing import NewType
 ModuleName = NewType("ModuleName", str)
 ColumnKey = NewType("ColumnKey", str)
 VariantName = NewType("VariantName", str)
+
+# The vendor's own candidate id — the CSV export's `id` column, landing in `candidates.sequence_id`
+# via app/importer/csv_importer.py. Distinct from `candidates.id`, which Postgres generates and no
+# export ever sees, and from `antibody_hash`, which is derived and DELIBERATELY collides.
+#
+# Uniqueness is guaranteed only per experiment (`uq_candidate_seq` is the composite
+# `(experiment_id, sequence_id)`), which is why anything keying a corpus-wide map by one has to say
+# what it does when two collide. See `Context._load_interface_kinds`.
+SequenceId = NewType("SequenceId", str)
