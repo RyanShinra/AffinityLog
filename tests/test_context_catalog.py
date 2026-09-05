@@ -86,7 +86,7 @@ class TestCatalogIsBuiltFromTheDatabase:
 
         catalog = await Context(session=seeded_catalog).catalog()
         metric = catalog.metric_by_identity[
-            (*_heading("boltz2", "protein_iptm"), VariantKind.INTERFACE, VariantName("antibody-target complex"))
+            MetricIdentity.for_interface(_heading("boltz2", "protein_iptm"), InterfaceKind.ANTIBODY_TARGET_COMPLEX)
         ]
 
         assert metric.module.name == "boltz2"

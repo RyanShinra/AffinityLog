@@ -48,25 +48,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
-from app.catalog.identifiers import ColumnKey, ModuleName, SequenceId
+from app.catalog.identifiers import SequenceId
 from app.catalog.interface_kind import InterfaceKind
-from app.catalog.keys import MetricIdentity
+from app.catalog.keys import Heading, MetricIdentity, ScoreKey, VariantAxes
 from app.catalog.variant_kind import VariantKind
 from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
 from app.models.views import CandidateSummary
-
-
-def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
-    """The catalog identity of one ORM row — four reads, no conversion.
-
-    This is what stage 4 bought. Until the ORM was retyped, three of these four fields needed
-    re-wrapping at the boundary to say what they already were — `ModuleName(metric.module.name)` and
-    two more — which is the friction that gets `NewType` quietly abandoned. `Mapped[ModuleName]`,
-    `Mapped[ColumnKey]` and `Mapped[VariantName | None]` cost nothing to declare (the columns are
-    still `String(128)`, unchanged) and the aliases now flow outward for free.
-    """
-    return (metric.module.name, metric.column_key, metric.variant_kind, metric.variant)
 
 
 @dataclass(frozen=True, eq=False)
@@ -78,7 +66,7 @@ class MetricCatalog:
       * `metric_by_identity` — "what does this exact identity mean?" The 1132 lookups a full
         `{ candidates { scores } }` performs are all dict hits against this.
 
-      * `variant_kinds_per_heading` — "along which axis, if any, do this heading's metrics vary?"
+      * `variant_axes_per_heading` — "along which axis, if any, do this heading's metrics vary?"
         Tier one of the two-tier lookup. Measured on the corpus: 197 of 200 keys carry their whole
         identity and hit `metric_by_identity` directly; 3 do not, and need the candidate's
         interface kind folded in first.
@@ -124,7 +112,37 @@ class MetricCatalog:
     """
 
     metric_by_identity: Mapping[MetricIdentity, db.Metric]
-    variant_kinds_per_heading: Mapping[tuple[ModuleName, ColumnKey], frozenset[VariantKind]]
+    variant_axes_per_heading: Mapping[Heading, VariantAxes]
+
+    def metric_for(self, score_key: ScoreKey, interface_kind: InterfaceKind | None) -> db.Metric | None:
+        """The catalog row explaining this key FOR THIS CANDIDATE, or None if there is none.
+
+        The two-tier lookup, and the only place it is written down. Tier one asks whether the key
+        can identify a metric by itself; tier two supplies the piece it cannot. See the long comment
+        in `_load_catalog` for why the question is asked in that order.
+        """
+        axes = self.variant_axes_per_heading.get(score_key.heading, VariantAxes.none())
+
+        if not axes.interface_qualified:
+            return self.metric_by_identity.get(score_key.identity)
+
+        if interface_kind is None:
+            # A `GraphQLError` with a code, not a ValueError and not an `assert`, for the reasons
+            # `_load_interface_kinds` sets out: `MaskInternalErrors` would replace an uncoded
+            # message with "Internal server error.", and `python -O` strips asserts. Nor `None`,
+            # which would make "we cannot tell which row applies" indistinguishable from "this
+            # column is not in the catalog" — the two callers-visible outcomes that must not blur.
+            raise GraphQLError(
+                f"score key {score_key.heading.dotted!r} is interface-qualified: which of its catalog rows "
+                "applies depends on the chains this candidate folded, and no interface kind was "
+                "supplied. Remedy: the candidate is missing from the candidate_summary view, which "
+                "should be impossible — every candidate joins an experiment and chains are LEFT "
+                "joined.",
+                extensions={"code": "INTERFACE_KIND_REQUIRED"},
+            )
+
+        return self.metric_by_identity.get(MetricIdentity.for_interface(score_key.heading, interface_kind))
+
     # End MetricCatalog Class
 
 
@@ -232,7 +250,7 @@ class Context(BaseContext):
         Split out so `catalog()` is nothing but cache policy — the double-check, the lock, the
         memo — and this is nothing but how the two indexes get built.
         """
-        # WHAT `variant_kinds_per_heading` IS
+        # WHAT `variant_axes_per_heading` IS
         # ----------------------------------
         # It is small. Measured against the seeded corpus, 144 metric rows produce exactly FOUR
         # entries — it is not an index over the catalog, it is an exception list:
@@ -244,7 +262,7 @@ class Context(BaseContext):
         #
         # The other 140 rows have a NULL variant_kind, contribute nothing, and so their
         # (module, column_key) is simply absent. A caller reads it as
-        # `variant_kinds_per_heading.get(pair, frozenset())` and gets the empty set for almost
+        # `variant_axes_per_heading.get(pair, frozenset())` and gets the empty set for almost
         # everything.
         #
         # THE QUESTION IT ANSWERS
@@ -299,7 +317,7 @@ class Context(BaseContext):
         #     InterfaceKind enum, and the INTERFACE variants in seed/catalog.json against it too,
         #     all without a database. What is unguarded is the SHAPE above, not the spelling.)
         metric_by_identity: dict[MetricIdentity, db.Metric] = dict()
-        kinds_seen_per_heading: defaultdict[tuple[ModuleName, ColumnKey], set[VariantKind]] = defaultdict(set)
+        kinds_seen_per_heading: defaultdict[Heading, set[VariantKind]] = defaultdict(set)
 
         stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
             selectinload(db.Metric.module),
@@ -316,24 +334,24 @@ class Context(BaseContext):
         rows: Sequence[db.Metric] = result.scalars().all()
 
         for metric in rows:
-            metric_identity: MetricIdentity = metric_identity_from_db_metric(metric)
+            metric_identity: MetricIdentity = MetricIdentity.from_metric(metric)
             metric_by_identity[metric_identity] = metric
 
             if metric.variant_kind is not None:
-                kinds_seen_per_heading[(metric.module.name, metric.column_key)].add(metric.variant_kind)
+                kinds_seen_per_heading[Heading.from_metric(metric)].add(metric.variant_kind)
 
         # Now we need to freeze the sets; recreating it is the easiest way
         # (I'm specifically not doing the dict comprehension for future readability)
-        variant_kinds_per_heading: dict[tuple[ModuleName, ColumnKey], frozenset[VariantKind]] = dict()
+        variant_axes_per_heading: dict[Heading, VariantAxes] = dict()
 
         for heading, seen_kinds in kinds_seen_per_heading.items():
-            variant_kinds_per_heading[heading] = frozenset(seen_kinds)
+            variant_axes_per_heading[heading] = VariantAxes(frozenset(seen_kinds))
 
         # Wrapped on the way out. The dicts above are mutable because building them requires it;
         # the catalog handed to 1132 resolvers must not be.
         return MetricCatalog(
             metric_by_identity=MappingProxyType(metric_by_identity),
-            variant_kinds_per_heading=MappingProxyType(variant_kinds_per_heading),
+            variant_axes_per_heading=MappingProxyType(variant_axes_per_heading),
         )
 
     # End def catalog
@@ -341,7 +359,7 @@ class Context(BaseContext):
     async def interface_kinds(self) -> Mapping[SequenceId, InterfaceKind]:
         """What each candidate's ipTM-style scores are actually measuring. Loaded once per request.
 
-        TIER TWO of the two-tier lookup. `catalog().variant_kinds_per_heading` answers "is this
+        TIER TWO of the two-tier lookup. `catalog().variant_axes_per_heading` answers "is this
         heading INTERFACE-qualified?"; this answers "and what did THIS candidate fold?". Neither is
         sufficient alone, which is the whole shape of the 2026-07-31 finding: `boltz2.protein_iptm`
         is one key meaning three different physical quantities, and the discriminator lives on the
