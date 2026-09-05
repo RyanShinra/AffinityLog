@@ -265,8 +265,8 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   test's own connection for the duration, so a seeder's `commit()` becomes a SAVEPOINT release inside
   the rollback. Outside that, using it raises `UnboundExecutionError` — except where the code under
   test never executes a statement, which is why `tests/test_importer.py` gets away with it today.
-  That file's module docstring carries a block flagged for the planned test-review PR; read it before
-  changing any fixture.
+  That file's "WHY NO DATABASE" docstring explains why; the item is logged in
+  `docs/test-review-plan.md`, which collects the test-review pass. Read it before changing any fixture.
 - **The PR #13 cleanup list is closed.** `docs/pr-13-diary.md`'s Act VI listed fifteen defects the
   second review pass found in PR #13's own fixes; all fifteen shipped on `spring-cleaning-in-summer`
   and `docs/pr-14-diary.md` records what each became. Read Act VI for the history, not as a work
