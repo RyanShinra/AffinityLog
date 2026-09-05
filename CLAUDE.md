@@ -206,10 +206,12 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   statement through `execute_statement()` — safe only because that takes a *different* lock. One
   lock serving both invariants is the version that deadlocks: `asyncio.Lock` is not reentrant, so
   the task waits on itself forever, with no exception, no traceback and no timeout, while every
-  other request on the loop is served normally. `interface_kinds()` wants exactly this shape — give
-  it `_interface_kinds_lock`, not the session's.
-  `tests/test_context_catalog.py::TestTheTwoLocksAreSeparate` guards it, including a test that
-  collapses the two locks back into one and asserts the hang.
+  other request on the loop is served normally. `interface_kinds()` has exactly this shape and its
+  own `_interface_kinds_lock` — three locks now, one per invariant.
+  `tests/test_context_catalog.py::TestTheLocksAreSeparate` guards all three, including tests that
+  collapse a memo lock back into the session's and assert the hang. The two memo locks are kept
+  apart from each other too, though that pair cannot deadlock (the builds never nest): the rule
+  under test is one lock per invariant, not "two locks happen to be enough".
 - **`monkeypatch` in a test is a smell — often the only way, never the first thing to reach for.**
   It couples the test to the implementation's internals, so it can only be right if you know exactly
   where the value is read, and it fails *silently* when you don't: the test passes, against the bug.

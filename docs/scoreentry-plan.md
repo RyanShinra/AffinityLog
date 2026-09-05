@@ -38,7 +38,7 @@ value, so it wants its own per-request memo.
 
 `asyncio.Lock` is not reentrant. Reusing `_catalog_lock` or reaching for the session's lock produces
 a task waiting on itself: no exception, no traceback, no timeout, while every other request on the
-loop is served normally. `tests/test_context_catalog.py::TestTheTwoLocksAreSeparate` already guards
+loop is served normally. `tests/test_context_catalog.py::TestTheLocksAreSeparate` already guards
 the two that exist, including a test that collapses them and asserts the hang; the third belongs
 there.
 
@@ -129,7 +129,7 @@ finished function to review.
 
 * `Context.interface_kinds()`: the query, the memo, `_interface_kinds_lock`, and the test that
   collapses it into `_catalog_lock` and asserts the hang (the existing
-  `TestTheTwoLocksAreSeparate` is the pattern).
+  `TestTheLocksAreSeparate` is the pattern).
 * The Strawberry type declarations and their wiring into `Query`/`Candidate`.
 * Regenerating `schema.graphql` at each stage so every SDL change is a reviewable diff.
 * Tests around his logic once its shape is settled — including deleting `_identity_for` from the
