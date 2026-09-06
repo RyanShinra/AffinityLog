@@ -319,7 +319,7 @@ class Context(BaseContext):
         metric_by_identity: dict[MetricIdentity, db.Metric] = dict()
         kinds_seen_per_heading: defaultdict[Heading, set[VariantKind]] = defaultdict(set)
 
-        stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
+        select_db_metrics: Select[tuple[db.Metric]] = select(db.Metric).options(
             selectinload(db.Metric.module),
             selectinload(db.Metric.concept),
             selectinload(db.Metric.benchmark_results),
@@ -330,15 +330,15 @@ class Context(BaseContext):
         # entire method. That is exactly what the two locks buy: this takes the SESSION's lock,
         # a different object, so there is nothing to re-enter. Under one shared lock this line
         # would hang the request forever, which is why this used to be `self.session.execute`.
-        result: Result[tuple[db.Metric]] = await self.execute_statement(stmt)
-        rows: Sequence[db.Metric] = result.scalars().all()
+        db_metrics_result: Result[tuple[db.Metric]] = await self.execute_statement(select_db_metrics)
+        db_metrics_rows: Sequence[db.Metric] = db_metrics_result.scalars().all()
 
-        for metric in rows:
-            metric_identity: MetricIdentity = MetricIdentity.from_metric(metric)
-            metric_by_identity[metric_identity] = metric
+        for db_metric in db_metrics_rows:
+            metric_identity: MetricIdentity = MetricIdentity.from_db_metric(db_metric)
+            metric_by_identity[metric_identity] = db_metric
 
-            if metric.variant_kind is not None:
-                kinds_seen_per_heading[Heading.from_metric(metric)].add(metric.variant_kind)
+            if db_metric.variant_kind is not None:
+                kinds_seen_per_heading[Heading.from_db_metric(db_metric)].add(db_metric.variant_kind)
 
         # Now we need to freeze the sets; recreating it is the easiest way
         # (I'm specifically not doing the dict comprehension for future readability)
@@ -411,12 +411,14 @@ class Context(BaseContext):
         Each message therefore names its own remedy, because whoever reads it will not be holding
         this context.
         """
-        stmt: Select[tuple[SequenceId, str]] = select(CandidateSummary.candidate_id, CandidateSummary.interface_kind)
-        result: Result[tuple[SequenceId, str]] = await self.execute_statement(stmt)
+        select_candidates: Select[tuple[SequenceId, str]] = select(
+            CandidateSummary.candidate_id, CandidateSummary.interface_kind
+        )
+        select_candidates_results: Result[tuple[SequenceId, str]] = await self.execute_statement(select_candidates)
 
         interface_kind_per_candidate: dict[SequenceId, InterfaceKind] = dict()
 
-        for candidate_id, label in result.all():
+        for candidate_id, label in select_candidates_results.all():
             # THE KEY IS THE VENDOR'S, AND IT IS ONLY UNIQUE PER EXPERIMENT.
             # `candidate_summary.candidate_id` is `candidates.sequence_id` — the `id` column of the
             # Bio Discovery export — and `uq_candidate_seq` constrains `(experiment_id,

@@ -224,7 +224,7 @@ class Heading(NamedTuple):
         return f"{self.module}.{self.column_key}"
 
     @classmethod
-    def from_metric(cls, metric: db.Metric) -> Heading:
+    def from_db_metric(cls, metric: db.Metric) -> Heading:
         """The heading of one ORM row.
 
         A named constructor rather than `Heading(metric.module.name, metric.column_key)` at the call
@@ -242,7 +242,7 @@ class MetricIdentity(NamedTuple):
     variant: VariantName | None
 
     @classmethod
-    def from_metric(cls, metric: db.Metric) -> MetricIdentity:
+    def from_db_metric(cls, metric: db.Metric) -> MetricIdentity:
         """The catalog identity of one ORM row — four reads, no conversion.
 
         This is what stage 4 of the type-safety branch bought. Until the ORM was retyped, three of
