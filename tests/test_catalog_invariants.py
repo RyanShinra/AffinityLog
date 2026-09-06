@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
-from app.catalog.invariants import Heading, find_heading_violations, raise_on_heading_violations
+from app.catalog.invariants import HeadingAudit, find_heading_violations, raise_on_heading_violations
 from app.catalog.keys import decompose
 from app.catalog.variant_kind import VariantKind
 from app.graphql.context import Context
@@ -42,10 +42,10 @@ def _heading(
     variant_kinds: tuple[VariantKind, ...] = (),
     variants: tuple[str, ...] = (),
     bare_rows: int = 0,
-) -> Heading:
-    """A Heading from plain strings — see `_key` in test_catalog_keys.py for why the `NewType`
+) -> HeadingAudit:
+    """A HeadingAudit from plain strings — see `_key` in test_catalog_keys.py for why the `NewType`
     laundering is safe in a test and would not be in production code."""
-    return Heading(
+    return HeadingAudit(
         ModuleName(module),
         ColumnKey(column_key),
         variant_kinds,
@@ -167,7 +167,7 @@ class TestShapesItMustRefuse:
         again on the orphan that was in the tuple all along.
 
         (This said "the two HAVING arms". There is no HAVING — the query returns every heading and
-        `Heading.problems()` classifies in Python, because two of the branches need sets imported
+        `HeadingAudit.problems()` classifies in Python, because two of the branches need sets imported
         from app.catalog.keys and app.catalog.interface_kind that SQL cannot see. There are four
         branches now, not two.)
         """
@@ -452,7 +452,7 @@ class TestTheDatabaseRefusesHalfPopulatedRows:
 
 
 class TestProblemsNeedsNoDatabase:
-    """`Heading.problems()` is a pure function, so the classification is testable on its own."""
+    """`HeadingAudit.problems()` is a pure function, so the classification is testable on its own."""
 
     def test_a_clean_heading_has_no_problems(self) -> None:
         assert _heading("boltz2", "ptm", bare_rows=1).problems() == ()
