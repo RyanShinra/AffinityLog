@@ -113,7 +113,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from sqlalchemy import text
+from sqlalchemy import TextClause, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
@@ -122,7 +122,7 @@ from app.catalog.keys import declared_variants_for, decomposable_kinds_for
 from app.catalog.variant_kind import VariantKind
 
 
-class Heading(NamedTuple):
+class HeadingAudit(NamedTuple):
     """One `(module, column_key)` and the shape of its catalog rows."""
 
     module: ModuleName
@@ -197,7 +197,7 @@ class Heading(NamedTuple):
 # No HAVING: this returns EVERY heading and `Heading.problems()` decides which are broken. The
 # classification needs `decomposable_kinds_for` from app.catalog.keys, which SQL cannot import,
 # and at 144 rows the difference is not worth splitting the logic across two languages.
-_HEADINGS_SQL = text("""
+_HEADINGS_SQL: TextClause = text("""
     SELECT  mo.name                                                       AS module,
             me.column_key                                                 AS column_key,
             array_agg(DISTINCT me.variant_kind::text)
@@ -212,7 +212,7 @@ _HEADINGS_SQL = text("""
     """)
 
 
-async def find_heading_violations(session: AsyncSession) -> list[Heading]:
+async def find_heading_violations(session: AsyncSession) -> list[HeadingAudit]:
     """Every heading the ScoreEntry lookup cannot resolve. Empty list means clean.
 
     Call INSIDE the seeding transaction and before `commit()`: uncommitted rows are visible to
@@ -220,8 +220,8 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
     reporting it after the fact.
     """
     result = await session.execute(_HEADINGS_SQL)
-    headings = [
-        Heading(
+    audits: list[HeadingAudit] = [
+        HeadingAudit(
             module=ModuleName(row.module),
             column_key=ColumnKey(row.column_key),
             # THE STRING BOUNDARY. `_HEADINGS_SQL` casts the enum column to text, so this is the
@@ -234,7 +234,7 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
         )
         for row in result
     ]
-    return [heading for heading in headings if heading.problems()]
+    return [audit for audit in audits if audit.problems()]
 
 
 async def raise_on_heading_violations(session: AsyncSession, *, source: str) -> None:
