@@ -135,10 +135,19 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 
 - **Discuss the approach before building it.** For anything past a trivial edit, propose the plan,
   name the decision points, and wait. Building first pre-empts the owner's input and wastes his time.
-- **Leave the decision-carrying code to him.** He writes the pieces that encode a judgment — the
-  `CASE` classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score
-  parsing. Scaffold around it, mark the spot, explain the trade-offs, and offer a "fill in the
-  blanks" version rather than assuming he wants to type boilerplate.
+- **Err toward writing NOTHING directly; show the code instead.** The default is a locale list —
+  file, line, and the code that goes there, in the reply — and he types it. This is stronger than
+  "leave him the decision-carrying code", which is what this entry used to say: it applies to
+  boilerplate too. An earlier version ended "rather than assuming he wants to type boilerplate",
+  which had it backwards. Typing it is how he learns the Python data layer, which is half the point
+  of the project, and a locale list is reviewable in a way a finished diff is not.
+  He writes the pieces that encode a judgment for the same reason, only more so — the `CASE`
+  classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score parsing,
+  the two-tier branch. Mark the spot, name the trade-offs, and wait.
+  Two things still belong to Claude by default: **tests** (he has said so explicitly, including
+  writing them first so he can code against them) and **mechanical fallout** that a change he just
+  made has already decided — a rename's call sites, an import that went dead. When in doubt,
+  show it rather than land it; landing it and reporting clearly is the fallback, not the default.
 - **Never start, stop, or restart Docker — ask, or hand the command over.** Launching Docker
   Desktop spins up a VM, mounts filesystems, and starts any container with a restart policy; on a
   laptop that is a real battery and memory commitment, and it changes machine state well beyond the
@@ -147,6 +156,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 - **Consult the linter before saying "run it."** Editor diagnostics have caught errors that were then
   shipped anyway; treat ruff/mypy/black as a pre-run gate, and reason about the installed library's
   real signatures rather than the remembered ones.
+- **A red suite mid-change is fine when the red is explicable.** From the owner, quoting his
+  software-testing lecturer: *"Some of you seem to think that debugging is like finding the bottom
+  of the hill. Fix one thing and the number of errors increases, so you did the wrong thing.
+  Sometimes the number of errors goes up, on the way to the correct solution."* So do NOT split a
+  coherent change into commits chosen to keep `pytest` green at every step, and do not narrow a
+  refactor to avoid breaking tests you are about to update anyway. Let the count rise, say WHY it
+  rose, and bring it back down when the change is done. What is not acceptable is unexplained red,
+  or red nobody noticed. (This does not license committing red without saying so — the TDD commit
+  `f786597` labels itself RED ON PURPOSE in its first line.)
 - **Move deliberately; verify against the data.** One checked query beats three plausible paragraphs.
   Nearly every finding in `docs/schema-stress-log.md` came from stopping to measure something instead
   of asserting it — including the ipTM discovery, which contradicted the obvious hypothesis. When he
