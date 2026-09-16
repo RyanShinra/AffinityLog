@@ -493,6 +493,19 @@ class TestTheGuardsFailLoudly:
 
         The control case matters as much as the two codes: it is what would catch `should_mask_error`
         being inverted, which would let every internal error through while these two still passed.
+
+        EVERY ERROR HERE CARRIES AN `original_error`, because that is what a resolver-raised error
+        looks like by the time the extension sees it — graphql-core wraps whatever a resolver raised.
+        A `GraphQLError("boom")` built bare has NO original, which is the signature of GraphQL's own
+        syntax/validation errors, and those are deliberately not masked. The first draft of this
+        test built the control bare, and it went red the moment that rule landed: it was asserting
+        "internal errors are masked" against an error that was not internal.
         """
-        assert should_mask_error(GraphQLError("boom")), "control: an uncoded error IS masked"
-        assert not should_mask_error(GraphQLError("boom", extensions={"code": code}))
+        internal = GraphQLError("boom", original_error=RuntimeError("boom"))
+        assert should_mask_error(internal), "control: an uncoded error out of a resolver IS masked"
+
+        deliberate = GraphQLError("boom", original_error=ValueError("boom"), extensions={"code": code})
+        assert not should_mask_error(deliberate)
+
+        graphqls_own = GraphQLError("Cannot query field 'nosuchfield' on type 'Query'.")
+        assert not should_mask_error(graphqls_own), "a syntax/validation error has no original and must reach the client"

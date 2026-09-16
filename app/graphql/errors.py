@@ -45,14 +45,30 @@ from strawberry.extensions import MaskErrors
 
 
 def should_mask_error(error: GraphQLError) -> bool:
-    """True for anything not raised deliberately, i.e. anything with no ``code`` extension.
+    """True for anything that could carry something internal. Two kinds of error never can.
 
-    Deliberately conservative in the safe direction: a *new* deliberate error that forgets to set a
-    code gets masked, which is a confusing bug report. The reverse default — show unless told to
-    hide — would turn the same omission into an information leak. Failing toward silence is the
-    cheaper mistake.
+    GRAPHQL'S OWN ERRORS — syntax and validation — arrive with no `original_error`, because
+    graphql-core produced them during parse/validate before any resolver ran. Nothing internal has
+    executed, so there is nothing to leak, and a client's typo should read as a typo. Measured:
+    `{ nosuchfield }` and an unterminated query both arrive with `original_error is None` and empty
+    extensions. Masking them turned every typo into "Internal server error."
+
+    DELIBERATE ERRORS carry a `code` extension — `_as_uuid` in schema.py is the precedent — and the
+    code is the marker for "meant to be read". Same convention Apollo uses.
+
+    Everything else is masked, and that default is deliberately conservative: a *new* deliberate
+    error that forgets its code gets masked, which is a confusing bug report. The reverse default —
+    show unless told to hide — would turn the same omission into an information leak. Failing
+    toward silence is the cheaper mistake.
     """
-    return not (error.extensions or {}).get("code")
+    if error.original_error is None:
+        return False
+
+    # noqa: SIM103 — Ruff wants a single line, a triple (quadruple?) negative. This is about as readable as I can make it
+    if (error.extensions is not None) and (error.extensions.get("code") is not None):  # noqa: SIM103
+        return False
+
+    return True
 
 
 class MaskInternalErrors(MaskErrors):
