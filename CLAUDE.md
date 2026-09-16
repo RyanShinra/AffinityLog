@@ -335,6 +335,10 @@ ships. These were learned the hard way; they are not preferences to optimise awa
     and `charliermarsh.ruff` extensions (listed in `.vscode/extensions.json`, VS Code will
     prompt to install them) on whichever machine's VS Code you're using; this is separate from
     the pre-commit hook and doesn't carry over between Mac/PC automatically.
+- **Local LLM tooling (Ollama + Continue) is per machine and documented in `docs/local-llm-setup.md`.**
+  The Continue config, the Ollama env and the assistant's memory all live outside the repo and do
+  not sync, so that doc carries the decisions, the config files and the measured numbers. Mac is
+  done; the PC section lists what has to be decided there before anything is pulled.
 
 ---
 
