@@ -119,14 +119,14 @@ type Metric {
   propertyCategories: [String!]!
   module: Module!
   concept: Concept
-  transformOf: Metric
+  transformOf: Metric  # NOT BUILT: nothing populates transform_of_metric_id yet
   benchmarkResults: [BenchmarkResult!]!
 }
 
 type Module {
   name: String!
   moduleType: ModuleType!
-  functions: [String!]!
+  functions: [ModuleFunction!]!  # Adding an enum to cover this (WIP)
   repoUrl: String
   description: String
   version: String

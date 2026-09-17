@@ -22,11 +22,11 @@ from collections.abc import Sequence
 
 import strawberry
 from graphql import GraphQLError
-from sqlalchemy import Result, Select
+from sqlalchemy import Result, Select, select
 
 from app.graphql.context import Context
 from app.graphql.errors import MaskInternalErrors
-from app.graphql.types import Candidate, Experiment
+from app.graphql.types import Candidate, Experiment, Metric, Module
 from app.models import orm as db
 
 # ---------------------------------------------------------------------------------------------
@@ -127,6 +127,21 @@ class Query:
         if row is None:
             return None
         return Candidate.from_row(row)
+
+    @strawberry.field
+    async def modules(self, info: strawberry.Info[Context, None]) -> list[Module]:
+        stmt: Select[tuple[db.Module]] = select(db.Module).order_by(db.Module.name)
+        result: Result[tuple[db.Module]] = await info.context.execute_statement(stmt)
+        rows: Sequence[db.Module] = result.scalars().all()
+        return [Module.from_row(r) for r in rows]
+
+    @strawberry.field
+    async def metrics(self, info: strawberry.Info[Context, None]) -> list[Metric]:
+        # From the per-request catalog memo, not a select of its own: the ScoreEntry lookup reads
+        # the same rows, so the two cannot disagree about what a metric is, and the eager loads are
+        # written down once — in `_load_catalog` — instead of twice.
+        catalog = await info.context.catalog()
+        return [Metric.from_row(row) for row in catalog.metric_by_identity.values()]
 
 
 # Building this object is what generates the SDL — there is no schema file to keep in sync, which is

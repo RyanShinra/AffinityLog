@@ -79,9 +79,15 @@ from sqlalchemy import Result, Select, select
 from sqlalchemy.orm import selectinload
 from strawberry.scalars import JSON
 
+from app.catalog import variant_kind
+from app.catalog.identifiers import ModuleName
+
+# from app.catalog.identifiers import ModuleName
+from app.graphql.context import MetricCatalog
 from app.models import orm as db
 
 if TYPE_CHECKING:
+
     from app.graphql.context import Context
 
 # Wrap the ORM's ChainRole enum rather than declaring a parallel one. `strawberry.enum` registers the
@@ -89,7 +95,17 @@ if TYPE_CHECKING:
 # vocabulary — the same reasoning that keeps InterfaceKind in one place. The GraphQL enum exposes
 # the member NAMES (HEAVY/LIGHT/TARGET), not the values ("H"/"L"/"T"): that is the GraphQL
 # convention, and happens to be the more readable half of the pair.
+# > These bind nothing anyone uses: `strawberry.enum` REGISTERS the class with the schema and returns
+# it unchanged, so the annotation to write is `db.ModuleType`, not `ModuleType` — the binding's
+# inferred type is `EnumType | Callable[...]`, which is a value, not a type expression. See
+# `Chain.role` for the shape.
+
 ChainRole = strawberry.enum(db.ChainRole)
+MetricValueType = strawberry.enum(db.MetricValueType)
+Direction = strawberry.enum(db.Direction)
+ModuleType = strawberry.enum(db.ModuleType)
+VariantKind = strawberry.enum(variant_kind.VariantKind)
+ModuleFunction = strawberry.enum(db.ModuleFunction)
 
 
 @strawberry.type
@@ -277,3 +293,147 @@ class Experiment:
         result: Result[tuple[db.Candidate]] = await info.context.execute_statement(stmt)
         rows: Sequence[db.Candidate] = result.scalars().all()
         return [Candidate.from_row(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# THE CATALOG — what a score MEANS.
+# Every object below is already in memory once Context.catalog() has run:
+# _load_catalog eager-loads module, concept, benchmark_results and transform_of.
+# These are declarations over data we already fetch, not new queries.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.type
+class Concept:
+    """What a metric measures, independent of which module measured it."""
+
+    name: str
+    label: str
+    description: str | None
+
+    @staticmethod
+    def from_row(row: db.Concept) -> Concept:
+        return Concept(name=row.name, label=row.label, description=row.description)
+
+
+@strawberry.type
+class BenchmarkResult:
+    """One published benchmark row for a metric.
+
+    ALWAYS EMPTY TODAY: `benchmark_results` has zero rows and the tables were deliberately never
+    populated (CLAUDE.md). Built because the field is in the committed spec and `[]` is truthful —
+    but nothing exercises the mapping below, so do not read a green test as coverage.
+    """
+
+    property: str
+    n: int
+    spearman_correlation: float
+    auroc: float | None
+    auprc: float | None
+    precision_top5: float | None
+
+    @staticmethod
+    def from_row(row: db.BenchmarkResult) -> BenchmarkResult:
+        return BenchmarkResult(
+            property=row.property,
+            n=row.n,
+            spearman_correlation=row.spearman_correlation,
+            auroc=row.auroc,
+            auprc=row.auprc,
+            precision_top5=row.precision_top5,
+        )
+
+
+@strawberry.type
+class Module:
+    """An algorithmic unit in Bio Discovery — Boltz2, EvoProtGrad, TemStaPro."""
+
+    name: str  # narrowed from ModuleName: a NewType cannot cross into the SDL
+    module_type: db.ModuleType
+    functions: list[db.ModuleFunction]
+    repo_url: str | None
+    description: str | None
+    version: str | None
+    license: str | None
+
+    @staticmethod
+    def from_row(row: db.Module) -> Module:
+        return Module(
+            name=row.name,
+            module_type=row.module_type,
+            functions=list(row.functions),
+            repo_url=row.repo_url,
+            description=row.description,
+            version=row.version,
+            license=row.license,
+        )
+
+    @strawberry.field
+    async def metrics(self, info: strawberry.Info[Context, None]) -> list[Metric]:
+        """Every metric this module emits.
+
+        A resolver rather than a plain field, and that is structural: `Metric.from_row` builds its
+        `Module`, so a `Module.from_row` that built its metrics would recurse without end. A resolver
+        runs only when the client asks for the field.
+
+        Reads `metrics_per_module`, grouped once when the catalog is built — not a scan per module
+        per request. No query of its own either way.
+        """
+        catalog: MetricCatalog = await info.context.catalog()
+        rows = catalog.metrics_per_module.get(ModuleName(self.name), ())
+
+        result: list[Metric] = []
+        for row in rows:
+            result.append(Metric.from_row(row))
+        return result
+
+
+@strawberry.type
+class Metric:
+    """One catalogued column, and what it means.
+
+    NO `transformOf` YET, deliberately. `metrics.transform_of_metric_id` is a self-FK for the
+    raw-vs-transformed metric pairs, and nothing in the repo writes it — not `seed/catalog.json`,
+    not any seeder. Exposing it would also need care: `selectinload(transform_of)` loads exactly one
+    level, so recursing `from_row` into the parent touches ITS unloaded `module` and raises
+    MissingGreenlet. When something populates the column, the shape is a resolver over a by-id
+    catalog index, not a field. `docs/graphql-schema.md` still specifies it.
+
+    `benchmarkResults` below is NOT the same case and stays: it is a list, so `[]` is a truthful
+    answer rather than a stand-in, and it needs no recursion.
+    """
+
+    column_key: str
+    display_name: str
+    value_type: db.MetricValueType
+    unit: str | None
+    direction: db.Direction
+    variant_kind: variant_kind.VariantKind | None
+    variant: str | None
+    notes: str | None
+    property_categories: list[str]
+    module: Module
+    concept: Concept | None
+    benchmark_results: list[BenchmarkResult]
+
+    @strawberry.field
+    def curated(self) -> bool:
+        """No column: a metric is curated when someone gave it a name other than its raw header."""
+        return self.display_name != self.column_key
+
+    @staticmethod
+    def from_row(row: db.Metric) -> Metric:
+        return Metric(
+            column_key=row.column_key,
+            display_name=row.display_name,
+            value_type=row.value_type,
+            unit=row.unit,
+            direction=row.direction,
+            variant_kind=row.variant_kind,
+            variant=row.variant,
+            notes=row.notes,
+            property_categories=list(row.property_categories),
+            module=Module.from_row(row.module),
+            concept=Concept.from_row(row.concept) if row.concept is not None else None,
+            benchmark_results=[BenchmarkResult.from_row(b) for b in row.benchmark_results],
+        )
