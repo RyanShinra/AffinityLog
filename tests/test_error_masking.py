@@ -27,27 +27,53 @@ from app.graphql.errors import MaskInternalErrors, should_mask_error
 
 
 class TestShouldMaskError:
-    """The predicate: safe to show iff the error carries a deliberate `code`."""
+    """The predicate: mask unless the error is GraphQL's own, or carries a deliberate `code`.
+
+    EVERY ERROR HERE CARRIES AN `original_error`, and that is not decoration. graphql-core wraps
+    whatever a resolver raised, so a resolver-produced error ALWAYS has one by the time the
+    extension sees it; a bare `GraphQLError(...)` has none, which is the signature of a syntax or
+    validation error instead.
+
+    These tests built them bare until 2026-09-17, with comments saying "what SQLAlchemy, asyncpg and
+    any ordinary bug produce" — true of the intent, never of the object. Under the old
+    one-condition predicate that made no difference, so they passed while exercising a value that
+    cannot occur, and went red the moment `original_error` started to matter. Note which tests did
+    NOT go red: `TestMaskingEndToEnd` raises a real `RuntimeError` through a real schema and was
+    correct throughout. The end-to-end case was right where the unit case was fictional.
+    """
 
     def test_error_with_a_code_is_shown(self) -> None:
-        error = GraphQLError("malformed id", extensions={"code": "BAD_USER_INPUT"})
+        error = GraphQLError("malformed id", original_error=ValueError("bad"), extensions={"code": "BAD_USER_INPUT"})
         assert should_mask_error(error) is False
 
+    def test_graphqls_own_errors_are_shown(self) -> None:
+        """Syntax and validation — the reason the predicate grew a second condition.
+
+        Produced during parse/validate, before any resolver runs, so nothing internal has executed
+        and there is nothing to leak. Masking them turned a client's typo into "Internal server
+        error.", the opposite of what this file guards.
+        """
+        assert should_mask_error(GraphQLError("Cannot query field 'nope' on type 'Query'.")) is False
+
     def test_error_with_no_extensions_is_masked(self) -> None:
-        # What SQLAlchemy, asyncpg and any ordinary bug produce.
-        assert should_mask_error(GraphQLError("column does not exist")) is True
+        # What SQLAlchemy and asyncpg produce, once graphql-core has wrapped them.
+        error = GraphQLError("column does not exist", original_error=RuntimeError("column does not exist"))
+        assert should_mask_error(error) is True
 
     def test_error_with_empty_extensions_is_masked(self) -> None:
-        assert should_mask_error(GraphQLError("boom", extensions={})) is True
+        error = GraphQLError("boom", original_error=RuntimeError("boom"), extensions={})
+        assert should_mask_error(error) is True
 
     def test_extensions_without_a_code_key_are_masked(self) -> None:
         # Only `code` counts. Any other metadata an extension might attach must not be read as
         # consent to publish the message.
-        assert should_mask_error(GraphQLError("boom", extensions={"timestamp": 123})) is True
+        error = GraphQLError("boom", original_error=RuntimeError("boom"), extensions={"timestamp": 123})
+        assert should_mask_error(error) is True
 
     def test_an_empty_code_is_masked(self) -> None:
         # Falsy rather than absent — masking is the safe direction, so it fails toward silence.
-        assert should_mask_error(GraphQLError("boom", extensions={"code": ""})) is True
+        error = GraphQLError("boom", original_error=RuntimeError("boom"), extensions={"code": ""})
+        assert should_mask_error(error) is True
 
 
 @strawberry.type
@@ -73,6 +99,17 @@ class TestMaskingEndToEnd:
         assert result.errors is not None
         assert result.errors[0].message == "malformed id: 'haha' is not a UUID"
         assert result.errors[0].extensions == {"code": "BAD_USER_INPUT"}
+
+    async def test_a_client_typo_is_not_masked(self) -> None:
+        """End to end, through a real schema: an unknown field must name itself.
+
+        The counterpart to `test_graphqls_own_errors_are_shown`, and the case that was broken in
+        production while every unit test above was green.
+        """
+        result = await _schema.execute("{ nosuchfield }")
+
+        assert result.errors is not None
+        assert "nosuchfield" in result.errors[0].message
 
     async def test_internal_error_is_replaced(self) -> None:
         result = await _schema.execute("{ internal }")
