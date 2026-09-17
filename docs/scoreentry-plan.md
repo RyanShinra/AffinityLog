@@ -1,12 +1,14 @@
 # The ScoreEntry chapter — the plan for PR #16
 
-> **Status: the plan, written 2026-08-25 as PR #15 closed and merged. Not started.** PR #15 typed the domain
-> vocabulary specifically so this could be built on something internally consistent; this is the work
-> that was waiting. `docs/graphql-schema.md` is the committed contract and stays authoritative for
-> WHAT the types are — this file is the order to build them in and the decisions that order forces.
+> **Status: in progress on `score-entry-resolvers`. Stages 1, 1b and 3 shipped; stage 2 is next.**
+> Written 2026-08-25 as PR #15 closed, and kept up to date since — the decisions each stage forced
+> are recorded in "What stages 1, 1b and 3 decided" below, because the commits carry the reasoning
+> but this file is what a cold session reads. `docs/graphql-schema.md` is the committed contract and
+> stays authoritative for WHAT the types are; this file is the order and the decisions.
 
-**Where the API is now.** Four resolvers (`experiments`, `experiment`, `candidates`, `candidate`) and
-seven SDL types. The spec has sixteen. Everything below is the gap.
+**Where the API is now.** Six resolvers (`experiments`, `experiment`, `candidates`, `candidate`,
+`modules`, `metrics`) and sixteen SDL types, up from four and seven. Still missing: `ScoreEntry`,
+`Artifact`, `Candidate.scores`, `.interfaceKind`, `.target`, `.artifacts`, and `Mutation` entirely.
 
 ```
 built:     Candidate  Chain  ChainRole  Experiment  Project  Recipe  Target  JSON
@@ -21,11 +23,11 @@ catalogued metrics, 9 of them INTERFACE, 14 `candidate_summary` rows.
 
 ---
 
-## The keystone: `Context.interface_kinds()` does not exist
+## The keystone: `Context.interface_kinds()` — SHIPPED `12d6d28`
 
-Two comments already refer to it as though it does — `app/graphql/context.py:100` and
-`tests/test_context_catalog.py:174` — and CLAUDE.md gives it a design constraint. It is the
-candidate-side half of the two-tier lookup, and nothing else can be built first.
+It is the candidate-side half of the two-tier lookup, and nothing else could be built first. Two
+comments already referred to it as though it existed, and CLAUDE.md gave it a design constraint,
+before any of it was written. What follows is why it has the shape it has.
 
 `MetricCatalog` answers *"is this heading INTERFACE-qualified?"*. That is tier one. Tier two needs
 *"and what did THIS candidate fold?"*, which is `candidate_summary.interface_kind` — a per-candidate
@@ -55,9 +57,9 @@ bag plus the catalog row explaining it. This is where the finding the whole sche
 becomes API behaviour: `boltz2.protein_iptm` resolves to *HER2 binding confidence*, *heavy-light
 pairing*, or *not an interface*, depending on which chains that candidate folded.
 
-**The two-tier lookup must MOVE, not be copied.** It currently lives in
-`tests/test_context_catalog.py::_identity_for`, written longhand, and its own docstring says why that
-is temporary:
+**The two-tier lookup had to MOVE, not be copied — done in `f786597`/`b3b6c64`.** It lived in
+`tests/test_context_catalog.py::_identity_for`, written longhand, and its own docstring said why that
+was temporary:
 
 > It lives in the test for now because the resolver does not exist yet — when it does, this should be
 > deleted and the test should call it instead, or the test stops guarding the real code path.
@@ -89,16 +91,95 @@ than before, because it would look like coverage.
 Each stage moves `schema.graphql`, and `tests/test_schema_snapshot.py` turns every one into a
 reviewable diff. That was PR #15 stage 1's entire purpose and this is where it pays.
 
-| | | |
-|---|---|---|
-| 1 | `Context.interface_kinds()` + its own lock | nothing else can start |
-| 2 | `ScoreEntry`, `Candidate.scores`, the lookup moved out of the test | the chapter's point |
-| 3 | `Metric`, `Module`, `Concept`, `Query.modules`, `Query.metrics` | what a ScoreEntry points AT |
-| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist |
-| 5 | `Mutation.annotateCandidate` | the only write in the API |
+| | | | |
+|---|---|---|---|
+| 1 | `Context.interface_kinds()` + its own lock | nothing else can start | **shipped** `12d6d28` |
+| 1b | `Heading`, `MetricIdentity`, `VariantAxes`, `MetricCatalog.metric_for` | the lookup moved out of the test | **shipped** `f786597`, `b3b6c64` |
+| 3 | `Metric`, `Module`, `Concept`, `BenchmarkResult`, `Query.modules`, `Query.metrics` | what a ScoreEntry points AT | **shipped** `120d16d` |
+| 2 | `ScoreEntry`, `Candidate.scores` | the chapter's point | next |
+| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | |
+| 5 | `Mutation.annotateCandidate` | the only write in the API | |
+
+**STAGES 2 AND 3 WERE SWAPPED, on 2026-09-17, and the numbers above are left as they were rather
+than renumbered** — the commits reference them. `ScoreEntry.metric` points at `Metric`, and
+`ScoreEntry.numericValue` is specified as "null unless `metric.valueType` is FLOAT or INT", so
+stage 2 cannot be built without at least part of stage 3. Building the pointer first would have
+meant publishing a partial `Metric` in the SDL and growing it a commit later — a public contract
+changing twice for no reason. Stage 3 also turned out cheaper than this plan implied: `_load_catalog`
+already eager-loads `module`, `concept`, `benchmark_results` and `transform_of`, so it was type
+declarations over data already in memory, with no new queries.
+
+Stage 1 also grew a half. The two-tier lookup had to leave `tests/test_context_catalog.py` before
+anything could call it, and doing that properly meant naming the types it was assembled from — see
+"What stage 1b decided" below.
 
 Stage 4's `Artifact` closes the last "for now" comment in the codebase (`app/models/orm.py:451`,
-"the placeholder hook for now"). Stage 2 closes the other (`tests/test_context_catalog.py:40`).
+"the placeholder hook for now"). Stage 1b closed the other (`tests/test_context_catalog.py:40`).
+
+---
+
+## What stages 1, 1b and 3 decided
+
+Recorded here because the commits carry the reasoning but the plan is what a cold session reads.
+
+### Stage 1 — `interface_kinds()`
+
+* **Keyed by `candidates.sequence_id`**, because that is what `candidate_summary` publishes (as
+  `candidate_id`). That key is unique only PER EXPERIMENT — `uq_candidate_seq` is the composite —
+  while the map spans all nine, so two colliding rows would hand one candidate the other's interface
+  kind. Measured: 14 candidates, 14 distinct ids, and the two same-antibody pairs in the corpus
+  carry DIFFERENT vendor ids across runs. A guard raises rather than folding them; proved by forcing
+  a collision inside a rolled-back transaction. Adding `c.id` to the view would remove the question
+  structurally, and is the remedy the error message names.
+* **Both failures are `GraphQLError` with a code, not `ValueError`.** Neither is transient: once the
+  data or the code is in that state, every query touching scores fails identically until a human
+  intervenes. So each has two audiences — the operator who fixes it and the client who needs to know
+  what broke — and `MaskInternalErrors` replaces the message of anything without a `code`.
+
+### Stage 1b — the lookup's vocabulary
+
+* `Heading`, `MetricIdentity` (promoted from a bare tuple alias) and `VariantAxes` exist to make
+  `metric_for` readable, not to add behaviour. `Mapping[tuple[ModuleName, ColumnKey],
+  frozenset[VariantKind]]` costs a reader ten seconds; `if axes.interface_qualified` says what is
+  being asked where `if VariantKind.INTERFACE in kinds` did not.
+* **Promoting `MetricIdentity` to a class turned three of four defects into compile errors.** The
+  fourth — `.get()` with no default falling through to the raise for every ordinary key — was
+  invisible to mypy and caught by tests written first.
+* `metric_for` lives on `MetricCatalog` rather than in the resolver: it reads
+  `variant_axes_per_heading` and produces a key into `metric_by_identity`, both of which are that
+  class's own fields, and nowhere else can then reimplement the branch wrongly.
+
+### Stage 3 — the catalog types
+
+* **`Module.functions` is `[ModuleFunction!]!`, departing from the committed spec's `[String!]!`.**
+  The column is `ARRAY(Enum(ModuleFunction))` and `moduleType` beside it is already an enum. The JSON
+  a client receives is identical, so the difference is entirely contract: introspection shows the
+  closed set, a future `modules(function:)` filter is validated before a resolver runs, and adding a
+  member is already a migration `tests/test_postgres_enum_labels.py` enforces.
+  `docs/graphql-schema.md` was updated to match.
+* **`Query.metrics` reads the per-request catalog memo**, so it cannot disagree with the ScoreEntry
+  lookup about what a metric is, and the four eager loads are written once. `Query.modules` needs its
+  own `select`: a module that emits nothing is not in the catalog at all.
+* **`Module.metrics` is a resolver, not a field.** Structural, not stylistic: `Metric.from_row`
+  builds its `Module`, so a `Module.from_row` that built its metrics would recurse without end. It
+  reads `metrics_per_module`, grouped once when the catalog is built.
+* **`Metric.transformOf` is NOT exposed, though the spec lists it.** Nothing in the repo writes
+  `transform_of_metric_id`, and `selectinload` loads exactly one level, so recursing `from_row` into
+  the parent touches ITS unloaded `module` and raises `MissingGreenlet`. When something populates the
+  column, the shape is a resolver over a by-id index. A test asserts the ABSENCE so the gap reads as
+  a decision rather than an oversight.
+* **A Strawberry enum binding cannot be used as a type annotation.** `strawberry.enum` returns
+  `EnumType | Callable[[EnumType], EnumType]` — a union serving both decorator forms — so
+  `module_type: ModuleType` is rejected. It REGISTERS the class and returns it unchanged, so the
+  annotation to write is `db.ModuleType`. Those module-level lines are registration statements, not
+  aliases. `Chain.role` has had the right shape since it was written.
+
+### Found along the way, and fixed
+
+`MaskInternalErrors` was masking GraphQL's own syntax and validation errors, so every client typo
+came back as "Internal server error." Found because all fourteen stage-3 tests failed with that
+message instead of "Cannot query field 'metrics'". The discriminator is `original_error`, which
+GraphQL's own errors do not carry. See `1695043` and `f7f0f61`.
 
 ---
 
@@ -111,12 +192,14 @@ finished function to review.
 
 **HIS — the decision-carrying code:**
 
-1. **The two-tier branch in the ScoreEntry resolver.** This is the ipTM finding turned into an `if`.
-   `tests/test_context_catalog.py::_identity_for` is the longhand version to move, and it already
-   contains the two judgements: that a missing `interface_kind` on an INTERFACE-qualified heading
-   RAISES rather than building an identity that resolves to nothing, and that it raises rather than
-   `assert`s, because `python -O` strips asserts and the silent failure is the exact thing the
-   design exists to prevent.
+1. ~~**The two-tier branch in the ScoreEntry resolver.**~~ **DONE in stage 1b**, and it landed as
+   `MetricCatalog.metric_for` rather than inside the resolver — see "Stage 1b" above for why the
+   catalog owns it. Both judgements survived the move: a missing `interface_kind` on an
+   INTERFACE-qualified heading RAISES rather than building an identity that resolves to nothing, and
+   it raises rather than `assert`s, because `python -O` strips asserts and the silent failure is the
+   exact thing the design exists to prevent. What remains for the resolver is the FILTER semantics —
+   whether `module: "boltz2"` matches the key's prefix or `metric.module.name`, which differ for the
+   two `_export` keys.
 2. **`numericValue`'s defensive parse.** What counts as parseable, and what a failure returns.
    `docs/graphql-schema.md` §"numericValue parses defensively, even though nothing currently fails"
    has the reasoning; the code is four lines and every one of them is a decision.
@@ -132,8 +215,9 @@ finished function to review.
   `TestTheLocksAreSeparate` is the pattern).
 * The Strawberry type declarations and their wiring into `Query`/`Candidate`.
 * Regenerating `schema.graphql` at each stage so every SDL change is a reviewable diff.
-* Tests around his logic once its shape is settled — including deleting `_identity_for` from the
-  test and repointing the assertions at the real resolver, so the test stops guarding a copy.
+* ~~Tests around his logic, including deleting `_identity_for`~~ — **done in `f786597`**, which
+  wrote the spec first and deleted the copy, so `TestTheIptmFinding` now calls `metric_for` rather
+  than asserting the finding against a function defined in the test file.
 
 **A fair warning about stage 1.** `interface_kinds()` is raw SQL against `candidate_summary`, which
 is doorway one below. The bind is an untyped dict and mypy will not check it. Worth an eyeball on
