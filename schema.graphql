@@ -18,6 +18,7 @@ type Candidate {
   annotation: String
   chains: [Chain!]!
   experiment: Experiment
+  scores(module: String = null, chain: ChainRole = null, concept: String = null): [ScoreEntry!]!
 }
 
 type Chain {
@@ -135,6 +136,14 @@ type Recipe {
   recipeType: String
   author: String
   version: String
+}
+
+type ScoreEntry {
+  key: String!
+  value: String!
+  numericValue: Float
+  chain: ChainRole
+  metric: Metric
 }
 
 type Target {

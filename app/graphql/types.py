@@ -5,8 +5,9 @@ generated from these classes rather than parsed from a file, which is exactly wh
 written and reviewed before any of this existed — there was no other point at which changing the
 schema was cheap.
 
-This module covers the entity types only. ``ScoreEntry``, ``Metric``, ``Module`` and ``Concept`` —
-the interpretive half, and the reason the catalog exists — land in a later pass.
+Two halves. The entity types (``Candidate``, ``Experiment``, ``Chain`` and their satellites) map rows.
+The interpretive half — ``Metric``, ``Module``, ``Concept`` and ``ScoreEntry``, the reason the catalog
+exists — sits below them. ``ScoreEntry`` is the one type backed by no table: see ``Candidate.scores``.
 
 HOW A RESOLVER IS SHAPED (and where graphql-js habits mislead)
 -------------------------------------------------------------
@@ -70,6 +71,7 @@ are recorded so the decision is made against measurements rather than instinct.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
@@ -80,9 +82,9 @@ from sqlalchemy.orm import selectinload
 from strawberry.scalars import JSON
 
 from app.catalog import variant_kind
-from app.catalog.identifiers import ModuleName
-
-# from app.catalog.identifiers import ModuleName
+from app.catalog.identifiers import ModuleName, SequenceId
+from app.catalog.interface_kind import InterfaceKind
+from app.catalog.keys import ScoreKey, decompose
 from app.graphql.context import MetricCatalog
 from app.models import orm as db
 
@@ -106,6 +108,10 @@ Direction = strawberry.enum(db.Direction)
 ModuleType = strawberry.enum(db.ModuleType)
 VariantKind = strawberry.enum(variant_kind.VariantKind)
 ModuleFunction = strawberry.enum(db.ModuleFunction)
+
+# The first logger in `app/`. Named after the module, the standard-library way, so a handler can
+# be pointed at `app.graphql` without catching Strawberry's own `strawberry.execution` output.
+logger = logging.getLogger(__name__)
 
 
 @strawberry.type
@@ -170,9 +176,9 @@ class Chain:
 class Candidate:
     """A designed sequence and its chains.
 
-    `scores` is absent from this pass on purpose: turning the JSONB bag into interpreted
-    `ScoreEntry` values is the ScoreEntry chapter, and it needs `interface_kind` from the
-    `candidate_summary` view to disambiguate three of the 200 keys.
+    `scores` is a resolver over the private `score_bag`, not a field: turning the JSONB bag into
+    interpreted `ScoreEntry` values needs the catalog memo AND this candidate's `interface_kind`
+    from the `candidate_summary` view, which is what disambiguates three of the 200 keys.
     """
 
     id: strawberry.ID
@@ -191,6 +197,11 @@ class Candidate:
     # the one thing this schema exists not to do.
     experiment_id: strawberry.Private[uuid.UUID]
 
+    # The raw bag, kept off the schema. `scores` below is a RESOLVER over this, so the JSONB dict
+    # is never exposed as-is: the whole point of ScoreEntry is that a key means nothing until the
+    # catalog and the candidate's chains have both been consulted.
+    score_bag: strawberry.Private[dict[str, str]]
+
     @staticmethod
     def from_row(row: db.Candidate) -> Candidate:
         return Candidate(
@@ -199,6 +210,7 @@ class Candidate:
             annotation=row.annotation,
             chains=[Chain.from_row(c) for c in row.chains],
             experiment_id=row.experiment_id,
+            score_bag=row.scores,
         )
 
     @staticmethod
@@ -231,6 +243,56 @@ class Candidate:
         if row is None:
             return None
         return Experiment.from_row(row)
+
+    @strawberry.field
+    async def scores(
+        self,
+        info: strawberry.Info[Context, None],
+        module: str | None = None,
+        chain: db.ChainRole | None = None,
+        concept: str | None = None,
+    ) -> list[ScoreEntry]:
+        """The candidate's score bag, interpreted: one entry per JSONB key, plus what it means.
+
+        Backed by no table. Each entry is one bag key, the catalog row `metric_for` picks for it,
+        and the interface kind that lets `metric_for` pick. No SQL runs here: both memos load once
+        per request under their own locks, so `{ candidates { scores } }` is dict lookups from
+        here on. The filters run in Python for the reason docs/scoreentry-plan.md gives: pushing
+        them into JSONB would mean re-deriving `decompose()` in SQL.
+
+        Sorted by key. JSONB does not preserve insertion order, so without this the list order
+        would depend on Postgres's key hashing and nothing else.
+        """
+        catalog: MetricCatalog = await info.context.catalog()
+        interface_kind_per_candidate = await info.context.interface_kinds()
+        # `.get`, not `[]`: a candidate absent from the view is possible in principle, and
+        # `metric_for` already raises the coded error for the one case where that matters (an
+        # INTERFACE-qualified heading). Every other heading resolves fine without it.
+        interface_kind: InterfaceKind | None = interface_kind_per_candidate.get(SequenceId(self.sequence_id))
+
+        entries: list[ScoreEntry] = []
+        for key in sorted(self.score_bag):
+            value: str = self.score_bag[key]
+            score_key: ScoreKey = decompose(key)
+            db_metric: db.Metric | None = catalog.metric_for(score_key, interface_kind)
+
+            if not _passes_filters(score_key, db_metric, module=module, chain=chain, concept=concept):
+                continue
+
+            metric: Metric | None = None
+            if db_metric is not None:
+                metric = Metric.from_row(db_metric)
+
+            entries.append(
+                ScoreEntry(
+                    key=key,
+                    value=value,
+                    numeric_value=_numeric_value(value, db_metric),
+                    chain=score_key.chain,
+                    metric=metric,
+                )
+            )
+        return entries
 
 
 @strawberry.type
@@ -437,3 +499,92 @@ class Metric:
             concept=Concept.from_row(row.concept) if row.concept is not None else None,
             benchmark_results=[BenchmarkResult.from_row(b) for b in row.benchmark_results],
         )
+
+
+# ---------------------------------------------------------------------------
+# SCORE ENTRIES — the bag, interpreted. Backed by no table.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.type
+class ScoreEntry:
+    """One key of a candidate's score bag, and what the catalog says it means.
+
+    `value` is the stored string, uncoerced, always. `numeric_value` is a separate field rather
+    than a best-effort cast, so a CATEGORICAL that happens to look like a number never becomes one
+    (docs/graphql-schema.md, "value is never coerced"). `chain` is the suffix `decompose()`
+    stripped: it says which subject the value describes, not which metric it is, which is why it
+    is here and not on `Metric`. `metric` is nullable because an unresolvable key is information,
+    not an error: it says the column did not come from a catalogued module.
+    """
+
+    key: str
+    value: str
+    numeric_value: float | None
+    chain: db.ChainRole | None
+    metric: Metric | None
+
+
+def _numeric_value(value: str, db_metric: db.Metric | None) -> float | None:
+    """`value` as a float, or None. Populated only when the catalog says the metric is numeric.
+
+    docs/graphql-schema.md §"numericValue parses defensively": of the 995 values whose metric says
+    FLOAT or INT, all 995 parse today, and that is an artifact of how `value_type` was inferred
+    rather than a guarantee. "<40" and "-" are already in the corpus under CATEGORICAL rows, one
+    correction away from sitting under a numeric one.
+
+    Three choices, each deliberate:
+      * FLOAT and INT only. A BOOL stored as "1" would `float()` happily, and then a truth value
+        would be served as a measurement.
+      * `ValueError` only, not `Exception`. `value` is typed `str` all the way down, so a
+        `TypeError` here is OUR bug and should surface, not be swallowed into a null.
+      * A parse failure logs at DEBUG. It is a data-quality signal (a censored value under a
+        numeric metric) and not an alarm, and it fires once per bad value per request.
+    """
+    if db_metric is None:
+        return None
+    if db_metric.value_type not in (db.MetricValueType.FLOAT, db.MetricValueType.INT):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        logger.debug(
+            "score value %r under numeric metric %s.%s does not parse; numericValue is null",
+            value,
+            db_metric.module.name,
+            db_metric.column_key,
+        )
+        return None
+
+
+def _passes_filters(
+    score_key: ScoreKey,
+    db_metric: db.Metric | None,
+    *,
+    module: str | None,
+    chain: db.ChainRole | None,
+    concept: str | None,
+) -> bool:
+    """Whether one entry survives the `scores(module:, chain:, concept:)` arguments.
+
+    Three independent filters. `None` means "not filtering on this", for all three: an explicit
+    `chain: null` reads the same as omitting it. The three-valued version (`strawberry.UNSET` as
+    the default, so `null` could mean "unsuffixed entries only") was considered and rejected:
+    nothing asks for it, and a client can read `chain == null` off the response.
+
+    `module` matches the KEY's prefix, not the catalog's module. They agree for every catalogued
+    key and differ for an uncatalogued one, which has no metric to match: matching the key keeps
+    it, so `module: "mystery"` finds "mystery.column" whether or not the catalog knows it. The
+    client typed a string it can see in `key`; that is the thing it should match. `concept` has
+    no such choice, since a concept exists only through a metric, so it drops uncatalogued keys.
+    """
+    if module is not None and score_key.module != module:
+        return False
+    if chain is not None and score_key.chain != chain:
+        return False
+    if concept is not None:
+        if db_metric is None or db_metric.concept is None:
+            return False
+        if db_metric.concept.name != concept:
+            return False
+    return True

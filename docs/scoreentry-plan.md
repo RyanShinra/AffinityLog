@@ -1,20 +1,23 @@
 # The ScoreEntry chapter — the plan for PR #16
 
-> **Status: in progress on `score-entry-resolvers`. Stages 1, 1b and 3 shipped; stage 2 is next.**
+> **Status: in progress on `score-entry-resolvers`. Stages 1, 1b, 3 and 2 shipped; stage 4 is next.**
 > Written 2026-08-25 as PR #15 closed, and kept up to date since — the decisions each stage forced
-> are recorded in "What stages 1, 1b and 3 decided" below, because the commits carry the reasoning
+> are recorded in "What stages 1, 1b, 3 and 2 decided" below, because the commits carry the reasoning
 > but this file is what a cold session reads. `docs/graphql-schema.md` is the committed contract and
 > stays authoritative for WHAT the types are; this file is the order and the decisions.
 
-**Where the API is now.** Six resolvers (`experiments`, `experiment`, `candidates`, `candidate`,
-`modules`, `metrics`) and sixteen SDL types, up from four and seven. Still missing: `ScoreEntry`,
-`Artifact`, `Candidate.scores`, `.interfaceKind`, `.target`, `.artifacts`, and `Mutation` entirely.
+**Where the API is now.** Six root resolvers (`experiments`, `experiment`, `candidates`, `candidate`,
+`modules`, `metrics`), `Candidate.scores(module:, chain:, concept:)`, and seventeen SDL types. The
+chapter's success criterion is met: one JSONB key returns three display names in one response
+(`tests/test_score_entry.py::TestTheFinding`). Still missing: `Artifact`, `Candidate.interfaceKind`,
+`.target`, `.artifacts`, and `Mutation` entirely.
 
 ```
 built:     Candidate  Chain  ChainRole  Experiment  Project  Recipe  Target  JSON
-missing:   ScoreEntry  Metric  Module  Concept  Artifact  BenchmarkResult
-           Direction  MetricValueType  VariantKind  ModuleType  InterfaceKind
-           Query.modules  Query.metrics  Candidate.scores  Candidate.interfaceKind
+           ScoreEntry  Metric  Module  Concept  BenchmarkResult
+           Direction  MetricValueType  VariantKind  ModuleType  ModuleFunction
+           Query.modules  Query.metrics  Candidate.scores
+missing:   Artifact  InterfaceKind  Candidate.interfaceKind
            Candidate.target  Candidate.artifacts  Mutation entirely
 ```
 
@@ -96,8 +99,8 @@ reviewable diff. That was PR #15 stage 1's entire purpose and this is where it p
 | 1 | `Context.interface_kinds()` + its own lock | nothing else can start | **shipped** `12d6d28` |
 | 1b | `Heading`, `MetricIdentity`, `VariantAxes`, `MetricCatalog.metric_for` | the lookup moved out of the test | **shipped** `f786597`, `b3b6c64` |
 | 3 | `Metric`, `Module`, `Concept`, `BenchmarkResult`, `Query.modules`, `Query.metrics` | what a ScoreEntry points AT | **shipped** `120d16d` |
-| 2 | `ScoreEntry`, `Candidate.scores` | the chapter's point | next |
-| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | |
+| 2 | `ScoreEntry`, `Candidate.scores` | the chapter's point | **shipped** 2026-09-18 |
+| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | next |
 | 5 | `Mutation.annotateCandidate` | the only write in the API | |
 
 **STAGES 2 AND 3 WERE SWAPPED, on 2026-09-17, and the numbers above are left as they were rather
@@ -118,7 +121,7 @@ Stage 4's `Artifact` closes the last "for now" comment in the codebase (`app/mod
 
 ---
 
-## What stages 1, 1b and 3 decided
+## What stages 1, 1b, 3 and 2 decided
 
 Recorded here because the commits carry the reasoning but the plan is what a cold session reads.
 
@@ -174,7 +177,44 @@ Recorded here because the commits carry the reasoning but the plan is what a col
   annotation to write is `db.ModuleType`. Those module-level lines are registration statements, not
   aliases. `Chain.role` has had the right shape since it was written.
 
-### Found along the way, and fixed
+### Stage 2 — `ScoreEntry` and `Candidate.scores`
+
+Built copy-paste style: every line shown in chat and interrogated before it went in, tests included.
+The four judgement calls, and where each landed:
+
+* **`numericValue`** (`_numeric_value` in `app/graphql/types.py`): FLOAT and INT only, so a BOOL
+  stored as `"1"` is never served as a measurement. Catches `ValueError` only — `value` is `str`
+  all the way down, so a `TypeError` there is our bug and must surface. A parse failure logs at
+  DEBUG, the first logger in `app/`: a censored value under a numeric metric is a signal, not an
+  alarm. `tests/test_score_entry.py::TestNumericValue` pins all three.
+* **`metric: null`**: `metric_for` already returns `None` on a miss and the resolver passes it
+  through. No log line — on the real corpus every key resolves, and the seeder's `--dry-run` is
+  the tool for "what is new in this CSV", not a resolver firing 1132 times a request.
+* **`module` filters on the KEY's prefix**, `score_key.module`, not on `metric.module.name`. The
+  two agree for every catalogued key and differ only for an uncatalogued one, which has no metric
+  to match: matching the key keeps it, so `module: "mystery"` finds `mystery.column` whether or
+  not the catalog knows it. `concept` has no such choice and drops uncatalogued keys.
+* **`chain: null` means no filter**, two-valued. The three-valued version (`strawberry.UNSET` so
+  that `null` could mean "unsuffixed entries only") was considered and rejected: nothing asks for
+  it, and a client can read `chain == null` off the response.
+* **Entries are sorted by key.** JSONB does not preserve insertion order, so without this the
+  list order would follow Postgres's key hashing and the snapshot-style tests would be flaky.
+* **The filters and the parse are module functions**, `_passes_filters` and `_numeric_value`,
+  so they are unit-testable with an unflushed `db.Metric` and no session. That is the ORM
+  construction doorway from `docs/type-safety-plan.md`: `**kw: Any`, so the keyword names in
+  those tests get no checking.
+
+The fixture in `tests/conftest.py` grew a seventh metric (`temstapro.verdict`, CATEGORICAL) and
+four keys per candidate, one per resolver branch: a chain suffix, a censored numeric, a
+categorical that looks numeric, and a key with no catalog row.
+
+**Found along the way:** `migrations/env.py`'s `fileConfig` was disabling every existing logger,
+because `disable_existing_loggers` defaults to True and `tests/conftest.py` runs the migrations
+in-process after the app is imported. A caplog test passed alone and failed in the suite. The
+server never hit it — docker-compose runs Alembic as its own process — but any future `app.*`
+logger would have been silent under pytest. One keyword.
+
+### Found along the way in stage 3, and fixed
 
 `MaskInternalErrors` was masking GraphQL's own syntax and validation errors, so every client typo
 came back as "Internal server error." Found because all fourteen stage-3 tests failed with that
@@ -200,13 +240,10 @@ finished function to review.
    exact thing the design exists to prevent. What remains for the resolver is the FILTER semantics —
    whether `module: "boltz2"` matches the key's prefix or `metric.module.name`, which differ for the
    two `_export` keys.
-2. **`numericValue`'s defensive parse.** What counts as parseable, and what a failure returns.
-   `docs/graphql-schema.md` §"numericValue parses defensively, even though nothing currently fails"
-   has the reasoning; the code is four lines and every one of them is a decision.
-3. **The `ScoreEntry.metric` null fallback.** 200 keys, 144 catalogued. What a key with no catalog
-   row surfaces as, and whether that is worth logging.
-4. **The `scores(module:, chain:, concept:)` filter semantics** — in particular whether `chain`
-   filters on the suffix `decompose()` stripped, which is the only place a ScoreEntry still knows it.
+2. ~~**`numericValue`'s defensive parse.**~~ **DONE in stage 2** — see above.
+3. ~~**The `ScoreEntry.metric` null fallback.**~~ **DONE in stage 2** — passed through, unlogged.
+4. ~~**The `scores(module:, chain:, concept:)` filter semantics**~~ **DONE in stage 2** — `chain`
+   does filter on the stripped suffix, via `ScoreKey.chain`.
 
 **MINE — the scaffolding around it:**
 
@@ -256,4 +293,6 @@ one JSONB key, chosen by what each candidate folded:
     scores(module: "boltz2") { key value metric { displayName } } } }
 ```
 
-That is the 2026-07-31 finding, served over HTTP. Nothing in the API demonstrates it today.
+That is the 2026-07-31 finding, served over HTTP. **It does, as of stage 2** — minus `interfaceKind`,
+which is stage 4. `tests/test_score_entry.py::TestTheFinding` runs that query against the fixture
+and asserts the three names.
