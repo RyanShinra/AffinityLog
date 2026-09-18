@@ -337,8 +337,11 @@ ships. These were learned the hard way; they are not preferences to optimise awa
     the pre-commit hook and doesn't carry over between Mac/PC automatically.
 - **Local LLM tooling (Ollama + Continue) is per machine and documented in `docs/local-llm-setup.md`.**
   The Continue config, the Ollama env and the assistant's memory all live outside the repo and do
-  not sync, so that doc carries the decisions, the config files and the measured numbers. Mac is
-  done; the PC section lists what has to be decided there before anything is pulled.
+  not sync, so that doc carries the decisions, the config files and the measured numbers. Both
+  machines are done (Mac 2026-09-16, PC 2026-09-18) and deliberately differ: on the PC autocomplete
+  is the point and chat is occasional, because its 16 GB card cannot hold both models at once.
+  What Continue sends to Ollama was read from its installed code, not its docs — re-check after an
+  upgrade.
 
 ---
 

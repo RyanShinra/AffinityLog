@@ -22,7 +22,7 @@ against the running database before it was written.
 | [`published-data-goal.md`](published-data-goal.md) | The stretch goal: ingest published external antibody data to test whether the schema is genuinely general rather than fitted to one vendor's export. Not started. |
 | [`graphql-schema.md`](graphql-schema.md) | **The committed GraphQL spec.** The SDL, the four decisions behind its harder choices, and the measurements those rest on. Written before any resolver existed, so it was reviewed as a document rather than as already-typed code. Supersedes the SDL discussion in `graphql-schema-handoff.md`. |
 | [`schema-erd.md`](schema-erd.md) | Entity-relationship reference for the tables. Assumes some domain familiarity. |
-| [`local-llm-setup.md`](local-llm-setup.md) | **Dev tooling, not the project.** Ollama + Continue in VS Code, per machine: the decisions that hold on both, the Mac's models, config files and measured speeds (2026-09-16), and what the PC has to decide differently. Exists because none of that config syncs and the repo is the only channel between the machines. Mac done, PC not started. |
+| [`local-llm-setup.md`](local-llm-setup.md) | **Dev tooling, not the project.** Ollama + Continue in VS Code, per machine: the decisions that hold on both, what Continue 2.0.0's code actually sends to Ollama, and each machine's models, config files and measured speeds (Mac 2026-09-16, PC 2026-09-18). The PC is autocomplete-first — its 16 GB card cannot hold a chat model and the autocomplete model at once. Exists because none of that config syncs and the repo is the only channel between the machines. Both done. |
 
 ## Historical — accurate about their moment, stale about now
 
