@@ -1,25 +1,25 @@
 # The ScoreEntry chapter — the plan for PR #16
 
-> **Status: in progress on `score-entry-resolvers`. Stages 1, 1b, 3, 2 and 4 shipped; stage 5 is next.**
+> **Status: ALL FIVE STAGES SHIPPED on `score-entry-resolvers` (2026-09-18). Ready for PR #16.**
 > Written 2026-08-25 as PR #15 closed, and kept up to date since — the decisions each stage forced
-> are recorded in "What stages 1, 1b, 3, 2 and 4 decided" below, because the commits carry the reasoning
+> are recorded in "What each stage decided" below, because the commits carry the reasoning
 > but this file is what a cold session reads. `docs/graphql-schema.md` is the committed contract and
 > stays authoritative for WHAT the types are; this file is the order and the decisions.
 
 **Where the API is now.** Six root resolvers (`experiments`, `experiment`, `candidates`, `candidate`,
 `modules`, `metrics`), `Candidate.scores(module:, chain:, concept:)`, `.interfaceKind`, `.target`,
-`.artifacts`, and nineteen SDL types. The chapter's success criterion is met with the plan's query
-VERBATIM: one JSONB key returns three display names beside three interface kinds in one response
-(`tests/test_candidate_fields.py::TestInterfaceKind::test_the_finding_in_one_query`). Still missing:
-`Mutation` entirely.
+`.artifacts`, `Mutation.annotateCandidate`, and twenty SDL types. The chapter's success criterion is
+met with the plan's query VERBATIM: one JSONB key returns three display names beside three interface
+kinds in one response (`tests/test_candidate_fields.py::TestInterfaceKind::test_the_finding_in_one_query`).
+Of the committed spec, only `Metric.transformOf` and `Recipe.modules` remain unbuilt, each by decision.
 
 ```
 built:     Candidate  Chain  ChainRole  Experiment  Project  Recipe  Target  JSON
            ScoreEntry  Metric  Module  Concept  BenchmarkResult  Artifact
            Direction  MetricValueType  VariantKind  ModuleType  ModuleFunction  InterfaceKind
            Query.modules  Query.metrics  Candidate.scores  Candidate.interfaceKind
-           Candidate.target  Candidate.artifacts
-missing:   Mutation entirely
+           Candidate.target  Candidate.artifacts  Mutation.annotateCandidate
+missing:   nothing this chapter set out to build
 ```
 
 **The corpus this has to serve** (measured 2026-08-25): 14 candidates, 200 distinct score keys, 144
@@ -102,7 +102,7 @@ reviewable diff. That was PR #15 stage 1's entire purpose and this is where it p
 | 3 | `Metric`, `Module`, `Concept`, `BenchmarkResult`, `Query.modules`, `Query.metrics` | what a ScoreEntry points AT | **shipped** `120d16d` |
 | 2 | `ScoreEntry`, `Candidate.scores` | the chapter's point | **shipped** 2026-09-18 |
 | 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | **shipped** 2026-09-18. `artifacts` ships EMPTY. Nothing writes the `artifacts` table and the 11 structures live on disk, found by `app/routers/demo.py` by filename; a loader is a later job, like `benchmarkResults`. |
-| 5 | `Mutation.annotateCandidate` | the only write in the API | next |
+| 5 | `Mutation.annotateCandidate` | the only write in the API | **shipped** 2026-09-18 |
 
 **STAGES 2 AND 3 WERE SWAPPED, on 2026-09-17, and the numbers above are left as they were rather
 than renumbered** — the commits reference them. `ScoreEntry.metric` points at `Metric`, and
@@ -122,7 +122,7 @@ Stage 4's `Artifact` closed the last "for now" comment in the codebase (`db.Arti
 
 ---
 
-## What stages 1, 1b, 3, 2 and 4 decided
+## What each stage decided
 
 Recorded here because the commits carry the reasoning but the plan is what a cold session reads.
 
@@ -244,6 +244,23 @@ Shown in chat first, then written in by Claude at the owner's request. Three fie
 Settled without reopening: `app/models/views.py`'s `interface_kind` stays `Mapped[str]`. Stage 1
 converts string to enum at the SQL boundary inside `_load_interface_kinds`, and `demo.py` keeps
 reading the view as a grouping key.
+
+### Stage 5 — `Mutation.annotateCandidate`
+
+* **The write goes through the lock.** `TaskSafeSession` grew its second method, `commit()`, in
+  the shape the first one set: take the lock, do the one thing, release. Its docstring's NOT A
+  PROXY section had predicted exactly this. `Context.commit()` is the one-line door, so the
+  mutation reads through `execute_statement` and writes through `commit` and can reach nothing
+  else. `tests/test_mutation.py::TestCommitGoesThroughTheLock` holds the lock and watches
+  `commit()` wait.
+* **`""` clears.** `String!` argument, nullable column. A nullable argument with no default is
+  also omittable, so `annotateCandidate(id: "x")` would clear silently; the required string with
+  the empty string meaning "none" keeps the clear explicit. Recorded in `docs/graphql-schema.md`.
+* **Unknown id is `NOT_FOUND`**, coded, distinct from `_as_uuid`'s `BAD_USER_INPUT`. The return
+  type is non-null, so null was never available.
+* The ORM attribute is set outside the lock, and that is safe by the GraphQL spec rather than by
+  luck: mutation root fields execute serially, and the returned Candidate's resolvers run only
+  after the mutation returns.
 
 ### Found along the way in stage 3, and fixed
 

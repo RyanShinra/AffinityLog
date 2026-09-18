@@ -223,6 +223,14 @@ class Context(BaseContext):
         """
         return await self._session.execute(statement)
 
+    async def commit(self) -> None:
+        """Commit this request's session. What the one mutation calls, and nothing else should.
+
+        One line, for `execute_statement`'s reason: `Context` never exposes the session, so a write
+        has to be given its own door, and this is it. The lock is `TaskSafeSession`'s business.
+        """
+        await self._session.commit()
+
     async def catalog(self) -> MetricCatalog:
         """The whole metric catalog, loaded once per request.
 

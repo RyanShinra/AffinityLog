@@ -256,6 +256,16 @@ the catalog says the metric is numeric, and is null otherwise — a separate fie
 best-effort cast on `value`. Silent coercion is how a categorical that happens to look like a number
 becomes a number forever.
 
+### `annotateCandidate`: the empty string clears
+
+`annotation` is `String!` and `candidates.annotation` is nullable, so the API needs a rule for
+clearing. `""` stores NULL. A nullable argument was considered and rejected: a nullable argument
+with no default is also omittable, so `annotateCandidate(id: "x")` would clear silently. Requiring
+a string, and making the one string that is not an annotation mean "none", keeps the clear explicit.
+
+A well-formed id matching nothing is a coded `NOT_FOUND`, distinct from the `BAD_USER_INPUT` a
+malformed id raises. The return type is non-null, so null was never an option for either.
+
 ---
 
 ### Errors: deliberate ones speak for themselves, everything else is masked

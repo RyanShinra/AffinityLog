@@ -8,11 +8,12 @@ Read a resolver's `id` parameter as the thing that makes this code-first: it is 
 parameter with an ordinary annotation, and Strawberry turns it into a GraphQL argument with a
 GraphQL type. Nothing is declared twice.
 
-WRITES ARE NOT HERE
--------------------
-There is no Mutation yet. `annotateCandidate` is the only one the spec calls for, and CSV import
-stays on REST — Strawberry has no native multipart support without tooling this project chose not
-to add for a single endpoint. See `docs/graphql-schema.md`, "Deliberately absent".
+THE ONE WRITE
+-------------
+`Mutation.annotateCandidate` is the only write the spec calls for, and the only one here. CSV
+import stays on REST — Strawberry has no native multipart support without tooling this project
+chose not to add for a single endpoint. See `docs/graphql-schema.md`, "Deliberately absent".
+It commits through `Context.commit()`, the one door `TaskSafeSession` opens for a write.
 """
 
 from __future__ import annotations
@@ -144,10 +145,49 @@ class Query:
         return [Metric.from_row(row) for row in catalog.metric_by_identity.values()]
 
 
+@strawberry.type
+class Mutation:
+    """The one write. CSV import stays on REST; see the module docstring."""
+
+    @strawberry.field
+    async def annotate_candidate(self, info: strawberry.Info[Context, None], id: strawberry.ID, annotation: str) -> Candidate:
+        """Set a candidate's free-text annotation and return the candidate as it now stands.
+
+        THE EMPTY STRING CLEARS. `annotation` is `String!` and the column is nullable, and those
+        two facts together need a rule: `""` stores NULL. A nullable argument was rejected because
+        a nullable argument with no default is also OMITTABLE in GraphQL, so
+        `annotateCandidate(id: "x")` would clear silently. Requiring a string and making the one
+        string that is not an annotation mean "none" keeps the clear explicit.
+
+        TWO WRONG-ID ANSWERS, kept distinct as the query resolvers keep them: a malformed id is
+        `BAD_USER_INPUT` from `_as_uuid`, a well-formed id matching nothing is `NOT_FOUND`. The
+        return type is non-null, so null was never available for the second case; the choice was
+        a coded error the client can branch on, or a masked "Internal server error."
+
+        The attribute is set on the ORM row OUTSIDE the session lock. That is safe because a
+        mutation root field executes serially (GraphQL spec §6.2.2) and the returned Candidate's
+        own resolvers only run after this returns, so nothing else touches the session between
+        the assignment and the commit that flushes it.
+        """
+        search_id: uuid.UUID = _as_uuid(str(id))  # BAD_USER_INPUT if malformed
+        stmt: Select[tuple[db.Candidate]] = Candidate.select_statement().where(db.Candidate.id == search_id)
+        result: Result[tuple[db.Candidate]] = await info.context.execute_statement(stmt)
+        row: db.Candidate | None = result.scalar_one_or_none()  # PK filter, at most one
+        if row is None:
+            raise GraphQLError(f"no candidate with id {str(id)!r}", extensions={"code": "NOT_FOUND"})
+
+        if annotation == "":
+            row.annotation = None
+        else:
+            row.annotation = annotation
+        await info.context.commit()
+        return Candidate.from_row(row)
+
+
 # Building this object is what generates the SDL — there is no schema file to keep in sync, which is
 # the code-first bargain: one definition, but the contract only becomes visible once the code runs.
 # tests/test_schema_snapshot.py now pins this against schema.graphql, so an annotation change that
 # altered the public contract shows up as a diff rather than as nothing. Still NOT checked against
-# the spec in docs/graphql-schema.md: that describes Artifact, Candidate.interfaceKind and Mutation,
-# which do not exist here yet, so the live schema is a strict subset and equality would fail on absence.
-schema = strawberry.Schema(query=Query, extensions=[MaskInternalErrors])
+# the spec in docs/graphql-schema.md: that still lists `Metric.transformOf` and `Recipe.modules`, which
+# are not built, so the live schema is a strict subset and equality would fail on absence.
+schema = strawberry.Schema(query=Query, mutation=Mutation, extensions=[MaskInternalErrors])

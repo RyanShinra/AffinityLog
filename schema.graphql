@@ -132,6 +132,10 @@ enum ModuleType {
   DESIGN_AND_SCORE
 }
 
+type Mutation {
+  annotateCandidate(id: ID!, annotation: String!): Candidate!
+}
+
 type Project {
   name: String!
   notes: String
