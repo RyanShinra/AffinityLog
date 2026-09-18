@@ -63,7 +63,7 @@ class TestTheMetricType:
         )
 
         by_display = {m["displayName"]: m for m in data["metrics"]}
-        assert len(data["metrics"]) == 6, "the fixture seeds six metric rows"
+        assert len(data["metrics"]) == 7, "the fixture seeds seven metric rows"
 
         her2 = by_display["HER2 binding confidence"]
         assert her2["columnKey"] == "protein_iptm"
@@ -158,11 +158,11 @@ class TestTheModuleType:
         assert by_name["boltz2"]["functions"] == ["BINDING_PREDICTION"]
 
     async def test_module_metrics_round_trip(self, seeded_catalog: AsyncSession) -> None:
-        """boltz2 owns the three INTERFACE rows; evoprotgrad the two PARAMETER ones."""
+        """boltz2 owns the three INTERFACE rows; evoprotgrad the two PARAMETER ones; temstapro clash and verdict."""
         data = await _query(seeded_catalog, "{ modules { name metrics { columnKey } } }")
 
         counts = {m["name"]: len(m["metrics"]) for m in data["modules"]}
-        assert counts == {"boltz2": 3, "evoprotgrad": 2, "temstapro": 1}
+        assert counts == {"boltz2": 3, "evoprotgrad": 2, "temstapro": 2}
 
 
 class TestModuleMetricsDoesNotLazyLoad:
@@ -192,7 +192,7 @@ class TestQueryRoots:
     async def test_metrics_returns_the_whole_catalog(self, seeded_catalog: AsyncSession) -> None:
         data = await _query(seeded_catalog, "{ metrics { columnKey } }")
 
-        assert len(data["metrics"]) == 6
+        assert len(data["metrics"]) == 7
 
     async def test_an_unseeded_database_returns_empty_lists_not_null(self, session: AsyncSession) -> None:
         """Both roots are `[T!]!` — non-null lists. Empty is a legitimate answer; null is not."""

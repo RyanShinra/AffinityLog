@@ -346,11 +346,12 @@ async def seeded_catalog(session: AsyncSession) -> AsyncIterator[AsyncSession]:
     prompt to decide whether the spec or the code was wrong — which a fixture built from real data
     cannot ask, because it passes for reasons nobody chose.
 
-    Six metrics across three headings, one per branch:
+        Seven metrics across four headings, one per branch, plus one that is not numeric:
 
         boltz2.protein_iptm     x3, variant_kind=INTERFACE   -> needs tier two
         evoprotgrad.pseudolikelihood_ratio x2, PARAMETER     -> decompose() fills it in unaided
         temstapro.clash         x1, variant_kind=NULL        -> resolves on identity alone
+        temstapro.verdict       x1, CATEGORICAL              -> numericValue must stay null
 
     Three candidates, one per interface kind the view's CASE can reach with chains present. The
     fourth arm ('no chains recorded') is deliberately unrepresented — it is a data-quality state,
@@ -407,6 +408,9 @@ async def seeded_catalog(session: AsyncSession) -> AsyncIterator[AsyncSession]:
             metric(evoprotgrad, "pseudolikelihood_ratio", variant_kind=VariantKind.PARAMETER, variant="amplify"),
             # The ordinary case: 193 of the corpus's 200 keys look like this.
             metric(temstapro, "clash", value_type=db.MetricValueType.INT),
+            # CATEGORICAL, with a value that LOOKS numeric in the candidates below. numericValue is
+            # driven by the catalog's value_type, never by whether the string happens to parse.
+            metric(temstapro, "verdict", value_type=db.MetricValueType.CATEGORICAL),
         ]
     )
 
@@ -418,7 +422,15 @@ async def seeded_catalog(session: AsyncSession) -> AsyncIterator[AsyncSession]:
         return db.Candidate(
             experiment_id=experiment.id,
             sequence_id=sequence_id,
-            scores={"boltz2.protein_iptm": "0.5", "temstapro.clash": "2"},
+            # One key per resolver branch. Sorted output order is the alphabetical order below.
+            scores={
+                "boltz2.protein_iptm": "0.5",  # INTERFACE: three metrics, the candidate picks
+                "mystery.column": "1.0",  # no catalog row at all -> metric null
+                "temstapro.clash": "2",  # the ordinary case, INT
+                "temstapro.clash.H": "3",  # same metric, chain suffix
+                "temstapro.clash.L": "<40",  # INT metric, censored value -> numericValue null
+                "temstapro.verdict": "7",  # CATEGORICAL that looks numeric -> numericValue null
+            },
             chains=[db.CandidateChain(role=role, sequence="QVQ", ordinal=0) for role in roles],
         )
 

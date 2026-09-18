@@ -41,7 +41,7 @@ class TestCatalogIsBuiltFromTheDatabase:
     async def test_both_indexes_are_built_in_one_pass(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
 
-        assert len(catalog.metric_by_identity) == 6, "six metric rows in, six identities out — none collided"
+        assert len(catalog.metric_by_identity) == 7, "seven metric rows in, seven identities out — none collided"
         assert set(catalog.variant_axes_per_heading) == {
             ("boltz2", "protein_iptm"),
             ("evoprotgrad", "pseudolikelihood_ratio"),
