@@ -1,24 +1,25 @@
 # The ScoreEntry chapter — the plan for PR #16
 
-> **Status: in progress on `score-entry-resolvers`. Stages 1, 1b, 3 and 2 shipped; stage 4 is next.**
+> **Status: in progress on `score-entry-resolvers`. Stages 1, 1b, 3, 2 and 4 shipped; stage 5 is next.**
 > Written 2026-08-25 as PR #15 closed, and kept up to date since — the decisions each stage forced
-> are recorded in "What stages 1, 1b, 3 and 2 decided" below, because the commits carry the reasoning
+> are recorded in "What stages 1, 1b, 3, 2 and 4 decided" below, because the commits carry the reasoning
 > but this file is what a cold session reads. `docs/graphql-schema.md` is the committed contract and
 > stays authoritative for WHAT the types are; this file is the order and the decisions.
 
 **Where the API is now.** Six root resolvers (`experiments`, `experiment`, `candidates`, `candidate`,
-`modules`, `metrics`), `Candidate.scores(module:, chain:, concept:)`, and seventeen SDL types. The
-chapter's success criterion is met: one JSONB key returns three display names in one response
-(`tests/test_score_entry.py::TestTheFinding`). Still missing: `Artifact`, `Candidate.interfaceKind`,
-`.target`, `.artifacts`, and `Mutation` entirely.
+`modules`, `metrics`), `Candidate.scores(module:, chain:, concept:)`, `.interfaceKind`, `.target`,
+`.artifacts`, and nineteen SDL types. The chapter's success criterion is met with the plan's query
+VERBATIM: one JSONB key returns three display names beside three interface kinds in one response
+(`tests/test_candidate_fields.py::TestInterfaceKind::test_the_finding_in_one_query`). Still missing:
+`Mutation` entirely.
 
 ```
 built:     Candidate  Chain  ChainRole  Experiment  Project  Recipe  Target  JSON
-           ScoreEntry  Metric  Module  Concept  BenchmarkResult
-           Direction  MetricValueType  VariantKind  ModuleType  ModuleFunction
-           Query.modules  Query.metrics  Candidate.scores
-missing:   Artifact  InterfaceKind  Candidate.interfaceKind
-           Candidate.target  Candidate.artifacts  Mutation entirely
+           ScoreEntry  Metric  Module  Concept  BenchmarkResult  Artifact
+           Direction  MetricValueType  VariantKind  ModuleType  ModuleFunction  InterfaceKind
+           Query.modules  Query.metrics  Candidate.scores  Candidate.interfaceKind
+           Candidate.target  Candidate.artifacts
+missing:   Mutation entirely
 ```
 
 **The corpus this has to serve** (measured 2026-08-25): 14 candidates, 200 distinct score keys, 144
@@ -100,8 +101,8 @@ reviewable diff. That was PR #15 stage 1's entire purpose and this is where it p
 | 1b | `Heading`, `MetricIdentity`, `VariantAxes`, `MetricCatalog.metric_for` | the lookup moved out of the test | **shipped** `f786597`, `b3b6c64` |
 | 3 | `Metric`, `Module`, `Concept`, `BenchmarkResult`, `Query.modules`, `Query.metrics` | what a ScoreEntry points AT | **shipped** `120d16d` |
 | 2 | `ScoreEntry`, `Candidate.scores` | the chapter's point | **shipped** 2026-09-18 |
-| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | next |
-| 5 | `Mutation.annotateCandidate` | the only write in the API | |
+| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | **shipped** 2026-09-18. `artifacts` ships EMPTY. Nothing writes the `artifacts` table and the 11 structures live on disk, found by `app/routers/demo.py` by filename; a loader is a later job, like `benchmarkResults`. |
+| 5 | `Mutation.annotateCandidate` | the only write in the API | next |
 
 **STAGES 2 AND 3 WERE SWAPPED, on 2026-09-17, and the numbers above are left as they were rather
 than renumbered** — the commits reference them. `ScoreEntry.metric` points at `Metric`, and
@@ -116,12 +117,12 @@ Stage 1 also grew a half. The two-tier lookup had to leave `tests/test_context_c
 anything could call it, and doing that properly meant naming the types it was assembled from — see
 "What stage 1b decided" below.
 
-Stage 4's `Artifact` closes the last "for now" comment in the codebase (`app/models/orm.py:451`,
+Stage 4's `Artifact` closed the last "for now" comment in the codebase (`db.Artifact`'s docstring,
 "the placeholder hook for now"). Stage 1b closed the other (`tests/test_context_catalog.py:40`).
 
 ---
 
-## What stages 1, 1b, 3 and 2 decided
+## What stages 1, 1b, 3, 2 and 4 decided
 
 Recorded here because the commits carry the reasoning but the plan is what a cold session reads.
 
@@ -214,6 +215,36 @@ in-process after the app is imported. A caplog test passed alone and failed in t
 server never hit it — docker-compose runs Alembic as its own process — but any future `app.*`
 logger would have been silent under pytest. One keyword.
 
+### Stage 4 — `interfaceKind`, `target`, `artifacts`
+
+Shown in chat first, then written in by Claude at the owner's request. Three fields, three decisions:
+
+* **`interfaceKind` is non-null, so absence RAISES.** A non-null field resolving to null takes the
+  whole `Candidate` with it, so a candidate missing from `candidate_summary` is a coded
+  `GraphQLError` (`CANDIDATE_NOT_IN_SUMMARY`) from `_interface_kind_of`, a module function testable
+  with an empty map. The `scores` resolver deliberately does NOT use it: an absent candidate can
+  still resolve every non-INTERFACE heading, and `metric_for` raises only for the ones it cannot.
+  The fourth member, `NO_CHAINS_RECORDED`, is proved reachable by a test that inserts a chainless
+  candidate.
+* **`target` is ONE join per candidate that asks**, `select(Target).join(Experiment)` on the
+  experiment id — not `Experiment.select_statement()` filtered by id, which carries three eager
+  loads and is why `candidates { experiment { name } }` measured at 58 queries. A client asking for
+  both `experiment` and `target` pays for the experiment twice; that is the cheaper trade.
+* **`artifacts` ships EMPTY, as a resolver, not an eager load.** Nothing writes the `artifacts`
+  table; the eleven structures live on disk and `app/routers/demo.py` finds them by filename. A
+  `selectinload` would add a query to every candidate read for a list that is always `[]`. The
+  mapping is exercised by a test that inserts a row inside the rolled-back transaction. A loader
+  is a later job, and if it lands, `artifacts.kind` (a `String(32)` holding a closed set) is the
+  next enum-plus-migration in the type-safety plan's shape.
+* **`InterfaceKind` is registered under a different binding name** (`InterfaceKindEnum`) from the
+  six others. Those rebind a name only reached through `db.`; this one is imported by its own name
+  and used as an annotation, and rebinding it would replace the class with the registration's
+  return value.
+
+Settled without reopening: `app/models/views.py`'s `interface_kind` stays `Mapped[str]`. Stage 1
+converts string to enum at the SQL boundary inside `_load_interface_kinds`, and `demo.py` keeps
+reading the view as a grouping key.
+
 ### Found along the way in stage 3, and fixed
 
 `MaskInternalErrors` was masking GraphQL's own syntax and validation errors, so every client typo
@@ -293,6 +324,6 @@ one JSONB key, chosen by what each candidate folded:
     scores(module: "boltz2") { key value metric { displayName } } } }
 ```
 
-That is the 2026-07-31 finding, served over HTTP. **It does, as of stage 2** — minus `interfaceKind`,
-which is stage 4. `tests/test_score_entry.py::TestTheFinding` runs that query against the fixture
-and asserts the three names.
+That is the 2026-07-31 finding, served over HTTP. **It does, as of stage 4.**
+`tests/test_candidate_fields.py::TestInterfaceKind::test_the_finding_in_one_query` runs exactly that
+query against the fixture and asserts the three (kind, name) pairs.

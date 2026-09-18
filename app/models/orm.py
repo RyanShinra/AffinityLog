@@ -450,7 +450,11 @@ class Experiment(ModelBase):
 
 
 class Artifact(ModelBase):
-    """A non-scalar output (structure/sequence file) referenced by URI. The placeholder hook for now."""
+    """A non-scalar output (structure/sequence file) referenced by URI.
+
+    Served by `Candidate.artifacts` in the API and EMPTY today: nothing writes rows yet, and the
+    predicted structures live on disk (see `app/routers/demo.py`). A loader is a later job.
+    """
 
     __tablename__ = "artifacts"
 

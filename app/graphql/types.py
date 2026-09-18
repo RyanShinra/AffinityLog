@@ -73,10 +73,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import strawberry
+from graphql import GraphQLError
 from sqlalchemy import Result, Select, select
 from sqlalchemy.orm import selectinload
 from strawberry.scalars import JSON
@@ -109,6 +110,12 @@ ModuleType = strawberry.enum(db.ModuleType)
 VariantKind = strawberry.enum(variant_kind.VariantKind)
 ModuleFunction = strawberry.enum(db.ModuleFunction)
 
+# A different binding name from the six above, deliberately. Those rebind a name only ever reached
+# through `db.`; `InterfaceKind` is imported by its own name and the `scores` resolver annotates
+# with it, so rebinding it would replace the class with the registration's return value (an
+# `EnumType | Callable[...]` union, not a type expression) and the annotation would fail to check.
+InterfaceKindEnum = strawberry.enum(InterfaceKind)
+
 # The first logger in `app/`. Named after the module, the standard-library way, so a handler can
 # be pointed at `app.graphql` without catching Strawberry's own `strawberry.execution` output.
 logger = logging.getLogger(__name__)
@@ -134,6 +141,25 @@ class Target:
     @staticmethod
     def from_row(row: db.Target) -> Target:
         return Target(name=row.name, pdb_id=row.pdb_id)
+
+
+@strawberry.type
+class Artifact:
+    """A non-scalar output referenced by URI: a structure file, a sequence file.
+
+    EMPTY FOR EVERY CANDIDATE TODAY, by decision (docs/scoreentry-plan.md, stage 4). Nothing
+    writes the `artifacts` table, and the eleven predicted structures live on disk under
+    `experiment_results/`, found by `app/routers/demo.py` by filename. A loader that registers
+    them as rows is a later job. Until then this is `benchmarkResults`' situation: the shape is
+    right, `[]` is truthful, and the mapping below is exercised only by a test that inserts a row.
+    """
+
+    kind: str
+    uri: str
+
+    @staticmethod
+    def from_row(row: db.Artifact) -> Artifact:
+        return Artifact(kind=row.kind, uri=row.uri)
 
 
 @strawberry.type
@@ -293,6 +319,53 @@ class Candidate:
                 )
             )
         return entries
+
+    @strawberry.field
+    async def interface_kind(self, info: strawberry.Info[Context, None]) -> InterfaceKind:
+        """What this candidate's ipTM-style scores are measuring: the view's CASE, as an enum.
+
+        From the per-request memo, so no query of its own. NON-NULL, which is why absence is an
+        error rather than a null: see `_interface_kind_of`.
+        """
+        interface_kind_per_candidate = await info.context.interface_kinds()
+        return _interface_kind_of(SequenceId(self.sequence_id), interface_kind_per_candidate)
+
+    @strawberry.field
+    async def target(self, info: strawberry.Info[Context, None]) -> Target | None:
+        """The antigen this candidate was designed against, hoisted through its experiment.
+
+        Two FK hops flattened to one field, served by ONE join. Not `Experiment.select_statement()`
+        filtered by id: that carries three eager loads, which is how `candidates { experiment
+        { name } }` came to cost 58 queries in the measured-cost table. A client asking for both
+        `experiment` and `target` pays for the experiment twice, and that is the cheaper trade.
+        """
+        stmt: Select[tuple[db.Target]] = (
+            select(db.Target)
+            .join(db.Experiment, db.Experiment.target_id == db.Target.id)
+            .where(db.Experiment.id == self.experiment_id)
+        )
+        result: Result[tuple[db.Target]] = await info.context.execute_statement(stmt)
+        row: db.Target | None = result.scalar_one_or_none()  # experiment PK, at most one
+        if row is None:
+            return None
+        return Target.from_row(row)
+
+    @strawberry.field
+    async def artifacts(self, info: strawberry.Info[Context, None]) -> list[Artifact]:
+        """Files attached to this candidate. Always `[]` today; see `Artifact`.
+
+        A resolver rather than a `selectinload` in `select_statement()`, because an eager load
+        would add a query to every candidate read for a list that is currently always empty.
+        Sorted so the order is the data's, not the planner's.
+        """
+        stmt: Select[tuple[db.Artifact]] = (
+            select(db.Artifact)
+            .where(db.Artifact.candidate_id == uuid.UUID(self.id))
+            .order_by(db.Artifact.kind, db.Artifact.uri)
+        )
+        result: Result[tuple[db.Artifact]] = await info.context.execute_statement(stmt)
+        rows: Sequence[db.Artifact] = result.scalars().all()
+        return [Artifact.from_row(r) for r in rows]
 
 
 @strawberry.type
@@ -523,6 +596,31 @@ class ScoreEntry:
     numeric_value: float | None
     chain: db.ChainRole | None
     metric: Metric | None
+
+
+def _interface_kind_of(
+    sequence_id: SequenceId, interface_kind_per_candidate: Mapping[SequenceId, InterfaceKind]
+) -> InterfaceKind:
+    """This candidate's interface kind, or a coded error. Never None.
+
+    `Candidate.interfaceKind` is non-null, and a non-null field that resolves to null takes the
+    whole Candidate with it. A candidate absent from `candidate_summary` should be impossible
+    (every candidate joins an experiment and chains are LEFT joined), so when it happens something
+    is wrong with the view or the data, and the message says which to look at. Coded, so
+    `MaskInternalErrors` lets it through — the same reasoning as `metric_for`'s error.
+
+    The `scores` resolver deliberately does NOT use this: a candidate absent from the view can
+    still resolve every non-INTERFACE heading, and `metric_for` raises only for the ones it cannot.
+    """
+    interface_kind = interface_kind_per_candidate.get(sequence_id)
+    if interface_kind is None:
+        raise GraphQLError(
+            f"candidate {sequence_id!r} is not in the candidate_summary view, so its interface kind is "
+            "unknown. Remedy: the view LEFT JOINs chains and joins experiments, so check that this "
+            "candidate's experiment_id resolves, then sql/candidate_summary.sql.",
+            extensions={"code": "CANDIDATE_NOT_IN_SUMMARY"},
+        )
+    return interface_kind
 
 
 def _numeric_value(value: str, db_metric: db.Metric | None) -> float | None:

@@ -3,6 +3,11 @@
 # it still describes types that are not built yet, so the two are not the same file.
 # tests/test_schema_snapshot.py fails if this drifts from strawberry's output.
 
+type Artifact {
+  kind: String!
+  uri: String!
+}
+
 type BenchmarkResult {
   property: String!
   n: Int!
@@ -19,6 +24,9 @@ type Candidate {
   chains: [Chain!]!
   experiment: Experiment
   scores(module: String = null, chain: ChainRole = null, concept: String = null): [ScoreEntry!]!
+  interfaceKind: InterfaceKind!
+  target: Target
+  artifacts: [Artifact!]!
 }
 
 type Chain {
@@ -55,6 +63,13 @@ type Experiment {
   recipe: Recipe
   target: Target
   candidates: [Candidate!]!
+}
+
+enum InterfaceKind {
+  NO_CHAINS_RECORDED
+  ANTIBODY_TARGET_COMPLEX
+  ANTIBODY_ONLY_HL_PAIRING
+  SINGLE_CHAIN_NO_INTERFACE
 }
 
 """
