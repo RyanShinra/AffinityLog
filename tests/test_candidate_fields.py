@@ -7,9 +7,9 @@ WRITTEN BEFORE THE CODE. Three small fields, each with one decision behind it:
     the same treatment `metric_for` gives the same absence.
   * `target` is a two-hop hoist (candidate -> experiment -> target) served by ONE join, not by
     reusing `Experiment.select_statement()` and its three eager loads.
-  * `artifacts` ships EMPTY (decided 2026-09-18): nothing writes the table yet, and the eleven
-    structures live on disk. The mapping is exercised here by inserting a row inside the
-    rolled-back transaction, so a green test means the shape is right, not that data exists.
+  * `artifacts` is a resolver, not an eager load, so it costs nothing unless asked. The fixture
+    seeds no artifact rows, so the mapping is exercised by inserting one inside the rolled-back
+    transaction. (The real corpus has eleven, from `scripts/seed_corpus_context.py`.)
 
 The fixture's three candidates have chains [H, L, T], [H, L] and [H], which reach three of the
 view's four CASE arms. The fourth, NO_CHAINS_RECORDED, is reached by adding a chainless candidate
@@ -124,7 +124,7 @@ class TestTarget:
 
 
 class TestArtifacts:
-    """Ships empty by decision. The mapping is proven with a row that never leaves the transaction."""
+    """The fixture has no artifact rows; the mapping is proven with one that never leaves the transaction."""
 
     async def test_artifacts_is_an_empty_list_not_null(self, seeded_catalog: AsyncSession) -> None:
         data = await _query(seeded_catalog, "{ candidates { sequenceId artifacts { kind uri } } }")

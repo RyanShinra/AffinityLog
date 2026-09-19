@@ -145,13 +145,17 @@ class Target:
 
 @strawberry.type
 class Artifact:
-    """A non-scalar output referenced by URI: a structure file, a sequence file.
+    """A non-scalar output referenced by URI — today, a predicted structure file.
 
-    EMPTY FOR EVERY CANDIDATE TODAY, by decision (docs/scoreentry-plan.md, stage 4). Nothing
-    writes the `artifacts` table, and the eleven predicted structures live on disk under
-    `experiment_results/`, found by `app/routers/demo.py` by filename. A loader that registers
-    them as rows is a later job. Until then this is `benchmarkResults`' situation: the shape is
-    right, `[]` is truthful, and the mapping below is exercised only by a test that inserts a row.
+    Eleven rows in the loaded corpus, written by `scripts/seed_corpus_context.py` from the
+    `<candidate id>_<tool>.pdb` files under `experiment_results/`: `uri` is the repo-relative
+    path and `kind` is the TOOL that produced it (`boltz2`, `rfantibody`), so a candidate folded
+    by two tools carries two artifacts. Note the ORM comment on `kind` still says
+    "structure / sequence"; the seeder decided otherwise, and the seeder is what ran.
+
+    (Stage 4 was planned on the belief that nothing wrote this table. That was wrong — the
+    seeder inserts with raw SQL, which a grep for `Artifact(` did not find — and was caught by
+    running the resolvers against the real corpus. Measured 2026-09-18: 11 artifacts.)
     """
 
     kind: str
@@ -352,11 +356,11 @@ class Candidate:
 
     @strawberry.field
     async def artifacts(self, info: strawberry.Info[Context, None]) -> list[Artifact]:
-        """Files attached to this candidate. Always `[]` today; see `Artifact`.
+        """Files attached to this candidate — its predicted structures, for eleven of fourteen.
 
         A resolver rather than a `selectinload` in `select_statement()`, because an eager load
-        would add a query to every candidate read for a list that is currently always empty.
-        Sorted so the order is the data's, not the planner's.
+        would add a query to every candidate read whether or not the client asked. Sorted so the
+        order is the data's, not the planner's.
         """
         stmt: Select[tuple[db.Artifact]] = (
             select(db.Artifact)

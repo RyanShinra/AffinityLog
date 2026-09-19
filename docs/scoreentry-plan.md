@@ -101,7 +101,7 @@ reviewable diff. That was PR #15 stage 1's entire purpose and this is where it p
 | 1b | `Heading`, `MetricIdentity`, `VariantAxes`, `MetricCatalog.metric_for` | the lookup moved out of the test | **shipped** `f786597`, `b3b6c64` |
 | 3 | `Metric`, `Module`, `Concept`, `BenchmarkResult`, `Query.modules`, `Query.metrics` | what a ScoreEntry points AT | **shipped** `120d16d` |
 | 2 | `ScoreEntry`, `Candidate.scores` | the chapter's point | **shipped** 2026-09-18 |
-| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | **shipped** 2026-09-18. `artifacts` ships EMPTY. Nothing writes the `artifacts` table and the 11 structures live on disk, found by `app/routers/demo.py` by filename; a loader is a later job, like `benchmarkResults`. |
+| 4 | `Candidate.interfaceKind`, `.target`, `.artifacts` + the `Artifact` type | small, and `target` is a two-hop hoist | **shipped** 2026-09-18. ~~`artifacts` ships EMPTY~~ — **that premise was wrong**, see the stage 4 notes: the table holds 11 rows, written by `scripts/seed_corpus_context.py`. |
 | 5 | `Mutation.annotateCandidate` | the only write in the API | **shipped** 2026-09-18 |
 
 **STAGES 2 AND 3 WERE SWAPPED, on 2026-09-17, and the numbers above are left as they were rather
@@ -230,12 +230,18 @@ Shown in chat first, then written in by Claude at the owner's request. Three fie
   experiment id — not `Experiment.select_statement()` filtered by id, which carries three eager
   loads and is why `candidates { experiment { name } }` measured at 58 queries. A client asking for
   both `experiment` and `target` pays for the experiment twice; that is the cheaper trade.
-* **`artifacts` ships EMPTY, as a resolver, not an eager load.** Nothing writes the `artifacts`
-  table; the eleven structures live on disk and `app/routers/demo.py` finds them by filename. A
-  `selectinload` would add a query to every candidate read for a list that is always `[]`. The
-  mapping is exercised by a test that inserts a row inside the rolled-back transaction. A loader
-  is a later job, and if it lands, `artifacts.kind` (a `String(32)` holding a closed set) is the
-  next enum-plus-migration in the type-safety plan's shape.
+* **`artifacts` is a resolver, not an eager load** — a `selectinload` would add a query to every
+  candidate read whether or not the client asked. **The stage was planned and first written on
+  a false premise: "nothing writes the `artifacts` table, the structures live only on disk."**
+  Wrong. `scripts/seed_corpus_context.py` — in CLAUDE.md's rebuild sequence — registers every
+  `<candidate id>_<tool>.pdb` as a row, `kind` = the tool (`boltz2`, `rfantibody`), `uri` = the
+  repo-relative path; the grep that missed it looked for `Artifact(` and the seeder inserts with
+  raw SQL. Caught by running the finished resolvers against the real corpus: 11 artifacts, not 0.
+  The code needed no change; three docstrings, the ORM's `kind` comment ("structure / sequence",
+  also wrong) and this doc did. The fixture still seeds no artifact rows, so the mapping test
+  inserts one. `kind` is a `String(32)` holding a closed set of tool names, which is the
+  type-safety plan's enum-plus-migration shape, and is now a live question rather than a
+  hypothetical one.
 * **`InterfaceKind` is registered under a different binding name** (`InterfaceKindEnum`) from the
   six others. Those rebind a name only reached through `db.`; this one is imported by its own name
   and used as an annotation, and rebinding it would replace the class with the registration's

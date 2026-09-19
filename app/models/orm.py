@@ -450,17 +450,17 @@ class Experiment(ModelBase):
 
 
 class Artifact(ModelBase):
-    """A non-scalar output (structure/sequence file) referenced by URI.
+    """A non-scalar output (a structure file) referenced by URI.
 
-    Served by `Candidate.artifacts` in the API and EMPTY today: nothing writes rows yet, and the
-    predicted structures live on disk (see `app/routers/demo.py`). A loader is a later job.
+    Written by `scripts/seed_corpus_context.py`, one row per `<candidate id>_<tool>.pdb` under
+    `experiment_results/`; served by `Candidate.artifacts`. 11 rows in the loaded corpus.
     """
 
     __tablename__ = "artifacts"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"))
-    kind: Mapped[str] = mapped_column(String(32))  # "structure" / "sequence"
+    kind: Mapped[str] = mapped_column(String(32))  # the producing tool: "boltz2" / "rfantibody" (seeder's choice)
     uri: Mapped[str] = mapped_column(String(1000))  # "s3://bucket/…" or "https://…"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
