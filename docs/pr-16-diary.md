@@ -285,8 +285,9 @@ was not.
 Three small fields: `interfaceKind`, `target`, `artifacts`. Two of them went as planned.
 
 `interfaceKind` is non-null, so a candidate missing from the view cannot resolve to `null` without
-blanking the whole `Candidate`; it raises `CANDIDATE_NOT_IN_SUMMARY` from a helper testable with an
-empty map. Notably the `scores` resolver does **not** use that helper — a candidate absent from the
+nulling the entire response — the stage was written believing it was only the `Candidate`, and the
+review corrected that (see the coda). It raises `CANDIDATE_NOT_IN_SUMMARY` from a helper testable
+with an empty map. Notably the `scores` resolver does **not** use that helper — a candidate absent from the
 view can still resolve every non-INTERFACE heading, and `metric_for` raises only for the ones it
 cannot. `target` is one join per candidate that asks, rather than reusing
 `Experiment.select_statement()` and its three eager loads, which is how `candidates { experiment
@@ -366,8 +367,15 @@ Each finding was reproduced before it was reported, with a toy schema where no d
 | `numericValue` returns NaN or infinity, which GraphQL's Float cannot serialize, so the entry comes back as a masked "Internal server error." | **fixed** — `math.isfinite`, logged at DEBUG like any other value that will not serve as a number |
 | `Query.metrics` and `Module.metrics` come back in heap order, which the idempotent seeder reshuffles on every re-run | **fixed** — the catalog query orders on the metric's full identity |
 | The `Artifact` docstring cited an ORM comment the correction commit had already changed | **fixed** |
-| One candidate missing from the view nulls the entire `candidates` response, not "the whole Candidate" as three documents say | open — the trigger is unreachable today, and whether that justifies blanking everything is the owner's call |
+| One candidate missing from the view nulls the entire `candidates` response, not "the whole Candidate" as three documents say | **prose corrected**, in the code, the spec, the plan and this diary; the behaviour is deferred to issue #17 |
 | A NUL character in an annotation is rejected by Postgres at commit and surfaces as a masked internal error | **fixed** — confirmed read-only against the dev database (`CharacterNotInRepertoireError`), then refused as `BAD_USER_INPUT` before the session is touched |
+
+The blast-radius finding led somewhere larger. Asked what could make the trigger reachable, the
+answer was isolation: the request runs at READ COMMITTED, so every statement takes a fresh snapshot,
+and the context module's claim that one session keeps out "rows that never coexisted" was never
+true. One session narrows the window; it does not close it. The prose now says so, and the decision
+— whether each request should run at REPEATABLE READ, and what that costs the one mutation — is
+issue #17.
 
 The ordering fix is the one worth a sentence. `scores` had been sorted from the start, with a
 docstring explaining exactly why a list in Postgres's order is a flaky list. The two lists beside it

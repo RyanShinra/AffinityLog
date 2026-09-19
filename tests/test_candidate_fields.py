@@ -3,8 +3,9 @@
 WRITTEN BEFORE THE CODE. Three small fields, each with one decision behind it:
 
   * `interfaceKind` is NON-NULL. A candidate missing from `candidate_summary` therefore cannot
-    return null without blanking the whole Candidate, so it raises a coded error instead —
-    the same treatment `metric_for` gives the same absence.
+    return null without nulling the entire response (every item of `[Candidate!]!` is non-null
+    too), so it raises a coded error instead — the same treatment `metric_for` gives the same
+    absence. Whether that trade still holds up is deferred to issue #17.
   * `target` is a two-hop hoist (candidate -> experiment -> target) served by ONE join, not by
     reusing `Experiment.select_statement()` and its three eager loads.
   * `artifacts` is a resolver, not an eager load, so it costs nothing unless asked. The fixture

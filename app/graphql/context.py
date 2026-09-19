@@ -13,9 +13,15 @@ THE DECISION THIS FILE ENCODES
 One session per HTTP request, shared by every resolver in the query tree — NOT one session per
 resolver. A GraphQL query is a tree, so a single request can touch experiments, their candidates,
 and those candidates' chains; giving each resolver its own session would spread one logical read
-across several transactions, so a concurrent write could land between them and the response would
-contain rows that never coexisted. One session is also one connection from the pool, rather than
-one per node in the tree.
+across several transactions. One session is also one connection from the pool, rather than one per
+node in the tree.
+
+What one session does NOT buy is one snapshot. This paragraph used to say it kept a response from
+containing "rows that never coexisted", and at the isolation level the request actually runs at,
+it does not: the request is READ COMMITTED (measured with `SHOW transaction_isolation`), where
+every statement takes a fresh snapshot, so a concurrent write can still land between two
+statements of the same request. One session narrows that window; it does not close it. Found in
+review of PR #16 and deferred to issue #17, which weighs REPEATABLE READ per request.
 
 ``app/database.py``'s ``get_session`` already provides exactly this shape, and this is the same
 decision its docstring records.
@@ -141,9 +147,9 @@ class MetricCatalog:
             raise GraphQLError(
                 f"score key {score_key.heading.dotted!r} is interface-qualified: which of its catalog rows "
                 "applies depends on the chains this candidate folded, and no interface kind was "
-                "supplied. Remedy: the candidate is missing from the candidate_summary view, which "
-                "should be impossible — every candidate joins an experiment and chains are LEFT "
-                "joined.",
+                "supplied, because the candidate is missing from the candidate_summary view. The "
+                "view's shape rules that out, so the likely cause is a delete committed by another "
+                "request between this request's statements; retrying should succeed.",
                 extensions={"code": "INTERFACE_KIND_REQUIRED"},
             )
 

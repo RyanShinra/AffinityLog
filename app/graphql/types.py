@@ -607,11 +607,18 @@ def _interface_kind_of(
 ) -> InterfaceKind:
     """This candidate's interface kind, or a coded error. Never None.
 
-    `Candidate.interfaceKind` is non-null, and a non-null field that resolves to null takes the
-    whole Candidate with it. A candidate absent from `candidate_summary` should be impossible
-    (every candidate joins an experiment and chains are LEFT joined), so when it happens something
-    is wrong with the view or the data, and the message says which to look at. Coded, so
-    `MaskInternalErrors` lets it through — the same reasoning as `metric_for`'s error.
+    `Candidate.interfaceKind` is non-null, and a non-null field that raises does not stop at the
+    Candidate. Every item of `candidates: [Candidate!]!` is non-null too, so the null propagates to
+    the root and the WHOLE RESPONSE comes back `data: null`. This docstring said "takes the whole
+    Candidate with it" until the review of PR #16, and the decision to raise was argued on that
+    smaller blast radius.
+
+    The view's shape rules the absence out: every candidate joins an experiment on a non-null key,
+    and chains are LEFT joined. The one way through is isolation. The request runs at READ
+    COMMITTED, so a candidate deleted by another request between the candidate select and this
+    map's read is in the list and not in the map. Nothing deletes today. Whether raising still holds
+    up is deferred to issue #17. Coded, so `MaskInternalErrors` lets it through — the same
+    reasoning as `metric_for`'s error.
 
     The `scores` resolver deliberately does NOT use this: a candidate absent from the view can
     still resolve every non-INTERFACE heading, and `metric_for` raises only for the ones it cannot.
@@ -620,8 +627,8 @@ def _interface_kind_of(
     if interface_kind is None:
         raise GraphQLError(
             f"candidate {sequence_id!r} is not in the candidate_summary view, so its interface kind is "
-            "unknown. Remedy: the view LEFT JOINs chains and joins experiments, so check that this "
-            "candidate's experiment_id resolves, then sql/candidate_summary.sql.",
+            "unknown. The view's shape rules that out, so the likely cause is a delete committed by "
+            "another request between this request's statements; retrying should succeed.",
             extensions={"code": "CANDIDATE_NOT_IN_SUMMARY"},
         )
     return interface_kind

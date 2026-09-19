@@ -219,8 +219,10 @@ logger would have been silent under pytest. One keyword.
 
 Shown in chat first, then written in by Claude at the owner's request. Three fields, three decisions:
 
-* **`interfaceKind` is non-null, so absence RAISES.** A non-null field resolving to null takes the
-  whole `Candidate` with it, so a candidate missing from `candidate_summary` is a coded
+* **`interfaceKind` is non-null, so absence RAISES.** A non-null field that raises nulls the entire
+  `candidates` response, not just the `Candidate` — this said otherwise until the review corrected
+  it, and whether raising still holds up is deferred to issue #17. A candidate missing from
+  `candidate_summary` is a coded
   `GraphQLError` (`CANDIDATE_NOT_IN_SUMMARY`) from `_interface_kind_of`, a module function testable
   with an empty map. The `scores` resolver deliberately does NOT use it: an absent candidate can
   still resolve every non-INTERFACE heading, and `metric_for` raises only for the ones it cannot.

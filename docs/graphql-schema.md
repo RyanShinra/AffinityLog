@@ -226,7 +226,10 @@ Measured today, every one of the 200 keys resolves. But that is tautological: th
 artifact of how the catalog was built, not a property of the data model.
 
 A non-null `Metric!` would also fail destructively. In GraphQL, a non-null field that cannot resolve
-propagates the null upward — one unrecognized key would blank out the entire candidate.
+propagates the null upward through every non-null ancestor. `scores` is `[ScoreEntry!]!` and
+`candidates` is `[Candidate!]!`, so one unrecognized key would blank out not just its candidate but
+the entire `candidates` response. (This said "the entire candidate" until the review of PR #16;
+`Candidate.interfaceKind`, which is non-null and raises, carries the same exposure — issue #17.)
 
 More importantly, an unresolvable score is **information, not an error**: it says the column did not
 come from Bio Discovery. That is a fact worth surfacing rather than swallowing, and it is the real
