@@ -113,16 +113,16 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from sqlalchemy import text
+from sqlalchemy import TextClause, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
 from app.catalog.interface_kind import InterfaceKind
-from app.catalog.keys import declared_variants_for, decomposable_kinds_for
+from app.catalog.keys import Heading, declared_variants_for, decomposable_kinds_for
 from app.catalog.variant_kind import VariantKind
 
 
-class Heading(NamedTuple):
+class HeadingAudit(NamedTuple):
     """One `(module, column_key)` and the shape of its catalog rows."""
 
     module: ModuleName
@@ -130,6 +130,16 @@ class Heading(NamedTuple):
     variant_kinds: tuple[VariantKind, ...]  # the distinct non-NULL axes found, sorted by name
     variants: tuple[VariantName, ...]  # the distinct non-NULL variant values found, sorted
     bare_rows: int  # rows with variant_kind IS NULL under the same heading
+
+    @property
+    def heading(self) -> Heading:
+        """Which heading this audits. A property, exactly as on `ScoreKey` and `MetricIdentity`.
+
+        The two fields stay flat because the SQL below returns them flat and this is a NamedTuple
+        built row by row; the property is what stops callers formatting `module` and `column_key`
+        by hand, which is how the pair kept travelling as parts.
+        """
+        return Heading(self.module, self.column_key)
 
     def problems(self) -> tuple[str, ...]:
         """Every way this heading breaks the lookup. Empty means it is fine.
@@ -186,18 +196,36 @@ class Heading(NamedTuple):
 
         return tuple(reasons)
 
+
+class HeadingViolation(NamedTuple):
+    """A heading that breaks the lookup, and every reason it does.
+
+    WHY THIS EXISTS RATHER THAN JUST RETURNING THE AUDIT. `problems()` builds its reason strings by
+    calling `decomposable_kinds_for` and `declared_variants_for` and formatting several f-strings.
+    Filtering on its truthiness and then calling `describe()` — which called `problems()` AGAIN —
+    meant every reason was built twice and the first set thrown away. Deciding "is this broken?" and
+    "why?" are the same computation, so the answer is carried rather than recomputed.
+
+    `problems` is non-empty by construction: `find_heading_violations` is the only thing that builds
+    one, and it does so only when there is at least one reason. That is what makes this type mean
+    "violation" rather than "audit that might be fine".
+    """
+
+    audit: HeadingAudit
+    problems: tuple[str, ...]
+
     def describe(self) -> str:
-        return f"{self.module}.{self.column_key}: {' and '.join(self.problems())}"
+        return f"{self.audit.heading.dotted}: {' and '.join(self.problems)}"
 
 
 # `count(DISTINCT variant_kind)` ignores NULLs, which is why the bare-row case needs its own
 # FILTER clause rather than falling out of the same count. Grouping is on module_id + column_key —
 # the heading — because that is the granularity the resolver's tier one asks about.
 #
-# No HAVING: this returns EVERY heading and `Heading.problems()` decides which are broken. The
+# No HAVING: this returns EVERY heading and `HeadingAudit.problems()` decides which are broken. The
 # classification needs `decomposable_kinds_for` from app.catalog.keys, which SQL cannot import,
 # and at 144 rows the difference is not worth splitting the logic across two languages.
-_HEADINGS_SQL = text("""
+_HEADINGS_SQL: TextClause = text("""
     SELECT  mo.name                                                       AS module,
             me.column_key                                                 AS column_key,
             array_agg(DISTINCT me.variant_kind::text)
@@ -212,7 +240,7 @@ _HEADINGS_SQL = text("""
     """)
 
 
-async def find_heading_violations(session: AsyncSession) -> list[Heading]:
+async def find_heading_violations(session: AsyncSession) -> list[HeadingViolation]:
     """Every heading the ScoreEntry lookup cannot resolve. Empty list means clean.
 
     Call INSIDE the seeding transaction and before `commit()`: uncommitted rows are visible to
@@ -220,8 +248,8 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
     reporting it after the fact.
     """
     result = await session.execute(_HEADINGS_SQL)
-    headings = [
-        Heading(
+    audits: list[HeadingAudit] = [
+        HeadingAudit(
             module=ModuleName(row.module),
             column_key=ColumnKey(row.column_key),
             # THE STRING BOUNDARY. `_HEADINGS_SQL` casts the enum column to text, so this is the
@@ -234,7 +262,19 @@ async def find_heading_violations(session: AsyncSession) -> list[Heading]:
         )
         for row in result
     ]
-    return [heading for heading in headings if heading.problems()]
+    # A LOOP, NOT A COMPREHENSION, and the reason is `problems()` rather than taste. This read
+    # `[audit for audit in audits if audit.problems()]`, which called `problems()` to test its
+    # truthiness and discarded the reasons it had just built — then `describe()` built them a second
+    # time for every survivor. Binding the result is what makes the work happen once, and it turns a
+    # tuple's truthiness standing in for "is broken" into a value with a name.
+    violations: list[HeadingViolation] = []
+
+    for audit in audits:
+        problems = audit.problems()
+        if problems:
+            violations.append(HeadingViolation(audit=audit, problems=problems))
+
+    return violations
 
 
 async def raise_on_heading_violations(session: AsyncSession, *, source: str) -> None:

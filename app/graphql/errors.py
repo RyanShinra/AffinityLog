@@ -26,10 +26,15 @@ outside those blocks. One extension at the schema boundary sees every error on i
 
 THE POLICY
 ----------
-An error is safe to show **iff it carries a deliberate ``code``**. Everything raised on purpose sets
-one (see ``_as_uuid`` in ``schema.py``); nothing raised by SQLAlchemy, asyncpg, or a plain bug does.
-That is the same convention Apollo uses, and it needs no new exception hierarchy — the marker was
-already there, it just was not being read as one.
+An error is masked unless one of two things is true. Either it carries a deliberate ``code``
+extension — everything raised on purpose sets one (see ``_as_uuid`` in ``schema.py``), and nothing
+raised by SQLAlchemy, asyncpg or a plain bug does — or it is GraphQL's OWN error, raised during
+parse or validate before any resolver ran, which cannot carry anything internal because nothing
+internal has executed. The ``code`` half is the same convention Apollo uses, and needs no new
+exception hierarchy: the marker was already there, it just was not being read as one.
+
+The second half was missing until 2026-09-17, and its absence turned every client typo into
+"Internal server error." — which is the opposite of what this file is for.
 
 Note that Strawberry's ``default_should_mask_error`` masks **everything**, deliberate errors
 included, so the predicate below is required rather than a refinement.
@@ -40,19 +45,42 @@ logger before this runs. The client loses the detail; the server keeps it.
 
 from __future__ import annotations
 
+from typing import Any
+
 from graphql import GraphQLError
+from graphql.error.graphql_error import GraphQLErrorExtensions
 from strawberry.extensions import MaskErrors
 
 
 def should_mask_error(error: GraphQLError) -> bool:
-    """True for anything not raised deliberately, i.e. anything with no ``code`` extension.
+    """True for anything that could carry something internal. Two kinds of error never can.
 
-    Deliberately conservative in the safe direction: a *new* deliberate error that forgets to set a
-    code gets masked, which is a confusing bug report. The reverse default — show unless told to
-    hide — would turn the same omission into an information leak. Failing toward silence is the
-    cheaper mistake.
+    GRAPHQL'S OWN ERRORS — syntax and validation — arrive with no `original_error`, because
+    graphql-core produced them during parse/validate before any resolver ran. Nothing internal has
+    executed, so there is nothing to leak, and a client's typo should read as a typo. Measured:
+    `{ nosuchfield }` and an unterminated query both arrive with `original_error is None` and empty
+    extensions. Masking them turned every typo into "Internal server error."
+
+    DELIBERATE ERRORS carry a `code` extension — `_as_uuid` in schema.py is the precedent — and the
+    code is the marker for "meant to be read". Same convention Apollo uses.
+
+    Everything else is masked, and that default is deliberately conservative. Two mistakes land in
+    the same place:
+
+      * a *new* deliberate error that forgets its code entirely
+      * one that sets it to "" and never fills it in
+
+    Different mistakes, same remedy. The reverse default, show unless told to hide, would turn
+    either into an information leak. Failing toward silence is the cheaper mistake.
     """
-    return not (error.extensions or {}).get("code")
+    raised_by_a_resolver: bool = error.original_error is not None
+
+    extensions: GraphQLErrorExtensions | None = error.extensions
+    code: Any | None = extensions.get("code") if extensions is not None else None
+    no_code: bool = code is None  # nobody set one: SQLAlchemy, asyncpg, a plain bug
+    blank_code: bool = code == ""  # someone set one and left it empty — an omission, not consent
+
+    return raised_by_a_resolver and (no_code or blank_code)
 
 
 class MaskInternalErrors(MaskErrors):

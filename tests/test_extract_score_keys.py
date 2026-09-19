@@ -30,7 +30,7 @@ would pass. Resolving them compares the objects, and `NewType` instances are sin
 
 from __future__ import annotations
 
-from typing import Final, get_args, get_type_hints
+from typing import Final, get_type_hints
 
 import pytest
 
@@ -46,7 +46,13 @@ from scripts.extract_score_keys import MetricKey
 # unchecked while all three assertions still passed. Verified with a simulated fifth field: every
 # check green, the fifth drifted. `MetricIdentity` is what actually defines the arity, so it decides
 # here too.
-_IDENTITY_ARITY: Final[int] = len(get_args(MetricIdentity))
+#
+# `_fields` rather than `get_args`: this read `len(get_args(MetricIdentity))` while MetricIdentity
+# was a `tuple[...]` ALIAS. Promoting it to a NamedTuple makes `get_args` return `()` — arity zero,
+# `_MIRRORED` empty, and `@parametrize` over an empty list runs ZERO tests while reporting success.
+# That is this file's own warning turned on itself, and the reason
+# `test_the_mirrored_fields_really_are_the_identity` exists is to fail when it happens.
+_IDENTITY_ARITY: Final[int] = len(MetricIdentity._fields)
 _MIRRORED: Final[tuple[str, ...]] = ScoreKey._fields[:_IDENTITY_ARITY]
 
 

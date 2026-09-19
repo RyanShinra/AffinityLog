@@ -97,9 +97,13 @@ async def collect() -> list[MetricKey]:
     # identity -> (chains seen, raw keys that produced it)
     buckets: dict[MetricIdentity, tuple[set[str], list[str]]] = defaultdict(lambda: (set(), []))
     for key in raw_keys:
-        module, column, variant_kind, variant, chain = decompose(key)
-        chains, originals = buckets[(module, column, variant_kind, variant)]
-        if chain:
+        # `.identity` rather than re-assembling the first four fields here. This read
+        # `module, column, variant_kind, variant, chain = decompose(key)` and then rebuilt
+        # `(module, column, variant_kind, variant)` as a bare tuple one line later — the same four
+        # values, in an order that had to be right twice, next to the property that guarantees it.
+        score_key = decompose(key)
+        chains, originals = buckets[score_key.identity]
+        if (chain := score_key.chain) is not None:
             # `.value` because `chains` is informational output — printed, and serialised to JSON
             # by `--json`. The enum is the internal spelling; the letter is the reported one.
             chains.add(chain.value)

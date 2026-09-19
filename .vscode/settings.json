@@ -7,6 +7,7 @@
         "boltz",
         "developability",
         "epitope",
+        "evoprotgrad",
         "fasta",
         "Germline",
         "immunogenicity",
@@ -16,8 +17,10 @@
         "nanobodies",
         "ondelete",
         "polyreactivity",
+        "pseudolikelihood",
         "selectinload",
         "sessionmaker",
+        "temstapro",
         "thermostability"
     ],
     "cSpell.ignorePaths": [

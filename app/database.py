@@ -111,3 +111,14 @@ class TaskSafeSession:
             # `Result[RowTuple]`.
             result: Result[RowTuple] = await self._session.execute(statement)
             return result
+
+    async def commit(self) -> None:
+        """Commit the session's transaction, serialised like every statement on it.
+
+        The second method this class was always going to grow (see NOT A PROXY above). The flush a
+        commit triggers walks the identity map and writes pending state, which is precisely the
+        state the lock exists to protect — so it is taken here, and nowhere a caller could hold it
+        across something else. `flush` and `add` are still absent: nothing needs them yet.
+        """
+        async with self._lock:
+            await self._session.commit()

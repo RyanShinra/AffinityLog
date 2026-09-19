@@ -13,9 +13,15 @@ THE DECISION THIS FILE ENCODES
 One session per HTTP request, shared by every resolver in the query tree — NOT one session per
 resolver. A GraphQL query is a tree, so a single request can touch experiments, their candidates,
 and those candidates' chains; giving each resolver its own session would spread one logical read
-across several transactions, so a concurrent write could land between them and the response would
-contain rows that never coexisted. One session is also one connection from the pool, rather than
-one per node in the tree.
+across several transactions. One session is also one connection from the pool, rather than one per
+node in the tree.
+
+What one session does NOT buy is one snapshot. This paragraph used to say it kept a response from
+containing "rows that never coexisted", and at the isolation level the request actually runs at,
+it does not: the request is READ COMMITTED (measured with `SHOW transaction_isolation`), where
+every statement takes a fresh snapshot, so a concurrent write can still land between two
+statements of the same request. One session narrows that window; it does not close it. Found in
+review of PR #16 and deferred to issue #17, which weighs REPEATABLE READ per request.
 
 ``app/database.py``'s ``get_session`` already provides exactly this shape, and this is the same
 decision its docstring records.
@@ -42,86 +48,113 @@ from types import MappingProxyType
 from typing import Annotated
 
 from fastapi import Depends
+from graphql import GraphQLError
 from sqlalchemy import Result, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from strawberry.fastapi import BaseContext
 
-from app.catalog.identifiers import ColumnKey, ModuleName
-from app.catalog.keys import MetricIdentity
+from app.catalog.identifiers import ModuleName, SequenceId
+from app.catalog.interface_kind import InterfaceKind
+from app.catalog.keys import Heading, MetricIdentity, ScoreKey, VariantAxes
 from app.catalog.variant_kind import VariantKind
 from app.database import RowTuple, TaskSafeSession, get_session
 from app.models import orm as db
-
-
-def metric_identity_from_db_metric(metric: db.Metric) -> MetricIdentity:
-    """The catalog identity of one ORM row — four reads, no conversion.
-
-    This is what stage 4 bought. Until the ORM was retyped, three of these four fields needed
-    re-wrapping at the boundary to say what they already were — `ModuleName(metric.module.name)` and
-    two more — which is the friction that gets `NewType` quietly abandoned. `Mapped[ModuleName]`,
-    `Mapped[ColumnKey]` and `Mapped[VariantName | None]` cost nothing to declare (the columns are
-    still `String(128)`, unchanged) and the aliases now flow outward for free.
-    """
-    return (metric.module.name, metric.column_key, metric.variant_kind, metric.variant)
+from app.models.views import CandidateSummary
 
 
 @dataclass(frozen=True, eq=False)
 class MetricCatalog:
-    """Every catalogued metric, indexed the two ways the ScoreEntry resolver needs to ask.
+    """Every catalogued metric, indexed the three ways the resolvers need to ask.
 
-    Both indexes come from ONE pass over ONE query. They answer different questions:
+    All three are built in ONE pass over ONE query, and each answers a different question:
 
-      * `metric_by_identity` — "what does this exact identity mean?" The 1132 lookups a full
-        `{ candidates { scores } }` performs are all dict hits against this.
+      * `metric_by_identity` — "what does this exact identity mean?" Every lookup `metric_for`
+        performs is a dict hit against this; a full `{ candidates { scores } }` does 1132 of them.
 
-      * `variant_kinds_per_heading` — "along which axis, if any, do this heading's metrics vary?"
-        Tier one of the two-tier lookup. Measured on the corpus: 197 of 200 keys carry their whole
-        identity and hit `metric_by_identity` directly; 3 do not, and need the candidate's
-        interface kind folded in first.
+      * `variant_axes_per_heading` — "along which axis, if any, do this heading's metrics vary?"
+        Tier one of the two-tier lookup. Measured: 197 of the corpus's 200 keys carry their whole
+        identity and hit `metric_by_identity` directly; 3 do not.
 
-        The field holds EVERY axis, but only INTERFACE leaves a key incomplete — a PARAMETER
-        variant is encoded in the key string and `decompose()` recovers it unaided. So the branch
-        reading this asks only about INTERFACE while the field stays general.
+      * `metrics_per_module` — "what does this module emit?" Serves `Module.metrics`, which would
+        otherwise scan all 144 rows once per module per request.
 
-        Asked first rather than retried on miss, because a retry reads as a general fallback when
-        interface-qualification is specific to one axis. The correctness argument for asking first
-        — a bare row beside INTERFACE rows would make tier one hit and never consult them — is now
-        also covered by `app/catalog/invariants.py`, though that is a write-time check rather than
-        a schema constraint, so it binds only rows the seeders write. See docs/graphql-schema.md,
-        "Which catalog row a key means is a two-tier question".
+    WHY TIER ONE IS ASKED, NOT RETRIED ON MISS
+    ------------------------------------------
+    `variant_axes_per_heading` holds EVERY axis, but only INTERFACE leaves a key incomplete: a
+    PARAMETER variant is spelled in the key string and `decompose()` recovers it unaided. So the
+    branch reading it asks only about INTERFACE, while the field stays general.
 
-    NAMING: both fields say what they are keyed BY, and the preposition carries meaning.
-    `by` is a lookup handle — an identity tuple is a key you construct, not a thing that owns a
-    metric. `per` is one entry for each domain entity. (`of` was rejected: "kinds of column" and
-    "kind of candidate" both misparse — "kinds of X" is a stronger collocation in English than
-    the binding we mean.) Singular/plural then follows the real cardinality rather than the
-    number of keys: one metric per identity, several kinds possible per heading. The
-    candidate-side map that `Context.interface_kinds()` returns is the same idea and is best
-    bound as `interface_kind_per_candidate` at the point of use.
+    Looking up and retrying on miss is shorter and works today, but only by accident of the
+    seeders: a bare row beside INTERFACE rows would make tier one hit and never consult them.
+    `app/catalog/invariants.py` now refuses that shape, but as a write-time check rather than a
+    schema constraint, so it binds only rows the seeders write. Asking cannot fail that way. Full
+    argument in docs/graphql-schema.md, "Which catalog row a key means is a two-tier question".
+
+    NAMING
+    ------
+    Every field says what it is keyed BY, and the preposition carries meaning. `by` is a lookup
+    handle — an identity is a key you construct, not a thing that owns a metric. `per` is one entry
+    for each domain entity. (`of` was rejected: "kinds of column" misparses, because "kinds of X" is
+    a stronger collocation in English than the binding meant here.) Singular or plural then follows
+    the real cardinality: one metric per identity, several axes possible per heading, several
+    metrics per module. `Context.interface_kinds()` returns the same idea and is best bound as
+    `interface_kind_per_candidate` at the point of use.
 
     "Heading" rather than "column": `column_key` holds the raw CSV export header, and "column"
-    already means something else entirely in a database application. The pair
-    (module, column_key) names a metric BEFORE disambiguation — the several catalog rows sharing
-    a heading differ only by variant.
+    already means something else in a database application. A heading names a metric BEFORE
+    disambiguation — the several rows sharing one differ only by variant.
 
-    IMMUTABILITY: `frozen=True` alone would be a promise this class cannot keep. It stops
-    `catalog.metric_by_identity = {}` and nothing else — `catalog.metric_by_identity[k] = x`,
-    `.clear()`, and mutating the values all still work, so any resolver could corrupt the memo for
-    every later resolver in the same request, silently. Worse, the values are live `db.Metric`
-    instances still attached to the request's session, so assigning to one would be written to
-    Postgres by the next autoflush. `MappingProxyType` is what actually closes that: a read-only
-    view, so the mutating call raises instead of succeeding.
+    IMMUTABILITY
+    ------------
+    `frozen=True` alone would be a promise this class cannot keep. It stops
+    `catalog.metric_by_identity = {}` and nothing else: `...[k] = x`, `.clear()` and mutating the
+    values all still work, so any resolver could corrupt the memo for every later resolver in the
+    same request, silently. Worse, the values are live `db.Metric` instances still attached to the
+    request's session, so assigning to one would reach Postgres on the next autoflush.
+    `MappingProxyType` is what actually closes it — a read-only view, where the mutating call
+    raises instead of succeeding. The tuples in `metrics_per_module` are the same move for a list.
 
     `eq=False` goes with it. `frozen=True` with the default `eq=True` synthesises a `__hash__` over
-    the field tuple, so `hash(catalog)` or putting one in a set raised
-    `TypeError: unhashable type: 'dict'` — an error the word "frozen" invites you to expect not to
-    get. Nothing compares or hashes catalogs, and identity is the right semantics for a per-request
-    memo anyway: `await ctx.catalog() is await ctx.catalog()` is what the memo test asserts.
+    the field tuple, so `hash(catalog)` raised `TypeError: unhashable type: 'dict'` — an error the
+    word "frozen" invites you not to expect. Nothing compares or hashes catalogs, and identity is
+    the right semantics for a per-request memo anyway: `await ctx.catalog() is await ctx.catalog()`
+    is what the memo test asserts.
     """
 
     metric_by_identity: Mapping[MetricIdentity, db.Metric]
-    variant_kinds_per_heading: Mapping[tuple[ModuleName, ColumnKey], frozenset[VariantKind]]
+    variant_axes_per_heading: Mapping[Heading, VariantAxes]
+    metrics_per_module: Mapping[ModuleName, tuple[db.Metric, ...]]
+
+    def metric_for(self, score_key: ScoreKey, interface_kind: InterfaceKind | None) -> db.Metric | None:
+        """The catalog row explaining this key FOR THIS CANDIDATE, or None if there is none.
+
+        The two-tier lookup, and the only place it is written down. Tier one asks whether the key
+        can identify a metric by itself; tier two supplies the piece it cannot. See the long comment
+        in `_load_catalog` for why the question is asked in that order.
+        """
+        axes = self.variant_axes_per_heading.get(score_key.heading, VariantAxes.none())
+
+        if not axes.interface_qualified:
+            return self.metric_by_identity.get(score_key.identity)
+
+        if interface_kind is None:
+            # A `GraphQLError` with a code, not a ValueError and not an `assert`, for the reasons
+            # `_load_interface_kinds` sets out: `MaskInternalErrors` would replace an uncoded
+            # message with "Internal server error.", and `python -O` strips asserts. Nor `None`,
+            # which would make "we cannot tell which row applies" indistinguishable from "this
+            # column is not in the catalog" — the two callers-visible outcomes that must not blur.
+            raise GraphQLError(
+                f"score key {score_key.heading.dotted!r} is interface-qualified: which of its catalog rows "
+                "applies depends on the chains this candidate folded, and no interface kind was "
+                "supplied, because the candidate is missing from the candidate_summary view. The "
+                "view's shape rules that out, so the likely cause is a delete committed by another "
+                "request between this request's statements; retrying should succeed.",
+                extensions={"code": "INTERFACE_KIND_REQUIRED"},
+            )
+
+        return self.metric_by_identity.get(MetricIdentity.for_interface(score_key.heading, interface_kind))
+
     # End MetricCatalog Class
 
 
@@ -170,6 +203,19 @@ class Context(BaseContext):
         # fresh install would query once per ScoreEntry forever.
         self._catalog: MetricCatalog | None = None
 
+        # A THIRD lock, for the same reason there is a second one. `_load_interface_kinds()` issues
+        # its statement through `execute_statement()` exactly as `_load_catalog()` does, so it needs
+        # a lock that is not the session's. It is also not `_catalog_lock`: the two builds never
+        # nest, so sharing would not deadlock — but it would serialise two unrelated memos against
+        # each other, and would put one object back in charge of two invariants, which is the shape
+        # that deadlocked before. One lock per invariant is the rule; this is the third invariant.
+        self._interface_kinds_lock = asyncio.Lock()
+
+        # `None` rather than `{}`, for `_catalog`'s reason: a database with no candidates
+        # legitimately produces an empty map, so the sentinel must be distinguishable from a real,
+        # empty answer or an empty corpus would re-query once per ScoreEntry forever.
+        self._interface_kinds: Mapping[SequenceId, InterfaceKind] | None = None
+
     async def execute_statement(self, statement: Select[RowTuple]) -> Result[RowTuple]:
         """Run one SQL statement against this request's session. What every resolver calls.
 
@@ -182,6 +228,14 @@ class Context(BaseContext):
         another file rots on any edit above it and nothing checks it.
         """
         return await self._session.execute(statement)
+
+    async def commit(self) -> None:
+        """Commit this request's session. What the one mutation calls, and nothing else should.
+
+        One line, for `execute_statement`'s reason: `Context` never exposes the session, so a write
+        has to be given its own door, and this is it. The lock is `TaskSafeSession`'s business.
+        """
+        await self._session.commit()
 
     async def catalog(self) -> MetricCatalog:
         """The whole metric catalog, loaded once per request.
@@ -216,7 +270,7 @@ class Context(BaseContext):
         Split out so `catalog()` is nothing but cache policy — the double-check, the lock, the
         memo — and this is nothing but how the two indexes get built.
         """
-        # WHAT `variant_kinds_per_heading` IS
+        # WHAT `variant_axes_per_heading` IS
         # ----------------------------------
         # It is small. Measured against the seeded corpus, 144 metric rows produce exactly FOUR
         # entries — it is not an index over the catalog, it is an exception list:
@@ -228,7 +282,7 @@ class Context(BaseContext):
         #
         # The other 140 rows have a NULL variant_kind, contribute nothing, and so their
         # (module, column_key) is simply absent. A caller reads it as
-        # `variant_kinds_per_heading.get(pair, frozenset())` and gets the empty set for almost
+        # `variant_axes_per_heading.get(pair, frozenset())` and gets the empty set for almost
         # everything.
         #
         # THE QUESTION IT ANSWERS
@@ -283,44 +337,177 @@ class Context(BaseContext):
         #     InterfaceKind enum, and the INTERFACE variants in seed/catalog.json against it too,
         #     all without a database. What is unguarded is the SHAPE above, not the spelling.)
         metric_by_identity: dict[MetricIdentity, db.Metric] = dict()
-        kinds_seen_per_heading: defaultdict[tuple[ModuleName, ColumnKey], set[VariantKind]] = defaultdict(set)
+        kinds_seen_per_heading: defaultdict[Heading, set[VariantKind]] = defaultdict(set)
+        metrics_seen_per_module: defaultdict[ModuleName, list[db.Metric]] = defaultdict(list)
 
-        stmt: Select[tuple[db.Metric]] = select(db.Metric).options(
-            selectinload(db.Metric.module),
-            selectinload(db.Metric.concept),
-            selectinload(db.Metric.benchmark_results),
-            selectinload(db.Metric.transform_of),
+        # ORDERED, on the metric's full identity. Every list this catalog serves inherits the order
+        # rows arrive in — `Query.metrics` through `metric_by_identity`, `Module.metrics` through
+        # `metrics_per_module` — and without an ORDER BY that is Postgres's heap order, which the
+        # idempotent catalog seeder reshuffles on every re-run: ON CONFLICT DO UPDATE writes a new
+        # version of each row it touches. Found in review of PR #16; `scores` already sorted for this
+        # reason and these lists did not.
+        #
+        # The four sort columns are `uq_metric_identity` (NULLS NOT DISTINCT) with the module's NAME in
+        # place of its id, and module names are unique, so the order is total. The join is there only
+        # to sort by that name: the module itself still arrives through `selectinload` below.
+        select_db_metrics: Select[tuple[db.Metric]] = (
+            select(db.Metric)
+            .join(db.Metric.module)
+            .order_by(db.Module.name, db.Metric.column_key, db.Metric.variant_kind, db.Metric.variant)
+            .options(
+                selectinload(db.Metric.module),
+                selectinload(db.Metric.concept),
+                selectinload(db.Metric.benchmark_results),
+                selectinload(db.Metric.transform_of),
+            )
         )
 
         # The ordinary front door, even though `catalog()` is holding `_catalog_lock` around this
         # entire method. That is exactly what the two locks buy: this takes the SESSION's lock,
         # a different object, so there is nothing to re-enter. Under one shared lock this line
         # would hang the request forever, which is why this used to be `self.session.execute`.
-        result: Result[tuple[db.Metric]] = await self.execute_statement(stmt)
-        rows: Sequence[db.Metric] = result.scalars().all()
+        db_metrics_result: Result[tuple[db.Metric]] = await self.execute_statement(select_db_metrics)
+        db_metrics_rows: Sequence[db.Metric] = db_metrics_result.scalars().all()
 
-        for metric in rows:
-            metric_identity: MetricIdentity = metric_identity_from_db_metric(metric)
-            metric_by_identity[metric_identity] = metric
+        for db_metric in db_metrics_rows:
+            metric_identity: MetricIdentity = MetricIdentity.from_db_metric(db_metric)
+            metric_by_identity[metric_identity] = db_metric
+            metrics_seen_per_module[db_metric.module.name].append(db_metric)
 
-            if metric.variant_kind is not None:
-                kinds_seen_per_heading[(metric.module.name, metric.column_key)].add(metric.variant_kind)
+            if db_metric.variant_kind is not None:
+                kinds_seen_per_heading[Heading.from_db_metric(db_metric)].add(db_metric.variant_kind)
 
         # Now we need to freeze the sets; recreating it is the easiest way
         # (I'm specifically not doing the dict comprehension for future readability)
-        variant_kinds_per_heading: dict[tuple[ModuleName, ColumnKey], frozenset[VariantKind]] = dict()
+        variant_axes_per_heading: dict[Heading, VariantAxes] = dict()
 
         for heading, seen_kinds in kinds_seen_per_heading.items():
-            variant_kinds_per_heading[heading] = frozenset(seen_kinds)
+            variant_axes_per_heading[heading] = VariantAxes(frozenset(seen_kinds))
+
+        # Same freeze as above: lists while building, tuples once handed out.
+        metrics_per_module: dict[ModuleName, tuple[db.Metric, ...]] = dict()
+
+        for module_name, seen_metrics in metrics_seen_per_module.items():
+            metrics_per_module[module_name] = tuple(seen_metrics)
 
         # Wrapped on the way out. The dicts above are mutable because building them requires it;
         # the catalog handed to 1132 resolvers must not be.
         return MetricCatalog(
             metric_by_identity=MappingProxyType(metric_by_identity),
-            variant_kinds_per_heading=MappingProxyType(variant_kinds_per_heading),
+            variant_axes_per_heading=MappingProxyType(variant_axes_per_heading),
+            metrics_per_module=MappingProxyType(metrics_per_module),
         )
 
     # End def catalog
+
+    async def interface_kinds(self) -> Mapping[SequenceId, InterfaceKind]:
+        """What each candidate's ipTM-style scores are actually measuring. Loaded once per request.
+
+        TIER TWO of the two-tier lookup. `catalog().variant_axes_per_heading` answers "is this
+        heading INTERFACE-qualified?"; this answers "and what did THIS candidate fold?". Neither is
+        sufficient alone, which is the whole shape of the 2026-07-31 finding: `boltz2.protein_iptm`
+        is one key meaning three different physical quantities, and the discriminator lives on the
+        candidate rather than in the key or the value.
+
+        ONE QUERY FOR EVERY CANDIDATE, not one per candidate. `{ candidates { scores } }` gathers
+        the score resolver across the whole list, so a per-candidate read would be 14 round trips on
+        today's corpus and one per row forever after — the same argument that makes `catalog()` load
+        all 144 metrics at once.
+
+        Keyed by `candidates.sequence_id`, because that is what `candidate_summary` publishes (as
+        `candidate_id`). See `_load_interface_kinds` for what that key costs and what guards it.
+        """
+        if self._interface_kinds is not None:
+            return self._interface_kinds
+
+        async with self._interface_kinds_lock:
+            # Double-checked inside the lock, for `catalog()`'s measured reason: without this the
+            # lock serialises the queries but still runs one per waiting caller.
+            if self._interface_kinds is not None:
+                return self._interface_kinds
+            self._interface_kinds = await self._load_interface_kinds()
+
+        return self._interface_kinds
+
+    # End def interface_kinds
+
+    async def _load_interface_kinds(self) -> Mapping[SequenceId, InterfaceKind]:
+        """Build the interface-kind map. Call only from `interface_kinds()`, holding its lock.
+
+        WHY THIS CAN FAIL IN THE MIDDLE OF A REQUEST, AND WHAT THAT COSTS
+        ----------------------------------------------------------------
+        Both failures below are NON-TRANSIENT. Neither is a blip to retry: once the data or the code
+        is in the failing state, every query that touches scores fails identically until a human
+        changes something. So the failure has two audiences at once — the operator, who has to go
+        fix it, and the client, who needs to be told something more useful than "it broke".
+
+        A bare `ValueError` serves neither. `MaskInternalErrors` (app/graphql/errors.py) replaces the
+        message of any error NOT carrying a deliberate `code`, so the caller would receive
+        "Internal server error." and have nothing to report. `GraphQLError` with a code is this
+        project's existing shape for an error meant to be read — `_as_uuid` in schema.py is the
+        precedent — and carrying the code is precisely what survives masking.
+
+        The operator half is thinner than it should be, and this says so rather than implying
+        otherwise: Strawberry logs the original to the `strawberry.execution` logger, and errors.py
+        notes there is no aggregation to alert from yet. Today "alarm" means a line in the server
+        log. If this project grows monitoring, these are two of the errors worth paging on.
+
+        Each message therefore names its own remedy, because whoever reads it will not be holding
+        this context.
+        """
+        select_candidates: Select[tuple[SequenceId, str]] = select(
+            CandidateSummary.candidate_id, CandidateSummary.interface_kind
+        )
+        select_candidates_results: Result[tuple[SequenceId, str]] = await self.execute_statement(select_candidates)
+
+        interface_kind_per_candidate: dict[SequenceId, InterfaceKind] = dict()
+
+        for candidate_id, label in select_candidates_results.all():
+            # THE KEY IS THE VENDOR'S, AND IT IS ONLY UNIQUE PER EXPERIMENT.
+            # `candidate_summary.candidate_id` is `candidates.sequence_id` — the `id` column of the
+            # Bio Discovery export — and `uq_candidate_seq` constrains `(experiment_id,
+            # sequence_id)`, not `sequence_id` alone. This map spans all nine experiments, so two
+            # colliding rows would silently fold into one entry and hand one candidate the OTHER's
+            # interface kind: an antibody's heavy-light pairing confidence (~0.95) reported as HER2
+            # binding, which is the precise inversion the two-tier design exists to prevent.
+            #
+            # No collision exists in the corpus (14 candidates, 14 distinct ids, measured), and the
+            # ids look like real UUIDs — so this is belt-and-braces against a guarantee the schema
+            # does not actually make, not against an observed fault.
+            if candidate_id in interface_kind_per_candidate:
+                raise GraphQLError(
+                    f"candidate id {candidate_id!r} appears in more than one experiment, so this "
+                    "request cannot tell which candidate's chains each score belongs to. Remedy: "
+                    "key this map by candidates.id, which means publishing it from the "
+                    "candidate_summary view (a migration).",
+                    extensions={"code": "AMBIGUOUS_CANDIDATE_ID"},
+                )
+
+            # str -> enum AT THE SQL BOUNDARY, the way app/catalog/invariants.py does it, so nothing
+            # downstream ever handles the raw CASE string. The enum is the shared vocabulary: the
+            # same four strings are the view's CASE arms and the `variant` of the nine INTERFACE
+            # catalog rows, and `InterfaceKind` is what makes them one definition instead of three.
+            #
+            # A label with no member means sql/candidate_summary.sql and
+            # app/catalog/interface_kind.py have drifted. tests/test_interface_kind.py already
+            # catches that in CI without a database, so this is the belt to that suspenders — but it
+            # is raised the same deliberate way rather than left to a bare ValueError, because the
+            # audience argument above does not change just because the cause is our bug.
+            try:
+                interface_kind_per_candidate[candidate_id] = InterfaceKind(label)
+            except ValueError as exc:
+                raise GraphQLError(
+                    f"the candidate_summary view produced interface kind {label!r}, which is not a "
+                    "member of InterfaceKind. Remedy: sql/candidate_summary.sql (and migration 004) "
+                    "have drifted from app/catalog/interface_kind.py — reconcile the CASE arms.",
+                    extensions={"code": "UNKNOWN_INTERFACE_KIND"},
+                ) from exc
+
+        # Wrapped on the way out, for MetricCatalog's reason: this map is handed to every ScoreEntry
+        # in the request and must not be mutable by any of them.
+        return MappingProxyType(interface_kind_per_candidate)
+
+    # End def _load_interface_kinds
 
 
 # End Context class

@@ -135,10 +135,19 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 
 - **Discuss the approach before building it.** For anything past a trivial edit, propose the plan,
   name the decision points, and wait. Building first pre-empts the owner's input and wastes his time.
-- **Leave the decision-carrying code to him.** He writes the pieces that encode a judgment — the
-  `CASE` classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score
-  parsing. Scaffold around it, mark the spot, explain the trade-offs, and offer a "fill in the
-  blanks" version rather than assuming he wants to type boilerplate.
+- **Err toward writing NOTHING directly; show the code instead.** The default is a locale list —
+  file, line, and the code that goes there, in the reply — and he types it. This is stronger than
+  "leave him the decision-carrying code", which is what this entry used to say: it applies to
+  boilerplate too. An earlier version ended "rather than assuming he wants to type boilerplate",
+  which had it backwards. Typing it is how he learns the Python data layer, which is half the point
+  of the project, and a locale list is reviewable in a way a finished diff is not.
+  He writes the pieces that encode a judgment for the same reason, only more so — the `CASE`
+  classifying interface kind, the `env.py` revision hook, migration `005`, the CSV score parsing,
+  the two-tier branch. Mark the spot, name the trade-offs, and wait.
+  Two things still belong to Claude by default: **tests** (he has said so explicitly, including
+  writing them first so he can code against them) and **mechanical fallout** that a change he just
+  made has already decided — a rename's call sites, an import that went dead. When in doubt,
+  show it rather than land it; landing it and reporting clearly is the fallback, not the default.
 - **Never start, stop, or restart Docker — ask, or hand the command over.** Launching Docker
   Desktop spins up a VM, mounts filesystems, and starts any container with a restart policy; on a
   laptop that is a real battery and memory commitment, and it changes machine state well beyond the
@@ -147,6 +156,15 @@ ships. These were learned the hard way; they are not preferences to optimise awa
 - **Consult the linter before saying "run it."** Editor diagnostics have caught errors that were then
   shipped anyway; treat ruff/mypy/black as a pre-run gate, and reason about the installed library's
   real signatures rather than the remembered ones.
+- **A red suite mid-change is fine when the red is explicable.** From the owner, quoting his
+  software-testing lecturer: *"Some of you seem to think that debugging is like finding the bottom
+  of the hill. Fix one thing and the number of errors increases, so you did the wrong thing.
+  Sometimes the number of errors goes up, on the way to the correct solution."* So do NOT split a
+  coherent change into commits chosen to keep `pytest` green at every step, and do not narrow a
+  refactor to avoid breaking tests you are about to update anyway. Let the count rise, say WHY it
+  rose, and bring it back down when the change is done. What is not acceptable is unexplained red,
+  or red nobody noticed. (This does not license committing red without saying so — the TDD commit
+  `f786597` labels itself RED ON PURPOSE in its first line.)
 - **Move deliberately; verify against the data.** One checked query beats three plausible paragraphs.
   Nearly every finding in `docs/schema-stress-log.md` came from stopping to measure something instead
   of asserting it — including the ipTM discovery, which contradicted the obvious hypothesis. When he
@@ -206,10 +224,12 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   statement through `execute_statement()` — safe only because that takes a *different* lock. One
   lock serving both invariants is the version that deadlocks: `asyncio.Lock` is not reentrant, so
   the task waits on itself forever, with no exception, no traceback and no timeout, while every
-  other request on the loop is served normally. `interface_kinds()` wants exactly this shape — give
-  it `_interface_kinds_lock`, not the session's.
-  `tests/test_context_catalog.py::TestTheTwoLocksAreSeparate` guards it, including a test that
-  collapses the two locks back into one and asserts the hang.
+  other request on the loop is served normally. `interface_kinds()` has exactly this shape and its
+  own `_interface_kinds_lock` — three locks now, one per invariant.
+  `tests/test_context_catalog.py::TestTheLocksAreSeparate` guards all three, including tests that
+  collapse a memo lock back into the session's and assert the hang. The two memo locks are kept
+  apart from each other too, though that pair cannot deadlock (the builds never nest): the rule
+  under test is one lock per invariant, not "two locks happen to be enough".
 - **`monkeypatch` in a test is a smell — often the only way, never the first thing to reach for.**
   It couples the test to the implementation's internals, so it can only be right if you know exactly
   where the value is read, and it fails *silently* when you don't: the test passes, against the bug.
@@ -263,8 +283,8 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   test's own connection for the duration, so a seeder's `commit()` becomes a SAVEPOINT release inside
   the rollback. Outside that, using it raises `UnboundExecutionError` — except where the code under
   test never executes a statement, which is why `tests/test_importer.py` gets away with it today.
-  That file's module docstring carries a block flagged for the planned test-review PR; read it before
-  changing any fixture.
+  That file's "WHY NO DATABASE" docstring explains why; the item is logged in
+  `docs/test-review-plan.md`, which collects the test-review pass. Read it before changing any fixture.
 - **The PR #13 cleanup list is closed.** `docs/pr-13-diary.md`'s Act VI listed fifteen defects the
   second review pass found in PR #13's own fixes; all fifteen shipped on `spring-cleaning-in-summer`
   and `docs/pr-14-diary.md` records what each became. Read Act VI for the history, not as a work
@@ -315,6 +335,13 @@ ships. These were learned the hard way; they are not preferences to optimise awa
     and `charliermarsh.ruff` extensions (listed in `.vscode/extensions.json`, VS Code will
     prompt to install them) on whichever machine's VS Code you're using; this is separate from
     the pre-commit hook and doesn't carry over between Mac/PC automatically.
+- **Local LLM tooling (Ollama + Continue) is per machine and documented in `docs/local-llm-setup.md`.**
+  The Continue config, the Ollama env and the assistant's memory all live outside the repo and do
+  not sync, so that doc carries the decisions, the config files and the measured numbers. Both
+  machines are done (Mac 2026-09-16, PC 2026-09-18) and deliberately differ: on the PC autocomplete
+  is the point and chat is occasional, because its 16 GB card cannot hold both models at once.
+  What Continue sends to Ollama was read from its installed code, not its docs — re-check after an
+  upgrade.
 
 ---
 

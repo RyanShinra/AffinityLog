@@ -5,8 +5,9 @@ generated from these classes rather than parsed from a file, which is exactly wh
 written and reviewed before any of this existed — there was no other point at which changing the
 schema was cheap.
 
-This module covers the entity types only. ``ScoreEntry``, ``Metric``, ``Module`` and ``Concept`` —
-the interpretive half, and the reason the catalog exists — land in a later pass.
+Two halves. The entity types (``Candidate``, ``Experiment``, ``Chain`` and their satellites) map rows.
+The interpretive half — ``Metric``, ``Module``, ``Concept`` and ``ScoreEntry``, the reason the catalog
+exists — sits below them. ``ScoreEntry`` is the one type backed by no table: see ``Candidate.scores``.
 
 HOW A RESOLVER IS SHAPED (and where graphql-js habits mislead)
 -------------------------------------------------------------
@@ -70,18 +71,27 @@ are recorded so the decision is made against measurements rather than instinct.
 
 from __future__ import annotations
 
+import logging
+import math
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import strawberry
+from graphql import GraphQLError
 from sqlalchemy import Result, Select, select
 from sqlalchemy.orm import selectinload
 from strawberry.scalars import JSON
 
+from app.catalog import variant_kind
+from app.catalog.identifiers import ModuleName, SequenceId
+from app.catalog.interface_kind import InterfaceKind
+from app.catalog.keys import ScoreKey, decompose
+from app.graphql.context import MetricCatalog
 from app.models import orm as db
 
 if TYPE_CHECKING:
+
     from app.graphql.context import Context
 
 # Wrap the ORM's ChainRole enum rather than declaring a parallel one. `strawberry.enum` registers the
@@ -89,7 +99,27 @@ if TYPE_CHECKING:
 # vocabulary — the same reasoning that keeps InterfaceKind in one place. The GraphQL enum exposes
 # the member NAMES (HEAVY/LIGHT/TARGET), not the values ("H"/"L"/"T"): that is the GraphQL
 # convention, and happens to be the more readable half of the pair.
+# > These bind nothing anyone uses: `strawberry.enum` REGISTERS the class with the schema and returns
+# it unchanged, so the annotation to write is `db.ModuleType`, not `ModuleType` — the binding's
+# inferred type is `EnumType | Callable[...]`, which is a value, not a type expression. See
+# `Chain.role` for the shape.
+
 ChainRole = strawberry.enum(db.ChainRole)
+MetricValueType = strawberry.enum(db.MetricValueType)
+Direction = strawberry.enum(db.Direction)
+ModuleType = strawberry.enum(db.ModuleType)
+VariantKind = strawberry.enum(variant_kind.VariantKind)
+ModuleFunction = strawberry.enum(db.ModuleFunction)
+
+# A different binding name from the six above, deliberately. Those rebind a name only ever reached
+# through `db.`; `InterfaceKind` is imported by its own name and the `scores` resolver annotates
+# with it, so rebinding it would replace the class with the registration's return value (an
+# `EnumType | Callable[...]` union, not a type expression) and the annotation would fail to check.
+InterfaceKindEnum = strawberry.enum(InterfaceKind)
+
+# The first logger in `app/`. Named after the module, the standard-library way, so a handler can
+# be pointed at `app.graphql` without catching Strawberry's own `strawberry.execution` output.
+logger = logging.getLogger(__name__)
 
 
 @strawberry.type
@@ -112,6 +142,28 @@ class Target:
     @staticmethod
     def from_row(row: db.Target) -> Target:
         return Target(name=row.name, pdb_id=row.pdb_id)
+
+
+@strawberry.type
+class Artifact:
+    """A non-scalar output referenced by URI — today, a predicted structure file.
+
+    Eleven rows in the loaded corpus, written by `scripts/seed_corpus_context.py` from the
+    `<candidate id>_<tool>.pdb` files under `experiment_results/`: `uri` is the repo-relative
+    path and `kind` is the TOOL that produced it (`boltz2`, `rfantibody`), so a candidate folded
+    by two tools carries two artifacts.
+
+    (Stage 4 was planned on the belief that nothing wrote this table. That was wrong — the
+    seeder inserts with raw SQL, which a grep for `Artifact(` did not find — and was caught by
+    running the resolvers against the real corpus. Measured 2026-09-18: 11 artifacts.)
+    """
+
+    kind: str
+    uri: str
+
+    @staticmethod
+    def from_row(row: db.Artifact) -> Artifact:
+        return Artifact(kind=row.kind, uri=row.uri)
 
 
 @strawberry.type
@@ -154,9 +206,9 @@ class Chain:
 class Candidate:
     """A designed sequence and its chains.
 
-    `scores` is absent from this pass on purpose: turning the JSONB bag into interpreted
-    `ScoreEntry` values is the ScoreEntry chapter, and it needs `interface_kind` from the
-    `candidate_summary` view to disambiguate three of the 200 keys.
+    `scores` is a resolver over the private `score_bag`, not a field: turning the JSONB bag into
+    interpreted `ScoreEntry` values needs the catalog memo AND this candidate's `interface_kind`
+    from the `candidate_summary` view, which is what disambiguates three of the 200 keys.
     """
 
     id: strawberry.ID
@@ -175,6 +227,11 @@ class Candidate:
     # the one thing this schema exists not to do.
     experiment_id: strawberry.Private[uuid.UUID]
 
+    # The raw bag, kept off the schema. `scores` below is a RESOLVER over this, so the JSONB dict
+    # is never exposed as-is: the whole point of ScoreEntry is that a key means nothing until the
+    # catalog and the candidate's chains have both been consulted.
+    score_bag: strawberry.Private[dict[str, str]]
+
     @staticmethod
     def from_row(row: db.Candidate) -> Candidate:
         return Candidate(
@@ -183,6 +240,7 @@ class Candidate:
             annotation=row.annotation,
             chains=[Chain.from_row(c) for c in row.chains],
             experiment_id=row.experiment_id,
+            score_bag=row.scores,
         )
 
     @staticmethod
@@ -215,6 +273,103 @@ class Candidate:
         if row is None:
             return None
         return Experiment.from_row(row)
+
+    @strawberry.field
+    async def scores(
+        self,
+        info: strawberry.Info[Context, None],
+        module: str | None = None,
+        chain: db.ChainRole | None = None,
+        concept: str | None = None,
+    ) -> list[ScoreEntry]:
+        """The candidate's score bag, interpreted: one entry per JSONB key, plus what it means.
+
+        Backed by no table. Each entry is one bag key, the catalog row `metric_for` picks for it,
+        and the interface kind that lets `metric_for` pick. No SQL runs here: both memos load once
+        per request under their own locks, so `{ candidates { scores } }` is dict lookups from
+        here on. The filters run in Python for the reason docs/scoreentry-plan.md gives: pushing
+        them into JSONB would mean re-deriving `decompose()` in SQL.
+
+        Sorted by key. JSONB does not preserve insertion order, so without this the list order
+        would depend on Postgres's key hashing and nothing else.
+        """
+        catalog: MetricCatalog = await info.context.catalog()
+        interface_kind_per_candidate = await info.context.interface_kinds()
+        # `.get`, not `[]`: a candidate absent from the view is possible in principle, and
+        # `metric_for` already raises the coded error for the one case where that matters (an
+        # INTERFACE-qualified heading). Every other heading resolves fine without it.
+        interface_kind: InterfaceKind | None = interface_kind_per_candidate.get(SequenceId(self.sequence_id))
+
+        entries: list[ScoreEntry] = []
+        for key in sorted(self.score_bag):
+            value: str = self.score_bag[key]
+            score_key: ScoreKey = decompose(key)
+            db_metric: db.Metric | None = catalog.metric_for(score_key, interface_kind)
+
+            if not _passes_filters(score_key, db_metric, module=module, chain=chain, concept=concept):
+                continue
+
+            metric: Metric | None = None
+            if db_metric is not None:
+                metric = Metric.from_row(db_metric)
+
+            entries.append(
+                ScoreEntry(
+                    key=key,
+                    value=value,
+                    numeric_value=_numeric_value(value, db_metric),
+                    chain=score_key.chain,
+                    metric=metric,
+                )
+            )
+        return entries
+
+    @strawberry.field
+    async def interface_kind(self, info: strawberry.Info[Context, None]) -> InterfaceKind:
+        """What this candidate's ipTM-style scores are measuring: the view's CASE, as an enum.
+
+        From the per-request memo, so no query of its own. NON-NULL, which is why absence is an
+        error rather than a null: see `_interface_kind_of`.
+        """
+        interface_kind_per_candidate = await info.context.interface_kinds()
+        return _interface_kind_of(SequenceId(self.sequence_id), interface_kind_per_candidate)
+
+    @strawberry.field
+    async def target(self, info: strawberry.Info[Context, None]) -> Target | None:
+        """The antigen this candidate was designed against, hoisted through its experiment.
+
+        Two FK hops flattened to one field, served by ONE join. Not `Experiment.select_statement()`
+        filtered by id: that carries three eager loads, which is how `candidates { experiment
+        { name } }` came to cost 58 queries in the measured-cost table. A client asking for both
+        `experiment` and `target` pays for the experiment twice, and that is the cheaper trade.
+        """
+        stmt: Select[tuple[db.Target]] = (
+            select(db.Target)
+            .join(db.Experiment, db.Experiment.target_id == db.Target.id)
+            .where(db.Experiment.id == self.experiment_id)
+        )
+        result: Result[tuple[db.Target]] = await info.context.execute_statement(stmt)
+        row: db.Target | None = result.scalar_one_or_none()  # experiment PK, at most one
+        if row is None:
+            return None
+        return Target.from_row(row)
+
+    @strawberry.field
+    async def artifacts(self, info: strawberry.Info[Context, None]) -> list[Artifact]:
+        """Files attached to this candidate — its predicted structures, for eleven of fourteen.
+
+        A resolver rather than a `selectinload` in `select_statement()`, because an eager load
+        would add a query to every candidate read whether or not the client asked. Sorted so the
+        order is the data's, not the planner's.
+        """
+        stmt: Select[tuple[db.Artifact]] = (
+            select(db.Artifact)
+            .where(db.Artifact.candidate_id == uuid.UUID(self.id))
+            .order_by(db.Artifact.kind, db.Artifact.uri)
+        )
+        result: Result[tuple[db.Artifact]] = await info.context.execute_statement(stmt)
+        rows: Sequence[db.Artifact] = result.scalars().all()
+        return [Artifact.from_row(r) for r in rows]
 
 
 @strawberry.type
@@ -277,3 +432,283 @@ class Experiment:
         result: Result[tuple[db.Candidate]] = await info.context.execute_statement(stmt)
         rows: Sequence[db.Candidate] = result.scalars().all()
         return [Candidate.from_row(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# THE CATALOG — what a score MEANS.
+# Every object below is already in memory once Context.catalog() has run:
+# _load_catalog eager-loads module, concept, benchmark_results and transform_of.
+# These are declarations over data we already fetch, not new queries.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.type
+class Concept:
+    """What a metric measures, independent of which module measured it."""
+
+    name: str
+    label: str
+    description: str | None
+
+    @staticmethod
+    def from_row(row: db.Concept) -> Concept:
+        return Concept(name=row.name, label=row.label, description=row.description)
+
+
+@strawberry.type
+class BenchmarkResult:
+    """One published benchmark row for a metric.
+
+    ALWAYS EMPTY TODAY: `benchmark_results` has zero rows and the tables were deliberately never
+    populated (CLAUDE.md). Built because the field is in the committed spec and `[]` is truthful —
+    but nothing exercises the mapping below, so do not read a green test as coverage.
+    """
+
+    property: str
+    n: int
+    spearman_correlation: float
+    auroc: float | None
+    auprc: float | None
+    precision_top5: float | None
+
+    @staticmethod
+    def from_row(row: db.BenchmarkResult) -> BenchmarkResult:
+        return BenchmarkResult(
+            property=row.property,
+            n=row.n,
+            spearman_correlation=row.spearman_correlation,
+            auroc=row.auroc,
+            auprc=row.auprc,
+            precision_top5=row.precision_top5,
+        )
+
+
+@strawberry.type
+class Module:
+    """An algorithmic unit in Bio Discovery — Boltz2, EvoProtGrad, TemStaPro."""
+
+    name: str  # narrowed from ModuleName: a NewType cannot cross into the SDL
+    module_type: db.ModuleType
+    functions: list[db.ModuleFunction]
+    repo_url: str | None
+    description: str | None
+    version: str | None
+    license: str | None
+
+    @staticmethod
+    def from_row(row: db.Module) -> Module:
+        return Module(
+            name=row.name,
+            module_type=row.module_type,
+            functions=list(row.functions),
+            repo_url=row.repo_url,
+            description=row.description,
+            version=row.version,
+            license=row.license,
+        )
+
+    @strawberry.field
+    async def metrics(self, info: strawberry.Info[Context, None]) -> list[Metric]:
+        """Every metric this module emits.
+
+        A resolver rather than a plain field, and that is structural: `Metric.from_row` builds its
+        `Module`, so a `Module.from_row` that built its metrics would recurse without end. A resolver
+        runs only when the client asks for the field.
+
+        Reads `metrics_per_module`, grouped once when the catalog is built — not a scan per module
+        per request. No query of its own either way.
+        """
+        catalog: MetricCatalog = await info.context.catalog()
+        rows = catalog.metrics_per_module.get(ModuleName(self.name), ())
+
+        result: list[Metric] = []
+        for row in rows:
+            result.append(Metric.from_row(row))
+        return result
+
+
+@strawberry.type
+class Metric:
+    """One catalogued column, and what it means.
+
+    NO `transformOf` YET, deliberately. `metrics.transform_of_metric_id` is a self-FK for the
+    raw-vs-transformed metric pairs, and nothing in the repo writes it — not `seed/catalog.json`,
+    not any seeder. Exposing it would also need care: `selectinload(transform_of)` loads exactly one
+    level, so recursing `from_row` into the parent touches ITS unloaded `module` and raises
+    MissingGreenlet. When something populates the column, the shape is a resolver over a by-id
+    catalog index, not a field. `docs/graphql-schema.md` still specifies it.
+
+    `benchmarkResults` below is NOT the same case and stays: it is a list, so `[]` is a truthful
+    answer rather than a stand-in, and it needs no recursion.
+    """
+
+    column_key: str
+    display_name: str
+    value_type: db.MetricValueType
+    unit: str | None
+    direction: db.Direction
+    variant_kind: variant_kind.VariantKind | None
+    variant: str | None
+    notes: str | None
+    property_categories: list[str]
+    module: Module
+    concept: Concept | None
+    benchmark_results: list[BenchmarkResult]
+
+    @strawberry.field
+    def curated(self) -> bool:
+        """No column: a metric is curated when someone gave it a name other than its raw header."""
+        return self.display_name != self.column_key
+
+    @staticmethod
+    def from_row(row: db.Metric) -> Metric:
+        return Metric(
+            column_key=row.column_key,
+            display_name=row.display_name,
+            value_type=row.value_type,
+            unit=row.unit,
+            direction=row.direction,
+            variant_kind=row.variant_kind,
+            variant=row.variant,
+            notes=row.notes,
+            property_categories=list(row.property_categories),
+            module=Module.from_row(row.module),
+            concept=Concept.from_row(row.concept) if row.concept is not None else None,
+            benchmark_results=[BenchmarkResult.from_row(b) for b in row.benchmark_results],
+        )
+
+
+# ---------------------------------------------------------------------------
+# SCORE ENTRIES — the bag, interpreted. Backed by no table.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.type
+class ScoreEntry:
+    """One key of a candidate's score bag, and what the catalog says it means.
+
+    `value` is the stored string, uncoerced, always. `numeric_value` is a separate field rather
+    than a best-effort cast, so a CATEGORICAL that happens to look like a number never becomes one
+    (docs/graphql-schema.md, "value is never coerced"). `chain` is the suffix `decompose()`
+    stripped: it says which subject the value describes, not which metric it is, which is why it
+    is here and not on `Metric`. `metric` is nullable because an unresolvable key is information,
+    not an error: it says the column did not come from a catalogued module.
+    """
+
+    key: str
+    value: str
+    numeric_value: float | None
+    chain: db.ChainRole | None
+    metric: Metric | None
+
+
+def _interface_kind_of(
+    sequence_id: SequenceId, interface_kind_per_candidate: Mapping[SequenceId, InterfaceKind]
+) -> InterfaceKind:
+    """This candidate's interface kind, or a coded error. Never None.
+
+    `Candidate.interfaceKind` is non-null, and a non-null field that raises does not stop at the
+    Candidate. Every item of `candidates: [Candidate!]!` is non-null too, so the null propagates to
+    the root and the WHOLE RESPONSE comes back `data: null`. This docstring said "takes the whole
+    Candidate with it" until the review of PR #16, and the decision to raise was argued on that
+    smaller blast radius.
+
+    The view's shape rules the absence out: every candidate joins an experiment on a non-null key,
+    and chains are LEFT joined. The one way through is isolation. The request runs at READ
+    COMMITTED, so a candidate deleted by another request between the candidate select and this
+    map's read is in the list and not in the map. Nothing deletes today. Whether raising still holds
+    up is deferred to issue #17. Coded, so `MaskInternalErrors` lets it through — the same
+    reasoning as `metric_for`'s error.
+
+    The `scores` resolver deliberately does NOT use this: a candidate absent from the view can
+    still resolve every non-INTERFACE heading, and `metric_for` raises only for the ones it cannot.
+    """
+    interface_kind = interface_kind_per_candidate.get(sequence_id)
+    if interface_kind is None:
+        raise GraphQLError(
+            f"candidate {sequence_id!r} is not in the candidate_summary view, so its interface kind is "
+            "unknown. The view's shape rules that out, so the likely cause is a delete committed by "
+            "another request between this request's statements; retrying should succeed.",
+            extensions={"code": "CANDIDATE_NOT_IN_SUMMARY"},
+        )
+    return interface_kind
+
+
+def _numeric_value(value: str, db_metric: db.Metric | None) -> float | None:
+    """`value` as a float, or None. Populated only when the catalog says the metric is numeric.
+
+    docs/graphql-schema.md §"numericValue parses defensively": of the 995 values whose metric says
+    FLOAT or INT, all 995 parse today, and that is an artifact of how `value_type` was inferred
+    rather than a guarantee. "<40" and "-" are already in the corpus under CATEGORICAL rows, one
+    correction away from sitting under a numeric one.
+
+    Three choices, each deliberate:
+      * FLOAT and INT only. A BOOL stored as "1" would `float()` happily, and then a truth value
+        would be served as a measurement.
+      * `ValueError` only, not `Exception`. `value` is typed `str` all the way down, so a
+        `TypeError` here is OUR bug and should surface, not be swallowed into a null.
+      * A parse failure logs at DEBUG. It is a data-quality signal (a censored value under a
+        numeric metric) and not an alarm, and it fires once per bad value per request.
+
+    And one that is not a choice: NON-FINITE IS A FAILURE TOO. `float()` accepts "nan", "inf"
+    and "-Infinity", and GraphQL's Float cannot represent any of them — graphql-core's
+    serializer raises, and MaskInternalErrors turns that into "Internal server error." for the
+    entry. So a value that parses but cannot be served declines to null the same way a value
+    that does not parse does. Found in review of PR #16; no corpus CSV contains one today.
+    """
+    if db_metric is None:
+        return None
+    if db_metric.value_type not in (db.MetricValueType.FLOAT, db.MetricValueType.INT):
+        return None
+    try:
+        parsed = float(value)
+    except ValueError:
+        logger.debug(
+            "score value %r under numeric metric %s.%s does not parse; numericValue is null",
+            value,
+            db_metric.module.name,
+            db_metric.column_key,
+        )
+        return None
+    if not math.isfinite(parsed):
+        logger.debug(
+            "score value %r under numeric metric %s.%s is not finite; numericValue is null",
+            value,
+            db_metric.module.name,
+            db_metric.column_key,
+        )
+        return None
+    return parsed
+
+
+def _passes_filters(
+    score_key: ScoreKey,
+    db_metric: db.Metric | None,
+    *,
+    module: str | None,
+    chain: db.ChainRole | None,
+    concept: str | None,
+) -> bool:
+    """Whether one entry survives the `scores(module:, chain:, concept:)` arguments.
+
+    Three independent filters. `None` means "not filtering on this", for all three: an explicit
+    `chain: null` reads the same as omitting it. The three-valued version (`strawberry.UNSET` as
+    the default, so `null` could mean "unsuffixed entries only") was considered and rejected:
+    nothing asks for it, and a client can read `chain == null` off the response.
+
+    `module` matches the KEY's prefix, not the catalog's module. They agree for every catalogued
+    key and differ for an uncatalogued one, which has no metric to match: matching the key keeps
+    it, so `module: "mystery"` finds "mystery.column" whether or not the catalog knows it. The
+    client typed a string it can see in `key`; that is the thing it should match. `concept` has
+    no such choice, since a concept exists only through a metric, so it drops uncatalogued keys.
+    """
+    if module is not None and score_key.module != module:
+        return False
+    if chain is not None and score_key.chain != chain:
+        return False
+    if concept is not None:
+        if db_metric is None or db_metric.concept is None:
+            return False
+        if db_metric.concept.name != concept:
+            return False
+    return True

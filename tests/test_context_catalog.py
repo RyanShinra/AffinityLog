@@ -16,49 +16,33 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from sqlalchemy import func, select
+from graphql import GraphQLError
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
-from app.catalog.keys import MetricIdentity, decompose
+from app.catalog.interface_kind import InterfaceKind
+from app.catalog.keys import Heading, MetricIdentity, VariantAxes, decompose
 from app.catalog.variant_kind import VariantKind
 from app.database import AsyncSessionLocal
 from app.graphql.context import Context
+from app.graphql.errors import should_mask_error
 from app.graphql.schema import schema
 from app.models import orm as db
 
 
-def _heading(module: str, column_key: str) -> tuple[ModuleName, ColumnKey]:
-    """A heading key from plain strings — see `_key` in test_catalog_keys.py for why this is safe
+def _heading(module: str, column_key: str) -> Heading:
+    """A heading from plain strings — see `_key` in test_catalog_keys.py for why this is safe
     in a test and would not be in production code."""
-    return (ModuleName(module), ColumnKey(column_key))
-
-
-def _identity_for(key: str, catalog_kinds: frozenset[VariantKind], interface_kind: str | None) -> MetricIdentity:
-    """The two-tier lookup, written out longhand.
-
-    This mirrors what the ScoreEntry resolver will do. It lives in the test for now because the
-    resolver does not exist yet — when it does, this should be deleted and the test should call it
-    instead, or the test stops guarding the real code path.
-    """
-    score_key = decompose(key)
-    if VariantKind.INTERFACE in catalog_kinds:
-        if interface_kind is None:
-            # Not an `assert`: `python -O` strips those, and the identity this would build
-            # instead — (module, column, 'INTERFACE', None) — is in no catalog, so the key would
-            # resolve to nothing silently. That is the precise failure the two-tier design exists
-            # to prevent, so it must not be removable by an interpreter flag.
-            raise ValueError(f"{key!r} is interface-qualified; resolving it needs the candidate's interface kind")
-        return (score_key.module, score_key.column_key, VariantKind.INTERFACE, VariantName(interface_kind))
-    return score_key.identity
+    return Heading(ModuleName(module), ColumnKey(column_key))
 
 
 class TestCatalogIsBuiltFromTheDatabase:
     async def test_both_indexes_are_built_in_one_pass(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
 
-        assert len(catalog.metric_by_identity) == 6, "six metric rows in, six identities out — none collided"
-        assert set(catalog.variant_kinds_per_heading) == {
+        assert len(catalog.metric_by_identity) == 7, "seven metric rows in, seven identities out — none collided"
+        assert set(catalog.variant_axes_per_heading) == {
             ("boltz2", "protein_iptm"),
             ("evoprotgrad", "pseudolikelihood_ratio"),
         }, "only headings with a non-NULL variant_kind appear; temstapro.clash is absent"
@@ -71,14 +55,16 @@ class TestCatalogIsBuiltFromTheDatabase:
         # back — but it is one line, and it raises rather than mismatching.
         catalog = await Context(session=seeded_catalog).catalog()
 
-        assert catalog.variant_kinds_per_heading[_heading("boltz2", "protein_iptm")] == frozenset({VariantKind.INTERFACE})
+        assert catalog.variant_axes_per_heading[_heading("boltz2", "protein_iptm")] == VariantAxes(
+            frozenset({VariantKind.INTERFACE})
+        )
 
     async def test_a_heading_can_carry_several_variants_of_one_kind(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
 
         # Two PARAMETER rows, one kind. The frozenset is about AXES, not about how many rows exist.
-        assert catalog.variant_kinds_per_heading[_heading("evoprotgrad", "pseudolikelihood_ratio")] == frozenset(
-            {VariantKind.PARAMETER}
+        assert catalog.variant_axes_per_heading[_heading("evoprotgrad", "pseudolikelihood_ratio")] == VariantAxes(
+            frozenset({VariantKind.PARAMETER})
         )
         assert len([i for i in catalog.metric_by_identity if i[:2] == ("evoprotgrad", "pseudolikelihood_ratio")]) == 2
 
@@ -100,7 +86,7 @@ class TestCatalogIsBuiltFromTheDatabase:
 
         catalog = await Context(session=seeded_catalog).catalog()
         metric = catalog.metric_by_identity[
-            (*_heading("boltz2", "protein_iptm"), VariantKind.INTERFACE, VariantName("antibody-target complex"))
+            MetricIdentity.for_interface(_heading("boltz2", "protein_iptm"), InterfaceKind.ANTIBODY_TARGET_COMPLEX)
         ]
 
         assert metric.module.name == "boltz2"
@@ -118,7 +104,7 @@ class TestCatalogIsBuiltFromTheDatabase:
         catalog = await Context(session=session).catalog()
 
         assert catalog.metric_by_identity == {}
-        assert catalog.variant_kinds_per_heading == {}
+        assert catalog.variant_axes_per_heading == {}
 
 
 class TestTheIptmFinding:
@@ -130,16 +116,18 @@ class TestTheIptmFinding:
         say.
         """
         catalog = await Context(session=seeded_catalog).catalog()
-        kinds = catalog.variant_kinds_per_heading[_heading("boltz2", "protein_iptm")]
+        score_key = decompose("boltz2.protein_iptm")
 
         expected = {
-            "antibody-target complex": "HER2 binding confidence",
-            "antibody only (H/L pairing)": "Heavy-light pairing confidence",
-            "single chain (no interface)": "Not an interface",
+            InterfaceKind.ANTIBODY_TARGET_COMPLEX: "HER2 binding confidence",
+            InterfaceKind.ANTIBODY_ONLY_HL_PAIRING: "Heavy-light pairing confidence",
+            InterfaceKind.SINGLE_CHAIN_NO_INTERFACE: "Not an interface",
         }
         for interface_kind, display_name in expected.items():
-            identity = _identity_for("boltz2.protein_iptm", kinds, interface_kind)
-            assert catalog.metric_by_identity[identity].display_name == display_name
+            metric = catalog.metric_for(score_key, interface_kind)
+
+            assert metric is not None, f"{interface_kind} must resolve to a catalog row"
+            assert metric.display_name == display_name
 
     async def test_the_bare_identity_resolves_to_nothing(self, seeded_catalog: AsyncSession) -> None:
         """Tier one is not an optimisation: skip it and the key resolves to no metric at all."""
@@ -151,20 +139,23 @@ class TestTheIptmFinding:
     async def test_a_parameter_key_needs_no_second_tier(self, seeded_catalog: AsyncSession) -> None:
         """The asymmetry: a PARAMETER variant is in the key string, an INTERFACE variant is not."""
         catalog = await Context(session=seeded_catalog).catalog()
-        kinds = catalog.variant_kinds_per_heading[_heading("evoprotgrad", "pseudolikelihood_ratio")]
+        score_key = decompose("evoprotgrad.esm_pseudolikelihood_ratio.H")
 
-        identity = _identity_for("evoprotgrad.esm_pseudolikelihood_ratio.H", kinds, interface_kind=None)
-        assert identity == (*_heading("evoprotgrad", "pseudolikelihood_ratio"), VariantKind.PARAMETER, VariantName("esm"))
-        assert identity in catalog.metric_by_identity
+        assert score_key.identity == MetricIdentity(
+            *_heading("evoprotgrad", "pseudolikelihood_ratio"), VariantKind.PARAMETER, VariantName("esm")
+        ), "decompose() filled the variant in from the key string; no candidate was consulted"
+        assert catalog.metric_for(score_key, interface_kind=None) is not None
 
     async def test_an_ordinary_key_resolves_on_identity_alone(self, seeded_catalog: AsyncSession) -> None:
         catalog = await Context(session=seeded_catalog).catalog()
-        kinds = catalog.variant_kinds_per_heading.get(_heading("temstapro", "clash"), frozenset())
+        score_key = decompose("temstapro.clash.H")
 
-        assert kinds == frozenset(), "no entry at all, which is the common case"
-        identity = _identity_for("temstapro.clash.H", kinds, interface_kind=None)
-        assert identity == (*_heading("temstapro", "clash"), None, None)
-        assert catalog.metric_by_identity[identity].column_key == "clash"
+        axes = catalog.variant_axes_per_heading.get(score_key.heading, VariantAxes.none())
+        assert not axes.interface_qualified, "no entry at all, which is the common case"
+
+        metric = catalog.metric_for(score_key, interface_kind=None)
+        assert metric is not None
+        assert metric.column_key == "clash"
 
 
 class TestTheViewSuppliesTierTwo:
@@ -284,14 +275,24 @@ class TestTheFixtureContainsWhatATestWrites:
         assert escaped == 0, "a commit through AsyncSessionLocal escaped the fixture's rollback"
 
 
-class TestTheTwoLocksAreSeparate:
-    """The memo lock and the session lock must be different objects.
+class TestTheLocksAreSeparate:
+    """Every lock guards ONE invariant, and no two of them are the same object.
 
-    `catalog()` holds `_catalog_lock` across the whole of `_load_catalog()`, and `_load_catalog()`
-    issues a statement through `execute_statement()`, which takes the session's lock. That is only
-    safe while the two are distinct. Collapse them into one and the task waits on a lock it already
-    holds — `asyncio.Lock` is not reentrant — so the request hangs forever with no exception and no
-    traceback, while every other request on the loop is served normally.
+    There are three, and the rule is the same for each. `TaskSafeSession` owns the session's lock,
+    which serialises statements. `_catalog_lock` guards "the metric catalog is built once per
+    request". `_interface_kinds_lock` guards "the interface-kind map is built once per request".
+
+    Both memo builds issue their statement through `execute_statement()` while holding their own
+    lock, which is safe only while that lock is not the session's. Collapse any pair and the task
+    waits on a lock it already holds — `asyncio.Lock` is not reentrant — so the request hangs
+    forever with no exception and no traceback, while every other request on the loop is served
+    normally.
+
+    The two memo locks are also kept apart from EACH OTHER, though that pairing cannot deadlock
+    today: the two builds never nest. Sharing would merely serialise two unrelated memos — but it
+    would also put one object back in charge of two invariants, which is the shape that produced
+    the deadlock in the first place. One lock per invariant is the rule being tested, not "two
+    locks happen to be enough".
 
     These are timeout-bounded on purpose. A deadlock does not fail a test, it *hangs* one, and a
     hung suite reads as CI being slow rather than as a bug.
@@ -323,3 +324,188 @@ class TestTheTwoLocksAreSeparate:
 
         with pytest.raises(TimeoutError):
             await asyncio.wait_for(context.catalog(), timeout=1.0)
+
+    async def test_the_interface_kinds_lock_is_neither_of_the_others(self, seeded_catalog: AsyncSession) -> None:
+        context = Context(session=seeded_catalog)
+
+        assert context._interface_kinds_lock is not context._session._lock
+        assert context._interface_kinds_lock is not context._catalog_lock
+
+    async def test_the_interface_map_builds_through_the_ordinary_front_door(self, seeded_catalog: AsyncSession) -> None:
+        """`_load_interface_kinds` calls `execute_statement()` while holding its own memo lock."""
+        context = Context(session=seeded_catalog)
+
+        interface_kind_per_candidate = await asyncio.wait_for(context.interface_kinds(), timeout=10.0)
+
+        assert interface_kind_per_candidate, "the fixture has three candidates"
+
+    async def test_collapsing_the_interface_lock_into_the_sessions_deadlocks(self, seeded_catalog: AsyncSession) -> None:
+        """The same break as above, on the third lock. Reverting the fix must fail loudly here too."""
+        context = Context(session=seeded_catalog)
+        context._interface_kinds_lock = context._session._lock
+
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(context.interface_kinds(), timeout=1.0)
+
+
+class TestInterfaceKindsIsTierTwo:
+    """`Context.interface_kinds()` — the candidate-side half of the two-tier lookup.
+
+    `TestTheViewSuppliesTierTwo` above asserts the view's `CASE` against raw rows. This asserts what
+    the resolver will actually hold: the same answer, memoized per request, converted to the shared
+    vocabulary, and immutable on the way out.
+    """
+
+    async def test_every_candidate_gets_the_kind_its_chains_imply(self, seeded_catalog: AsyncSession) -> None:
+        """The finding, one layer up from the SQL: chain composition decides what ipTM measures."""
+        interface_kind_per_candidate = await Context(session=seeded_catalog).interface_kinds()
+
+        assert interface_kind_per_candidate == {
+            "complex-cand": InterfaceKind.ANTIBODY_TARGET_COMPLEX,
+            "pairing-cand": InterfaceKind.ANTIBODY_ONLY_HL_PAIRING,
+            "lone-cand": InterfaceKind.SINGLE_CHAIN_NO_INTERFACE,
+        }
+
+    async def test_the_values_are_enum_members_not_the_raw_case_strings(self, seeded_catalog: AsyncSession) -> None:
+        """The str -> enum conversion happens at the SQL boundary, not somewhere downstream.
+
+        Asserted separately from the mapping above because `InterfaceKind.X == "..."` is False for a
+        plain `enum.Enum` — so that test would fail on a raw string, but for a reason that reads as
+        "wrong kind" rather than "wrong type". This says which.
+        """
+        interface_kind_per_candidate = await Context(session=seeded_catalog).interface_kinds()
+
+        assert all(isinstance(kind, InterfaceKind) for kind in interface_kind_per_candidate.values())
+
+    async def test_the_map_is_read_only(self, seeded_catalog: AsyncSession) -> None:
+        """Handed to every ScoreEntry in the request, so no resolver may corrupt it for the rest.
+
+        The same argument as `MetricCatalog`'s `MappingProxyType`: a plain dict would let one
+        resolver rewrite another's answer silently.
+        """
+        interface_kind_per_candidate = await Context(session=seeded_catalog).interface_kinds()
+
+        with pytest.raises(TypeError):
+            interface_kind_per_candidate["complex-cand"] = InterfaceKind.NO_CHAINS_RECORDED  # type: ignore[index]
+
+    async def test_the_interface_memo_survives_concurrent_callers(self, seeded_catalog: AsyncSession) -> None:
+        """Fourteen gathered callers, one map — `catalog()`'s measured failure, on the second memo.
+
+        Fourteen for the same reason as the catalog's: it is the corpus's candidate count, and
+        `{ candidates { scores } }` gathers the score resolver across that list. Without the
+        double-check inside the lock this returns fourteen distinct maps and runs fourteen queries.
+        """
+        context = Context(session=seeded_catalog)
+
+        maps = await asyncio.gather(*(context.interface_kinds() for _ in range(14)))
+
+        assert len({id(m) for m in maps}) == 1, "every caller must get the same map object"
+
+
+class TestTheGuardsFailLoudly:
+    """Both failure paths in `_load_interface_kinds`, and the reason each is a `GraphQLError`.
+
+    Neither failure is transient: once the data or the code is in the failing state, every query
+    that touches scores fails identically until a human intervenes. So each has two audiences — the
+    operator who has to fix it, and the client, who otherwise receives `MaskInternalErrors`'
+    "Internal server error." and has nothing to report. `test_both_guards_reach_the_client` is the
+    one that actually pins that requirement; the two above it only prove the guards fire.
+    """
+
+    async def test_a_vendor_id_reused_across_experiments_is_refused(self, seeded_catalog: AsyncSession) -> None:
+        """The collision the schema permits and the memo cannot represent.
+
+        `uq_candidate_seq` is `(experiment_id, sequence_id)`, so the SAME vendor id under a SECOND
+        experiment is legal — and this map spans every experiment. Folding the two would hand one
+        candidate the other's interface kind: heavy-light pairing confidence reported as HER2
+        binding, which is the inversion the whole two-tier design exists to prevent.
+
+        Built by inserting the real row rather than by patching the loader, so it exercises the view
+        as well as the guard. No collision exists in the real corpus (14 candidates, 14 distinct
+        ids), which is exactly why the case has to be constructed to be tested at all.
+        """
+        second_run = db.Experiment(name="second run", source_filename="second.csv")
+        seeded_catalog.add(second_run)
+        await seeded_catalog.flush()
+
+        seeded_catalog.add(
+            db.Candidate(
+                experiment_id=second_run.id,
+                sequence_id="complex-cand",  # already used by a candidate in "fixture run"
+                scores={},
+                chains=[db.CandidateChain(role=db.ChainRole.HEAVY, sequence="QVQ", ordinal=0)],
+            )
+        )
+        await seeded_catalog.flush()
+
+        with pytest.raises(GraphQLError) as raised:
+            await Context(session=seeded_catalog).interface_kinds()
+
+        assert (raised.value.extensions or {})["code"] == "AMBIGUOUS_CANDIDATE_ID"
+        assert "complex-cand" in raised.value.message, "the message must name the offending id"
+
+    async def test_a_view_label_with_no_enum_member_is_refused(self, seeded_catalog: AsyncSession) -> None:
+        """Drift between the view's CASE and `InterfaceKind`.
+
+        The real `CASE` cannot emit an unknown label, so the only honest way to reach this branch is
+        to replace the view — which is safe here and nowhere else: the test database is a
+        throwaway testcontainer, and the replacement rolls back with the fixture's transaction along
+        with everything else the test wrote. Preferred to patching the loader because it tests the
+        boundary that would actually drift.
+
+        `tests/test_interface_kind.py` catches this statically in CI, without a database. This is
+        the belt to that suspenders, and it exists to pin the ERROR SHAPE rather than the detection.
+        """
+        await seeded_catalog.execute(text("""
+                CREATE OR REPLACE VIEW candidate_summary AS
+                SELECT e.name                 AS experiment,
+                       c.sequence_id          AS candidate_id,
+                       left(c.sequence_id, 8) AS candidate,
+                       NULL::text             AS chains,
+                       NULL::text             AS antibody_hash,
+                       'a kind that does not exist'::text AS interface_kind,
+                       -- count(*) is bigint; an int literal here is rejected outright by
+                       -- CREATE OR REPLACE VIEW, which cannot change a column's type.
+                       0::bigint              AS n_scores,
+                       NULL::numeric          AS iptm,
+                       NULL::numeric          AS complex_plddt,
+                       NULL::numeric          AS humanness_oasis,
+                       NULL::numeric          AS humatch_human,
+                       NULL::text             AS thermo_class,
+                       NULL::int              AS epitope_residues,
+                       NULL::text             AS epitope_list
+                  FROM candidates c JOIN experiments e ON e.id = c.experiment_id
+                """))
+
+        with pytest.raises(GraphQLError) as raised:
+            await Context(session=seeded_catalog).interface_kinds()
+
+        assert (raised.value.extensions or {})["code"] == "UNKNOWN_INTERFACE_KIND"
+        assert "a kind that does not exist" in raised.value.message
+
+    @pytest.mark.parametrize("code", ["AMBIGUOUS_CANDIDATE_ID", "UNKNOWN_INTERFACE_KIND"])
+    def test_both_guards_reach_the_client(self, code: str) -> None:
+        """The requirement neither test above covers: the caller is told WHAT broke.
+
+        `MaskInternalErrors` replaces the message of any error without a deliberate `code`, so a
+        bare `ValueError` here would arrive as "Internal server error." — non-transient, permanent,
+        and unreportable. The codes are what survive that, and nothing else in the suite checks it.
+
+        The control case matters as much as the two codes: it is what would catch `should_mask_error`
+        being inverted, which would let every internal error through while these two still passed.
+
+        EVERY ERROR HERE CARRIES AN `original_error`, because that is what a resolver-raised error
+        looks like by the time the extension sees it — graphql-core wraps whatever a resolver raised.
+        A `GraphQLError("boom")` built bare has NO original, which is the signature of GraphQL's own
+        syntax/validation errors, and those are deliberately not masked. The first draft of this
+        test built the control bare, and it went red the moment that rule landed: it was asserting
+        "internal errors are masked" against an error that was not internal.
+        """
+        internal = GraphQLError("boom", original_error=RuntimeError("boom"))
+        assert should_mask_error(internal), "control: an uncoded error out of a resolver IS masked"
+
+        deliberate = GraphQLError("boom", original_error=ValueError("boom"), extensions={"code": code})
+        assert not should_mask_error(deliberate)
+
+        graphqls_own = GraphQLError("Cannot query field 'nosuchfield' on type 'Query'.")
+        assert not should_mask_error(graphqls_own), "a syntax/validation error has no original and must reach the client"

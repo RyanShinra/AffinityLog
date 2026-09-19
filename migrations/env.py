@@ -13,7 +13,12 @@ from app.database import ModelBase
 from app.models import orm  # noqa: F401 — ensure models are registered
 
 config = context.config
-fileConfig(config.config_file_name)  # type: ignore[arg-type]
+# `disable_existing_loggers=False` is not optional. The default (True) switches off every logger
+# that already exists when this runs, and tests/conftest.py runs the migrations IN-PROCESS after
+# the app has been imported, so `app.graphql.types` and any later `app.*` logger would go silent
+# for the rest of the pytest session. Found by a caplog test that passed alone and failed in the
+# suite. The server never hits this: docker-compose runs Alembic as its own process.
+fileConfig(config.config_file_name, disable_existing_loggers=False)  # type: ignore[arg-type]
 
 target_metadata = ModelBase.metadata
 

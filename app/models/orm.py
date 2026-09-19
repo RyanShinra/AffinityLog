@@ -39,7 +39,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.catalog.identifiers import ColumnKey, ModuleName, VariantName
+from app.catalog.identifiers import ColumnKey, ModuleName, SequenceId, VariantName
 from app.catalog.variant_kind import VariantKind
 from app.database import ModelBase
 
@@ -450,13 +450,17 @@ class Experiment(ModelBase):
 
 
 class Artifact(ModelBase):
-    """A non-scalar output (structure/sequence file) referenced by URI. The placeholder hook for now."""
+    """A non-scalar output (a structure file) referenced by URI.
+
+    Written by `scripts/seed_corpus_context.py`, one row per `<candidate id>_<tool>.pdb` under
+    `experiment_results/`; served by `Candidate.artifacts`. 11 rows in the loaded corpus.
+    """
 
     __tablename__ = "artifacts"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"))
-    kind: Mapped[str] = mapped_column(String(32))  # "structure" / "sequence"
+    kind: Mapped[str] = mapped_column(String(32))  # the producing tool: "boltz2" / "rfantibody" (seeder's choice)
     uri: Mapped[str] = mapped_column(String(1000))  # "s3://bucket/…" or "https://…"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -475,7 +479,9 @@ class Candidate(ModelBase):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     experiment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE"))
 
-    sequence_id: Mapped[str] = mapped_column(String(255))  # Bio Discovery's per-candidate id
+    # `Mapped[SequenceId]` needs no `type_annotation_map`: `mapped_column()` gives the column type
+    # explicitly, so the alias is only ever read as an annotation. Still VARCHAR(255), unchanged.
+    sequence_id: Mapped[SequenceId] = mapped_column(String(255))  # Bio Discovery's per-candidate id
     # The raw {column_key: value} bag — every export column lands here untyped (default=dict → '{}').
     # GIN-indexed above so we can query INSIDE it, e.g. WHERE (scores->>'pseudo_perplexity')::float < 10
     scores: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict, server_default=text("'{}'"))

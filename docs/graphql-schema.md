@@ -119,14 +119,14 @@ type Metric {
   propertyCategories: [String!]!
   module: Module!
   concept: Concept
-  transformOf: Metric
+  transformOf: Metric  # NOT BUILT: nothing populates transform_of_metric_id yet
   benchmarkResults: [BenchmarkResult!]!
 }
 
 type Module {
   name: String!
   moduleType: ModuleType!
-  functions: [String!]!
+  functions: [ModuleFunction!]!  # Adding an enum to cover this (WIP)
   repoUrl: String
   description: String
   version: String
@@ -226,7 +226,10 @@ Measured today, every one of the 200 keys resolves. But that is tautological: th
 artifact of how the catalog was built, not a property of the data model.
 
 A non-null `Metric!` would also fail destructively. In GraphQL, a non-null field that cannot resolve
-propagates the null upward — one unrecognized key would blank out the entire candidate.
+propagates the null upward through every non-null ancestor. `scores` is `[ScoreEntry!]!` and
+`candidates` is `[Candidate!]!`, so one unrecognized key would blank out not just its candidate but
+the entire `candidates` response. (This said "the entire candidate" until the review of PR #16;
+`Candidate.interfaceKind`, which is non-null and raises, carries the same exposure — issue #17.)
 
 More importantly, an unresolvable score is **information, not an error**: it says the column did not
 come from Bio Discovery. That is a fact worth surfacing rather than swallowing, and it is the real
@@ -255,6 +258,16 @@ Scores are stored as text, uncoerced, and are served that way. `numericValue` is
 the catalog says the metric is numeric, and is null otherwise — a separate field rather than a
 best-effort cast on `value`. Silent coercion is how a categorical that happens to look like a number
 becomes a number forever.
+
+### `annotateCandidate`: the empty string clears
+
+`annotation` is `String!` and `candidates.annotation` is nullable, so the API needs a rule for
+clearing. `""` stores NULL. A nullable argument was considered and rejected: a nullable argument
+with no default is also omittable, so `annotateCandidate(id: "x")` would clear silently. Requiring
+a string, and making the one string that is not an annotation mean "none", keeps the clear explicit.
+
+A well-formed id matching nothing is a coded `NOT_FOUND`, distinct from the `BAD_USER_INPUT` a
+malformed id raises. The return type is non-null, so null was never an option for either.
 
 ---
 
