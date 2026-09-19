@@ -173,6 +173,23 @@ class TestNumericValue:
         assert result is None
         assert any("'<40'" in record.message for record in caplog.records)
 
+    @pytest.mark.parametrize("value", ["nan", "NaN", "inf", "-Infinity"])
+    def test_a_non_finite_value_stays_null(self, value: str, caplog: pytest.LogCaptureFixture) -> None:
+        """`float()` accepts these, and GraphQL's Float cannot represent them.
+
+        Returning one would not hand the client a NaN: graphql-core's serializer raises, and
+        MaskInternalErrors turns that into "Internal server error." for the entry. Found in review
+        of PR #16 and reproduced through the real extension before this test was written. None of
+        the eleven corpus CSVs contains one; a pandas-style export writes `nan` for a missing float.
+        """
+        metric = db.Metric(column_key="clash", value_type=db.MetricValueType.FLOAT, module=db.Module(name="temstapro"))
+
+        with caplog.at_level(logging.DEBUG, logger="app.graphql.types"):
+            result = _numeric_value(value, metric)
+
+        assert result is None
+        assert any("not finite" in record.message for record in caplog.records)
+
     def test_a_bool_that_looks_numeric_stays_null(self) -> None:
         """ "1" under a BOOL metric would float() happily. It must not."""
         metric = db.Metric(column_key="flag", value_type=db.MetricValueType.BOOL, module=db.Module(name="m"))

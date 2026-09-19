@@ -334,11 +334,26 @@ class Context(BaseContext):
         kinds_seen_per_heading: defaultdict[Heading, set[VariantKind]] = defaultdict(set)
         metrics_seen_per_module: defaultdict[ModuleName, list[db.Metric]] = defaultdict(list)
 
-        select_db_metrics: Select[tuple[db.Metric]] = select(db.Metric).options(
-            selectinload(db.Metric.module),
-            selectinload(db.Metric.concept),
-            selectinload(db.Metric.benchmark_results),
-            selectinload(db.Metric.transform_of),
+        # ORDERED, on the metric's full identity. Every list this catalog serves inherits the order
+        # rows arrive in — `Query.metrics` through `metric_by_identity`, `Module.metrics` through
+        # `metrics_per_module` — and without an ORDER BY that is Postgres's heap order, which the
+        # idempotent catalog seeder reshuffles on every re-run: ON CONFLICT DO UPDATE writes a new
+        # version of each row it touches. Found in review of PR #16; `scores` already sorted for this
+        # reason and these lists did not.
+        #
+        # The four sort columns are `uq_metric_identity` (NULLS NOT DISTINCT) with the module's NAME in
+        # place of its id, and module names are unique, so the order is total. The join is there only
+        # to sort by that name: the module itself still arrives through `selectinload` below.
+        select_db_metrics: Select[tuple[db.Metric]] = (
+            select(db.Metric)
+            .join(db.Metric.module)
+            .order_by(db.Module.name, db.Metric.column_key, db.Metric.variant_kind, db.Metric.variant)
+            .options(
+                selectinload(db.Metric.module),
+                selectinload(db.Metric.concept),
+                selectinload(db.Metric.benchmark_results),
+                selectinload(db.Metric.transform_of),
+            )
         )
 
         # The ordinary front door, even though `catalog()` is holding `_catalog_lock` around this

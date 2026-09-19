@@ -6,7 +6,7 @@
 > taught. Where the two disagree, the plan is the one that was kept current as each stage landed.
 
 **Span:** 2026-09-04 → 2026-09-19 · **branch:** `score-entry-resolvers` · 22 commits · 31 files ·
-+3369 / −252 · 9 → 22 SDL types · 158 → 230 tests · five stages, in the order 1, 1b, 3, 2, 4, 5
++3369 / −252 · 9 → 22 SDL types · 158 → 235 tests · five stages, in the order 1, 1b, 3, 2, 4, 5
 
 ---
 
@@ -354,6 +354,25 @@ The lock is tested by holding it from outside and watching `commit()` queue behi
 rather than failing it, and a hung suite reads as CI being slow.
 
 ---
+
+## Coda — what the review found
+
+A review pass over the finished PR, at high effort, found five issues and none in the core logic:
+the two-tier lookup, the three locks, the collision guard and the mutation's commit path all held.
+Each finding was reproduced before it was reported, with a toy schema where no database was needed.
+
+| finding | outcome |
+|---|---|
+| `numericValue` returns NaN or infinity, which GraphQL's Float cannot serialize, so the entry comes back as a masked "Internal server error." | **fixed** — `math.isfinite`, logged at DEBUG like any other value that will not serve as a number |
+| `Query.metrics` and `Module.metrics` come back in heap order, which the idempotent seeder reshuffles on every re-run | **fixed** — the catalog query orders on the metric's full identity |
+| The `Artifact` docstring cited an ORM comment the correction commit had already changed | **fixed** |
+| One candidate missing from the view nulls the entire `candidates` response, not "the whole Candidate" as three documents say | open — the trigger is unreachable today, and whether that justifies blanking everything is the owner's call |
+| A NUL character in an annotation is rejected by Postgres at commit and surfaces as a masked internal error | open — confirmed read-only against the dev database: `CharacterNotInRepertoireError` |
+
+The ordering fix is the one worth a sentence. `scores` had been sorted from the start, with a
+docstring explaining exactly why a list in Postgres's order is a flaky list. The two lists beside it
+were not, and nobody noticed because a static table returns rows in insertion order until something
+updates one. The test does one UPDATE and asks again; it went red with the ORDER BY removed.
 
 ## What the branch actually taught
 

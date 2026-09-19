@@ -72,6 +72,7 @@ are recorded so the decision is made against measurements rather than instinct.
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
@@ -150,8 +151,7 @@ class Artifact:
     Eleven rows in the loaded corpus, written by `scripts/seed_corpus_context.py` from the
     `<candidate id>_<tool>.pdb` files under `experiment_results/`: `uri` is the repo-relative
     path and `kind` is the TOOL that produced it (`boltz2`, `rfantibody`), so a candidate folded
-    by two tools carries two artifacts. Note the ORM comment on `kind` still says
-    "structure / sequence"; the seeder decided otherwise, and the seeder is what ran.
+    by two tools carries two artifacts.
 
     (Stage 4 was planned on the belief that nothing wrote this table. That was wrong — the
     seeder inserts with raw SQL, which a grep for `Artifact(` did not find — and was caught by
@@ -642,13 +642,19 @@ def _numeric_value(value: str, db_metric: db.Metric | None) -> float | None:
         `TypeError` here is OUR bug and should surface, not be swallowed into a null.
       * A parse failure logs at DEBUG. It is a data-quality signal (a censored value under a
         numeric metric) and not an alarm, and it fires once per bad value per request.
+
+    And one that is not a choice: NON-FINITE IS A FAILURE TOO. `float()` accepts "nan", "inf"
+    and "-Infinity", and GraphQL's Float cannot represent any of them — graphql-core's
+    serializer raises, and MaskInternalErrors turns that into "Internal server error." for the
+    entry. So a value that parses but cannot be served declines to null the same way a value
+    that does not parse does. Found in review of PR #16; no corpus CSV contains one today.
     """
     if db_metric is None:
         return None
     if db_metric.value_type not in (db.MetricValueType.FLOAT, db.MetricValueType.INT):
         return None
     try:
-        return float(value)
+        parsed = float(value)
     except ValueError:
         logger.debug(
             "score value %r under numeric metric %s.%s does not parse; numericValue is null",
@@ -657,6 +663,15 @@ def _numeric_value(value: str, db_metric: db.Metric | None) -> float | None:
             db_metric.column_key,
         )
         return None
+    if not math.isfinite(parsed):
+        logger.debug(
+            "score value %r under numeric metric %s.%s is not finite; numericValue is null",
+            value,
+            db_metric.module.name,
+            db_metric.column_key,
+        )
+        return None
+    return parsed
 
 
 def _passes_filters(

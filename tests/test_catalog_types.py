@@ -31,10 +31,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.graphql.context import Context
 from app.graphql.schema import schema
+from app.models import orm as db
 
 
 async def _query(session: AsyncSession, document: str, **variables: Any) -> dict[str, Any]:
@@ -193,6 +195,31 @@ class TestQueryRoots:
         data = await _query(seeded_catalog, "{ metrics { columnKey } }")
 
         assert len(data["metrics"]) == 7
+
+    async def test_the_metric_order_survives_an_update(self, seeded_catalog: AsyncSession) -> None:
+        """`metrics` comes back in a defined order, not in Postgres's heap order.
+
+        The catalog seeder is idempotent and re-runs as `INSERT ... ON CONFLICT DO UPDATE`, which
+        writes a new version of every row it touches. Without an ORDER BY a sequential scan then
+        returns an updated row in its NEW position, so the list reshuffles after every reseed. Found
+        in review of PR #16: `scores` was sorted for exactly this reason and these lists were not.
+
+        One UPDATE is enough, and it has to be ONE: rewriting every row appends the new versions
+        in their old relative order and would prove nothing. The row chosen is the fixture's first
+        insert, so without the fix it moves from first place to last.
+        """
+        document = "{ metrics { module { name } columnKey variant } }"
+        before = await _query(seeded_catalog, document)
+
+        await seeded_catalog.execute(
+            update(db.Metric).where(db.Metric.display_name == "HER2 binding confidence").values(notes="touched")
+        )
+        await seeded_catalog.flush()
+        after = await _query(seeded_catalog, document)
+
+        assert after == before
+        module_names = [metric["module"]["name"] for metric in after["metrics"]]
+        assert module_names == sorted(module_names), "ordered by module first, so a client can group"
 
     async def test_an_unseeded_database_returns_empty_lists_not_null(self, session: AsyncSession) -> None:
         """Both roots are `[T!]!` — non-null lists. Empty is a legitimate answer; null is not."""
