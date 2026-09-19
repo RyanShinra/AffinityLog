@@ -186,8 +186,8 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   `candidate_summary` VIEW, and importing it would make autogenerate emit CREATE/DROP TABLE for it.
 - **`schema.graphql` is generated — regenerate it, never hand-edit it.**
   `python scripts/dump_schema.py`. It is a SNAPSHOT of what the code serves, not a specification:
-  `docs/graphql-schema.md` is the design and still describes types (`Metric`, `ScoreEntry`,
-  `Mutation`) that are not built, so the two are deliberately not the same file.
+  `docs/graphql-schema.md` is the design and still describes two fields that are deliberately not
+  built (`Metric.transformOf`, `Recipe.modules`), so the two are not the same file.
   `tests/test_schema_snapshot.py` fails when the snapshot drifts from Strawberry's output, which
   makes changing the public GraphQL contract a deliberate act with a reviewable diff. It exists
   because the schema is code-first — a changed annotation three layers down can alter the API with
@@ -207,7 +207,12 @@ ships. These were learned the hard way; they are not preferences to optimise awa
   resolver, because type resolvers run after that has already returned. `app/database.py`'s
   `get_session` provides the shape; `app/graphql/context.py` wires it in.
   (This entry previously said the opposite — engine-per-resolver — which the code never did.)
-- **Resolvers call `info.context.execute_statement(stmt)`.** There is no other door: `Context` holds
+  **One session is NOT one snapshot.** Requests run at READ COMMITTED (measured with
+  `SHOW transaction_isolation`), so every statement sees a fresh snapshot and a concurrent write
+  can land between two statements of the same request. Do not claim otherwise; `context.py` did,
+  until the PR #16 review. Whether each request should run at REPEATABLE READ is issue #17.
+- **Resolvers read through `info.context.execute_statement(stmt)`, and the one mutation writes
+  through `info.context.commit()`.** There is no third door: `Context` holds
   a `TaskSafeSession` (`app/database.py`) privately, so there is no `info.context.session` to reach
   through. That class owns the session's lock and is the only thing that can acquire it. One session
   shared across a tree is unsafe under concurrency — graphql-core gathers sibling fields and list

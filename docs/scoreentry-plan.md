@@ -1,6 +1,7 @@
 # The ScoreEntry chapter — the plan for PR #16
 
-> **Status: ALL FIVE STAGES SHIPPED on `score-entry-resolvers` (2026-09-18). Ready for PR #16.**
+> **Status: SHIPPED. All five stages merged to `main` as PR #16 on 2026-09-19 (`328d069`).** One
+> follow-up is open: issue #17, whether each request should run at REPEATABLE READ.
 > Written 2026-08-25 as PR #15 closed, and kept up to date since — the decisions each stage forced
 > are recorded in "What each stage decided" below, because the commits carry the reasoning
 > but this file is what a cold session reads. `docs/graphql-schema.md` is the committed contract and

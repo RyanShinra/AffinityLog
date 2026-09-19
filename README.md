@@ -79,21 +79,22 @@ Two things worth knowing before reading any number in this repo:
   vendored so it needs no network), chains coloured by role, and the predicted epitope painted onto
   HER2.
 - **Idempotent loaders** for the corpus, the catalog, and the derived recipes.
+- **GraphQL** (`/graphql`). `Query` answers `experiments`, `experiment(id)`, `candidates`,
+  `candidate(id)`, `modules` and `metrics`. `Candidate.scores` resolves each raw score key against
+  the catalog *for that candidate*, so `boltz2.protein_iptm` comes back as HER2 binding confidence,
+  heavy-light pairing confidence, or no interface at all, depending on which chains that candidate
+  folded — the ipTM problem above, answered by the API. `Mutation.annotateCandidate` is the one
+  write. Two fields in `docs/graphql-schema.md` are deliberately not built: `Metric.transformOf`
+  and `Recipe.modules`.
 
 **Not built yet — and the README will say so until it is**
 
-- **GraphQL** (`/graphql`). Live, and partial. `Query` answers `experiments`, `experiment(id)`,
-  `candidates` and `candidate(id)`, over `Experiment`, `Candidate`, `Chain`, `Project`, `Recipe`
-  and `Target`. Still to come, and declared in `docs/graphql-schema.md` rather than implemented:
-  `ScoreEntry`, `Metric`, `Module`, `Concept`, `Query.metrics`, `Query.modules`, and `Mutation`
-  entirely. The schema was designed first (`docs/graphql-schema-handoff.md`) and the catalog was
-  built to feed it.
 - **REST ingestion** (`POST /experiments/…/import`). Still placeheld. CSVs are loaded by script:
   `experiment_results/load_experiment_results.py` rebuilds this corpus, and
   `scripts/load_experiment.py` is the general single-CSV tool it wraps.
 
-The live HTTP surface is exactly: `GET /health`, `GET /demo`, `GET /demo/pdb/{candidate_id}`, and
-`/static`. Nothing else responds.
+The live HTTP surface is exactly: `GET /health`, `GET /demo`, `GET /demo/pdb/{candidate_id}`,
+`/graphql` (GET serves the in-browser IDE, POST runs a query), and `/static`. Nothing else responds.
 
 ---
 

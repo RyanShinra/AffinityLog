@@ -5,8 +5,9 @@
 > authoritative for *what* was built and in what order; this file records what it cost and what it
 > taught. Where the two disagree, the plan is the one that was kept current as each stage landed.
 
-**Span:** 2026-09-04 → 2026-09-19 · **branch:** `score-entry-resolvers` · 22 commits · 31 files ·
-+3369 / −252 · 9 → 22 SDL types · 158 → 236 tests · five stages, in the order 1, 1b, 3, 2, 4, 5
+**Span:** 2026-09-04 → 2026-09-19 · **branch:** `score-entry-resolvers` · 26 commits · 32 files ·
++3942 / −261 · 9 → 22 SDL types · 158 → 236 tests · five stages, in the order 1, 1b, 3, 2, 4, 5 ·
+merged as `328d069` · one follow-up, issue #17
 
 ---
 
