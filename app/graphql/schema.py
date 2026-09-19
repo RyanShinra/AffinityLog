@@ -164,12 +164,24 @@ class Mutation:
         return type is non-null, so null was never available for the second case; the choice was
         a coded error the client can branch on, or a masked "Internal server error."
 
+        A NUL character in `annotation` is `BAD_USER_INPUT` too, checked before the lookup. Postgres
+        `text` cannot store U+0000, and left to the database it fails at commit, uncoded and masked.
+
         The attribute is set on the ORM row OUTSIDE the session lock. That is safe because a
         mutation root field executes serially (GraphQL spec §6.2.2) and the returned Candidate's
         own resolvers only run after this returns, so nothing else touches the session between
         the assignment and the commit that flushes it.
         """
         search_id: uuid.UUID = _as_uuid(str(id))  # BAD_USER_INPUT if malformed
+        if "\x00" in annotation:
+            # Postgres `text` cannot store U+0000. Checked here, before the session is touched,
+            # because the database only refuses it at flush inside commit(): the refusal arrives
+            # uncoded and masked, and a failed commit leaves the session unusable for any later
+            # field in the same document. Found in review of PR #16.
+            raise GraphQLError(
+                "annotation contains a NUL character (U+0000), which cannot be stored",
+                extensions={"code": "BAD_USER_INPUT"},
+            )
         stmt: Select[tuple[db.Candidate]] = Candidate.select_statement().where(db.Candidate.id == search_id)
         result: Result[tuple[db.Candidate]] = await info.context.execute_statement(stmt)
         row: db.Candidate | None = result.scalar_one_or_none()  # PK filter, at most one

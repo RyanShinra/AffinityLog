@@ -84,6 +84,26 @@ class TestAnnotateCandidate:
         assert error.extensions is not None
         assert error.extensions["code"] == "NOT_FOUND"
 
+    async def test_a_nul_character_is_bad_user_input_and_writes_nothing(self, seeded_catalog: AsyncSession) -> None:
+        """Postgres `text` cannot store U+0000, so it is refused before the session is touched.
+
+        Found in review of PR #16 and confirmed against the dev database: left to Postgres, the byte
+        fails at flush inside commit() as CharacterNotInRepertoireError, which carries no code, so
+        the client saw "Internal server error." for its own bad input. The read-back is the half that
+        matters most: it shows the refusal came before any write, not after a partial one.
+        """
+        candidate_id = await _complex_candidate_id(seeded_catalog)
+        await _query(seeded_catalog, ANNOTATE, id=candidate_id, annotation="before")
+
+        result = await _execute(seeded_catalog, ANNOTATE, id=candidate_id, annotation="a\x00b")
+
+        assert result.errors is not None
+        (error,) = result.errors
+        assert error.extensions is not None
+        assert error.extensions.get("code") == "BAD_USER_INPUT"
+        read_back = await _query(seeded_catalog, "query ($id: ID!) { candidate(id: $id) { annotation } }", id=candidate_id)
+        assert read_back["candidate"]["annotation"] == "before", "the refused write left nothing behind"
+
     async def test_a_malformed_id_is_bad_user_input(self, seeded_catalog: AsyncSession) -> None:
         result = await _execute(seeded_catalog, ANNOTATE, id="not-a-uuid", annotation="x")
 

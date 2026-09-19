@@ -6,7 +6,7 @@
 > taught. Where the two disagree, the plan is the one that was kept current as each stage landed.
 
 **Span:** 2026-09-04 → 2026-09-19 · **branch:** `score-entry-resolvers` · 22 commits · 31 files ·
-+3369 / −252 · 9 → 22 SDL types · 158 → 235 tests · five stages, in the order 1, 1b, 3, 2, 4, 5
++3369 / −252 · 9 → 22 SDL types · 158 → 236 tests · five stages, in the order 1, 1b, 3, 2, 4, 5
 
 ---
 
@@ -367,7 +367,7 @@ Each finding was reproduced before it was reported, with a toy schema where no d
 | `Query.metrics` and `Module.metrics` come back in heap order, which the idempotent seeder reshuffles on every re-run | **fixed** — the catalog query orders on the metric's full identity |
 | The `Artifact` docstring cited an ORM comment the correction commit had already changed | **fixed** |
 | One candidate missing from the view nulls the entire `candidates` response, not "the whole Candidate" as three documents say | open — the trigger is unreachable today, and whether that justifies blanking everything is the owner's call |
-| A NUL character in an annotation is rejected by Postgres at commit and surfaces as a masked internal error | open — confirmed read-only against the dev database: `CharacterNotInRepertoireError` |
+| A NUL character in an annotation is rejected by Postgres at commit and surfaces as a masked internal error | **fixed** — confirmed read-only against the dev database (`CharacterNotInRepertoireError`), then refused as `BAD_USER_INPUT` before the session is touched |
 
 The ordering fix is the one worth a sentence. `scores` had been sorted from the start, with a
 docstring explaining exactly why a list in Postgres's order is a flaky list. The two lists beside it
