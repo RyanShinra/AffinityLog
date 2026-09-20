@@ -43,9 +43,9 @@
     }
   },
   "faces": {
-    "ibm-plex-sans": {
-      "family": "IBM Plex Sans",
-      "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    "archivo": {
+      "family": "Archivo",
+      "href": "https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap"
     },
     "jetbrains-mono": {
       "family": "JetBrains Mono",
