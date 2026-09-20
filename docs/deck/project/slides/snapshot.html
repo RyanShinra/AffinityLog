@@ -3,7 +3,7 @@
     <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The public contract</p>
     <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">A code-first schema needs a snapshot</h2>
   </div>
-  <p style="font-size:30px; line-height:1.5; color:#4E5B66">The schema is generated from Python annotations, so a changed annotation three layers down can alter the public contract with no diff to review.</p>
+  <p style="font-size:30px; line-height:1.5; color:#4E5B66">The schema is generated from Python annotations, so an annotation changed three layers down can alter the public contract with no diff to review.</p>
   <div style="display:flex; gap:28px">
     <div style="flex:1; display:flex; flex-direction:column; gap:10px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
       <p style="font-size:76px; font-weight:600; line-height:1; color:#12212E">9 to 22</p>
@@ -18,5 +18,5 @@
       <p style="font-size:26px; line-height:1.4; color:#4E5B66">regenerates the committed SDL, and a snapshot test fails the build when it drifts from what Strawberry produces</p>
     </div>
   </div>
-  <p style="font-size:28px; line-height:1.45; color:#4E5B66">It has caught an accidentally-added field and a strawberry.scalar — the second being exactly what the type-safety plan could have triggered. Every change to the public contract now lands as a reviewable diff.</p>
+  <p style="font-size:28px; line-height:1.45; color:#4E5B66">It has already caught an accidentally added field and a strawberry.scalar, which is exactly what the type safety plan could have triggered. Every change to the public contract now shows up as a diff I can read.</p>
 </section>

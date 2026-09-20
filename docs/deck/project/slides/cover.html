@@ -1,6 +1,10 @@
-<section id="cover" data-transition="fade" style="background:#12212E; color:#F0EFEA; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:center; gap:40px">
+<section id="cover" data-transition="fade" style="background:#12212E; color:#F0EFEA; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; justify-content:center; gap:36px">
   <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#E08A5F">Portfolio project · 2026</p>
   <h1 style="font-size:140px; font-weight:600; line-height:1; color:#F0EFEA">AffinityLog</h1>
-  <p style="width:1240px; font-size:36px; line-height:1.45; color:#A8BCC4">A backend for antibody-design experiment data, built around one problem: the same score column means different things depending on what was fed into it.</p>
+  <p style="width:1300px; font-size:34px; line-height:1.45; color:#DDE6EA">I ran eleven antibody design experiments on Amazon Bio Discovery, then built a backend to store and interpret what came out. The interesting part turned out to be that one score column measures three different things.</p>
+  <div style="width:1300px; border-top:1px solid #33475A; padding:28px 0 0 0; display:flex; flex-direction:column; gap:12px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#E08A5F">How the work split</p>
+    <p style="font-size:26px; line-height:1.5; color:#A8BCC4">I ran the experiments and made the design decisions: the schema shape, what got built, what got deferred. Claude did most of the typing and knew Postgres better than I did. I wrote the pieces that carry a judgment by hand, including the CASE that classifies each fold and the CSV score parsing.</p>
+  </div>
   <p style="position:absolute; left:128px; bottom:64px; width:1664px; font-size:24px; color:#87A0AC">Ryan O. · FastAPI · Strawberry GraphQL · SQLAlchemy 2.0 async · PostgreSQL 16</p>
 </section>

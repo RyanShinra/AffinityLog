@@ -14,5 +14,5 @@
     <tr><td>Four error-masking tests</td><td>Exercised a GraphQLError shape that cannot occur.</td></tr>
     <tr><td>Alembic's fileConfig</td><td>disable_existing_loggers defaults to True, silencing the logger a test was watching.</td></tr>
   </table>
-  <p style="font-size:28px; line-height:1.45; color:#4E5B66">Every one of them passed, and not one announced itself. The repo's existing rule — derive a constant rather than hand-listing it — gained a sibling: a probe must verify itself before you trust what it reports.</p>
+  <p style="font-size:28px; line-height:1.45; color:#4E5B66">All five passed. None of them announced itself. I already had a rule about deriving a constant rather than hand-listing it, and this gave me a second one: check that the probe works before trusting what it reports.</p>
 </section>

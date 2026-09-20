@@ -3,19 +3,19 @@
     <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The constraint</p>
     <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">The source has no API</h2>
   </div>
-  <p style="width:1440px; font-size:32px; line-height:1.5; color:#4E5B66">Amazon Bio Discovery — AWS's computational antibody-engineering platform, demoed at the June 2026 AWS Summit — is UI-only. No REST, no SDK, no boto3. Every row in this database entered it as a CSV file a person exported by hand.</p>
+  <p style="width:1440px; font-size:32px; line-height:1.5; color:#4E5B66">I knew I couldn't discover a drug in 30 days. But Bio Discovery doesn't offer any data storage, so everybody who uses it needs to make their own database. That is what this is. It's UI only, with no REST, no SDK and no boto3, so every row here entered as a CSV I exported by hand.</p>
   <div style="display:flex; gap:32px">
     <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">Ingestion is a script, not an endpoint</h3>
-      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Every loader is idempotent and converges on a re-run, because reloading the same export is the normal case rather than an error.</p>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">Loading is a script I run</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Every loader is idempotent, so re-running one converges instead of duplicating. Reloading the same export is the normal case here, not an error.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">The columns are not knowable in advance</h3>
-      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Each pipeline emits its own, so a fixed schema is wrong on arrival. Seven CSV files produced 200 distinct keys.</p>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">The columns aren't knowable in advance</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Each pipeline emits its own. Seven CSV files gave me 200 distinct keys, so a fixed schema would have been wrong on arrival.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">Nothing upstream will explain a column</h3>
-      <p style="font-size:26px; line-height:1.45; color:#4E5B66">There is no service to ask what a header means. The meaning has to be stored beside the data, by hand, once.</p>
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">Nothing upstream explains a column</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">There's no service to ask what a header means, so I had to store the meaning next to the data myself.</p>
     </div>
   </div>
 </section>
