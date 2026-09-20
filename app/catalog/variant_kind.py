@@ -20,7 +20,7 @@ so on storage grounds alone it could sit beside the others.
 
 It is here because storage is not what these members are for. Every rule that READS one is a catalog
 rule: `keys.py` decides which kind a key string encodes, `invariants.py` enforces that a heading is
-catalogued along exactly one axis, and the two-tier lookup in `app/graphql/context.py` branches on
+cataloged along exactly one axis, and the two-tier lookup in `app/graphql/context.py` branches on
 INTERFACE specifically. The ORM's interest is a single column declaration. Moving it here puts the
 vocabulary with the code that reasons about it, and stops `app/catalog/` reaching back through
 `app.models.orm` for a value it owns.

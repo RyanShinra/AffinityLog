@@ -529,7 +529,7 @@ class Module:
 
 @strawberry.type
 class Metric:
-    """One catalogued column, and what it means.
+    """One cataloged column, and what it means.
 
     NO `transformOf` YET, deliberately. `metrics.transform_of_metric_id` is a self-FK for the
     raw-vs-transformed metric pairs, and nothing in the repo writes it — not `seed/catalog.json`,
@@ -592,7 +592,7 @@ class ScoreEntry:
     (docs/graphql-schema.md, "value is never coerced"). `chain` is the suffix `decompose()`
     stripped: it says which subject the value describes, not which metric it is, which is why it
     is here and not on `Metric`. `metric` is nullable because an unresolvable key is information,
-    not an error: it says the column did not come from a catalogued module.
+    not an error: it says the column did not come from a cataloged module.
     """
 
     key: str
@@ -696,11 +696,11 @@ def _passes_filters(
     the default, so `null` could mean "unsuffixed entries only") was considered and rejected:
     nothing asks for it, and a client can read `chain == null` off the response.
 
-    `module` matches the KEY's prefix, not the catalog's module. They agree for every catalogued
-    key and differ for an uncatalogued one, which has no metric to match: matching the key keeps
+    `module` matches the KEY's prefix, not the catalog's module. They agree for every cataloged
+    key and differ for an uncataloged one, which has no metric to match: matching the key keeps
     it, so `module: "mystery"` finds "mystery.column" whether or not the catalog knows it. The
     client typed a string it can see in `key`; that is the thing it should match. `concept` has
-    no such choice, since a concept exists only through a metric, so it drops uncatalogued keys.
+    no such choice, since a concept exists only through a metric, so it drops uncataloged keys.
     """
     if module is not None and score_key.module != module:
         return False

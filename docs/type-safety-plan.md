@@ -241,7 +241,7 @@ The test is not "mypy passes" — it passes today. It is whether these two lines
 
 ```python
 metric_by_identity[(column_key, module, None, None)]      # transposed
-decomposable_kinds_for(module, column_key) == {"PARMETER"}  # misspelt
+decomposable_kinds_for(module, column_key) == {"PARMETER"}  # misspelled
 ```
 
 The first is what `NewType` buys. The second is what only the real enum buys, and is why the

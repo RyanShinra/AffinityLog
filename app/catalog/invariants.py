@@ -21,7 +21,7 @@ discarded. No exception; just the wrong meaning, or none.
 
 The tempting fix is to raise while building the per-request catalog. That was rejected twice over.
 It is the wrong layer — the resolver only READS — and it fails at the worst possible moment, taking
-down every GraphQL request for all 144 metrics because one row was miscatalogued. A check here runs
+down every GraphQL request for all 144 metrics because one row was miscataloged. A check here runs
 when the offending row is written, names it, and rolls the seed back before it lands.
 
 WHAT WOULD MAKE THIS FILE UNNECESSARY
@@ -49,7 +49,7 @@ FOUR WAYS A HEADING BREAKS THE LOOKUP
 -------------------------------------
 All four are silent, and only the first is about "more than one kind":
 
-  * MIXED AXES — one heading catalogued along two different axes. No identity can name both,
+  * MIXED AXES — one heading cataloged along two different axes. No identity can name both,
     because a metric row carries a single (variant_kind, variant) pair; the cross product has
     nowhere to live.
 
@@ -82,7 +82,7 @@ All four are silent, and only the first is about "more than one kind":
     Per heading, and that word is load-bearing. This asked `kind in DECOMPOSABLE_VARIANT_KINDS`
     until 2026-08-23 — a flat set of kind NAMES flattened from rules that are pinned to a module
     and a column. PARAMETER is recoverable for `evoprotgrad.pseudolikelihood_ratio` and for nothing
-    else, so `evoprotgrad.entropy` catalogued along PARAMETER passed clean while resolving to
+    else, so `evoprotgrad.entropy` cataloged along PARAMETER passed clean while resolving to
     nothing: a false negative in precisely the shape this branch exists to catch.
 
     Note how it composes with the case above rather than contradicting it: TRANSFORM beside a bare
@@ -90,7 +90,7 @@ All four are silent, and only the first is about "more than one kind":
 
   * AN AXIS WITH MISSING VALUES — a heading qualified along a RESOLVABLE axis that it does not
     fully cover. The three above ask whether an axis can be resolved at all; this asks whether
-    every value of it was actually catalogued. Tier two builds
+    every value of it was actually cataloged. Tier two builds
     (module, column_key, 'INTERFACE', <the candidate's interface kind>), so a heading seeded with
     two of the three scoreable kinds resolves to nothing for exactly the candidates carrying the
     third, while every other candidate resolves fine. A partial failure is harder to notice than a
@@ -100,7 +100,7 @@ All four are silent, and only the first is about "more than one kind":
     `declared_variants_for(module, column_key, kind)` for everything else — the latter only askable
     since the rules table began carrying its variants as data rather than as regex capture groups.
     It takes the AXIS as well as the heading, and must: without it, a heading carrying a rule for
-    one axis was measured against that rule's variants while catalogued along a different one, so
+    one axis was measured against that rule's variants while cataloged along a different one, so
     `evoprotgrad.pseudolikelihood_ratio` with a TRANSFORM row beside a bare row was refused while
     `fastdpe.SFvCSP` in the identical shape passed.
 
@@ -137,7 +137,7 @@ class HeadingAudit(NamedTuple):
 
         The two fields stay flat because the SQL below returns them flat and this is a NamedTuple
         built row by row; the property is what stops callers formatting `module` and `column_key`
-        by hand, which is how the pair kept travelling as parts.
+        by hand, which is how the pair kept traveling as parts.
         """
         return Heading(self.module, self.column_key)
 
@@ -153,7 +153,7 @@ class HeadingAudit(NamedTuple):
         interface = VariantKind.INTERFACE
 
         if len(self.variant_kinds) > 1:
-            reasons.append(f"catalogued along {len(self.variant_kinds)} axes {[k.name for k in self.variant_kinds]}")
+            reasons.append(f"cataloged along {len(self.variant_kinds)} axes {[k.name for k in self.variant_kinds]}")
 
         if self.bare_rows and interface in self.variant_kinds:
             reasons.append(f"has {self.bare_rows} variant-less row(s) beside INTERFACE rows, which can never be reached")

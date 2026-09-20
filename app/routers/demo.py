@@ -69,7 +69,7 @@ def structure_ids() -> set[str]:
 
 
 def _kind_rank(kind: str) -> tuple[int, str]:
-    """Sort key placing known interface kinds in _KIND_ORDER, and anything unrecognised last.
+    """Sort key placing known interface kinds in _KIND_ORDER, and anything unrecognized last.
 
     Defensive on purpose: the view's CASE can emit a fourth value ("no chains recorded") that this
     list doesn't mention, and future recipes may add more. Ranking unknowns last means a new kind

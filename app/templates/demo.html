@@ -181,7 +181,7 @@
       viewer.clear();
       viewer.addModel(pdb, "pdb");
 
-      // Colour each chain by its role.
+      // Color each chain by its role.
       for (const [chain, color] of Object.entries(CHAIN_COLORS)) {
         viewer.setStyle({ chain }, { cartoon: { color } });
       }
@@ -197,7 +197,7 @@
       caption.textContent = `${v.label} · ${v.experiment} · chains ${v.chains} · ${epi}`;
     }
 
-    // Build the grouped tab strip: one labelled row per interface kind, one button per structure.
+    // Build the grouped tab strip: one labeled row per interface kind, one button per structure.
     //
     // Deliberately ONE viewer shared by every tab, not a grid of them. Each 3Dmol viewer holds a
     // WebGL context and browsers cap those (~16); nine live contexts each rendering a ~600-residue

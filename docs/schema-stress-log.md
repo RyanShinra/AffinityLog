@@ -8,7 +8,7 @@
 
 Modules seen across all runs so far (of the ~42-module palette): **RFantibody, TemStaPro,
 PLM Pseudo-Perplexity, FastDPE, Boltz2, EvoProtGrad, BioPhi, Nanobody Polyreactivity Scorer**
-(8 catalogued) + **IntelliFold, Humatch Classify** (named but not yet in an export). Built-in
+(8 cataloged) + **IntelliFold, Humatch Classify** (named but not yet in an export). Built-in
 pipeline passes (NOT palette modules): `liabilities`, `cdr_indices`, `hdbscan`, `mmseqs`,
 `structure_analysis_*`.
 

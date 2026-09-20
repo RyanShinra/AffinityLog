@@ -100,7 +100,7 @@ class TestBuildScores:
         }
 
     def test_the_full_header_is_the_key_spaces_and_all(self) -> None:
-        # JSONB keys are just strings, so the header goes in verbatim — no normalising, because
+        # JSONB keys are just strings, so the header goes in verbatim — no normalizing, because
         # the catalog's identity is derived from exactly this text.
         assert build_scores({"id": "a", "biophi.OASis Percentile_After.H": "0.5"}) == {"biophi.OASis Percentile_After.H": "0.5"}
 

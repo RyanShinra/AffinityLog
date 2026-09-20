@@ -77,7 +77,7 @@ class TestCiDetection:
     def test_anything_not_explicitly_negative_counts_as_ci(self, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
         """Including "maybe", deliberately.
 
-        An unrecognised value must fail loudly rather than skip silently: mistaking real CI for
+        An unrecognized value must fail loudly rather than skip silently: mistaking real CI for
         local means every database test is skipped and the build ships green with no coverage,
         while mistaking local for CI is a one-line diagnosis.
         """

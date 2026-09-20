@@ -46,7 +46,7 @@ class InterfaceKind(enum.Enum):
     meaning "no chain rows were imported for this candidate", and it exists because the view LEFT
     JOINs ``candidate_chains`` — a candidate with no chains still produces a group, and ``bool_or``
     over zero rows returns NULL rather than false, so without an explicit guard such a row falls
-    through to the ``ELSE`` and is mislabelled as a lone chain.
+    through to the ``ELSE`` and is mislabeled as a lone chain.
 
     No candidate in the current corpus reaches it (all 14 have chains), so it is reachable but
     unreached. It is a member anyway: the row that would hit it is a row whose chain import failed,

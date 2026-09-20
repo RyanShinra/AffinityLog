@@ -65,7 +65,7 @@ from app.models.views import CandidateSummary
 
 @dataclass(frozen=True, eq=False)
 class MetricCatalog:
-    """Every catalogued metric, indexed the three ways the resolvers need to ask.
+    """Every cataloged metric, indexed the three ways the resolvers need to ask.
 
     All three are built in ONE pass over ONE query, and each answers a different question:
 
@@ -161,12 +161,12 @@ class MetricCatalog:
 class Context(BaseContext):
     """Per-request state handed to every resolver as ``info.context``.
 
-    Still a thin holder: it carries the session and serialises access to it, and it caches the one
+    Still a thin holder: it carries the session and serializes access to it, and it caches the one
     thing every ScoreEntry needs. Anything that answers a domain question belongs in a resolver.
 
     THE TWO LOCKS, AND WHY THEY ARE TWO
     -----------------------------------
-    Sharing one session across a gathered resolver tree has to be serialised. ``TaskSafeSession``
+    Sharing one session across a gathered resolver tree has to be serialized. ``TaskSafeSession``
     does that and owns the lock for it; this class never sees that lock and cannot acquire it.
 
     ``_catalog_lock`` is a second, unrelated lock guarding a different invariant — that the catalog
@@ -206,7 +206,7 @@ class Context(BaseContext):
         # A THIRD lock, for the same reason there is a second one. `_load_interface_kinds()` issues
         # its statement through `execute_statement()` exactly as `_load_catalog()` does, so it needs
         # a lock that is not the session's. It is also not `_catalog_lock`: the two builds never
-        # nest, so sharing would not deadlock — but it would serialise two unrelated memos against
+        # nest, so sharing would not deadlock — but it would serialize two unrelated memos against
         # each other, and would put one object back in charge of two invariants, which is the shape
         # that deadlocked before. One lock per invariant is the rule; this is the third invariant.
         self._interface_kinds_lock = asyncio.Lock()
@@ -251,7 +251,7 @@ class Context(BaseContext):
             return self._catalog
 
         async with self._catalog_lock:
-            # Checked again inside the lock. Without this the lock would serialise the queries but
+            # Checked again inside the lock. Without this the lock would serialize the queries but
             # still run one per caller: measured, 14 concurrent callers (one per candidate in
             # `{ candidates { scores } }`, which graphql-core gathers across the list) produced 14
             # distinct MetricCatalog objects and 14 queries. The memo only works if the winner is
@@ -422,7 +422,7 @@ class Context(BaseContext):
 
         async with self._interface_kinds_lock:
             # Double-checked inside the lock, for `catalog()`'s measured reason: without this the
-            # lock serialises the queries but still runs one per waiting caller.
+            # lock serializes the queries but still runs one per waiting caller.
             if self._interface_kinds is not None:
                 return self._interface_kinds
             self._interface_kinds = await self._load_interface_kinds()

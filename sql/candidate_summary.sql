@@ -46,7 +46,7 @@ SELECT
     -- (an H/L/T row also has a LIGHT chain, but it's a complex, not a pairing).
     -- The count() guard is first for a subtle reason: this is a LEFT JOIN, so a candidate with NO
     -- chain rows still produces a group — and bool_or over zero rows returns NULL, not false. NULL
-    -- isn't true, so such a row would silently fall through to the ELSE and be mislabelled.
+    -- isn't true, so such a row would silently fall through to the ELSE and be mislabeled.
     CASE
         WHEN count(cc.id) = 0                    THEN 'no chains recorded'
         WHEN bool_or(cc.role::text = 'TARGET')   THEN 'antibody-target complex'

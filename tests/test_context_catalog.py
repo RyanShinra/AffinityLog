@@ -130,7 +130,7 @@ class TestTheIptmFinding:
             assert metric.display_name == display_name
 
     async def test_the_bare_identity_resolves_to_nothing(self, seeded_catalog: AsyncSession) -> None:
-        """Tier one is not an optimisation: skip it and the key resolves to no metric at all."""
+        """Tier one is not an optimization: skip it and the key resolves to no metric at all."""
         catalog = await Context(session=seeded_catalog).catalog()
         bare = decompose("boltz2.protein_iptm")
 
@@ -279,7 +279,7 @@ class TestTheLocksAreSeparate:
     """Every lock guards ONE invariant, and no two of them are the same object.
 
     There are three, and the rule is the same for each. `TaskSafeSession` owns the session's lock,
-    which serialises statements. `_catalog_lock` guards "the metric catalog is built once per
+    which serializes statements. `_catalog_lock` guards "the metric catalog is built once per
     request". `_interface_kinds_lock` guards "the interface-kind map is built once per request".
 
     Both memo builds issue their statement through `execute_statement()` while holding their own
@@ -289,7 +289,7 @@ class TestTheLocksAreSeparate:
     normally.
 
     The two memo locks are also kept apart from EACH OTHER, though that pairing cannot deadlock
-    today: the two builds never nest. Sharing would merely serialise two unrelated memos — but it
+    today: the two builds never nest. Sharing would merely serialize two unrelated memos — but it
     would also put one object back in charge of two invariants, which is the shape that produced
     the deadlock in the first place. One lock per invariant is the rule being tested, not "two
     locks happen to be enough".

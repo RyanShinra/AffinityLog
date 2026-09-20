@@ -3,7 +3,7 @@
 WRITTEN BEFORE THE CODE. This file is the specification for `Heading`, `MetricIdentity`,
 `VariantAxes` and `MetricCatalog.metric_for` — it is expected to fail at import until those exist.
 
-WHY THESE TYPES EXIST AT ALL, since none of them adds behaviour the tuples lacked:
+WHY THESE TYPES EXIST AT ALL, since none of them adds behavior the tuples lacked:
 
     Mapping[tuple[ModuleName, ColumnKey], frozenset[VariantKind]]
 
@@ -148,7 +148,7 @@ class TestMetricForResolvesOneKeyPerCandidate:
         catalog, so the key would resolve to nothing and the score would silently lose its meaning.
         That is the precise failure the two-tier design exists to prevent, so it must not be
         expressible: `python -O` strips asserts, and returning None would make an unresolvable key
-        indistinguishable from an uncatalogued one.
+        indistinguishable from an uncataloged one.
         """
         catalog = await Context(session=seeded_catalog).catalog()
 

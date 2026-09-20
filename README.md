@@ -53,7 +53,7 @@ export. That is what this database stores:
 | **Does it stick to the target?** | Boltz2 | Predicts the 3D structure of antibody and target *together*, then scores its own confidence: **ipTM** (0–1, "is this interface real?") and **pLDDT** (0–1, "is this shape right?"). Neither is a measured binding strength — they are the model's confidence in its own picture. |
 | **Where does it grab?** | structure analysis | Reads that predicted structure geometrically: which target residues are in contact (the **epitope**), how many, how close. This is what the demo paints red. |
 | **Will the patient's immune system attack the drug itself?** | BioPhi, Humatch | An antibody that doesn't look human can provoke an immune response against the drug. **Humanness** scores how closely the sequence resembles real human antibodies — BioPhi's *OASis* is a percentile against a database of observed human antibody sequences; Humatch is a neural net trained on the same question. Running both is deliberate: they can disagree. |
-| **Can we actually manufacture and store it?** | liabilities, TemStaPro | Certain amino-acid motifs oxidise, degrade, or pick up sugar molecules in the wrong place over time. These count them. TemStaPro predicts heat tolerance. A brilliant binder that falls apart in a vial is not a drug. |
+| **Can we actually manufacture and store it?** | liabilities, TemStaPro | Certain amino-acid motifs oxidize, degrade, or pick up sugar molecules in the wrong place over time. These count them. TemStaPro predicts heat tolerance. A brilliant binder that falls apart in a vial is not a drug. |
 | **Is this sequence even plausible?** | ESM2, EvoProtGrad | Protein language models — trained on known protein sequences much as an LLM is trained on text. **Pseudo-perplexity** is literally "how surprised is the model by this sequence". EvoProtGrad uses one to mutate a starting antibody toward better scores. |
 | **Design one from scratch** | RFantibody | Generates a new binder against a target rather than improving an existing one. Much harder, and the scores show it. |
 
@@ -76,24 +76,25 @@ Two things worth knowing before reading any number in this repo:
 - A **catalog** of 144 metrics across 16 modules, giving each raw score key a display name, unit,
   direction, value type, and — where it matters — a warning about how it misleads.
 - A **`/demo` page**: the corpus rendered live from the database, with 3D structures (3Dmol.js,
-  vendored so it needs no network), chains coloured by role, and the predicted epitope painted onto
+  vendored so it needs no network), chains colored by role, and the predicted epitope painted onto
   HER2.
 - **Idempotent loaders** for the corpus, the catalog, and the derived recipes.
+- **GraphQL** (`/graphql`). `Query` answers `experiments`, `experiment(id)`, `candidates`,
+  `candidate(id)`, `modules` and `metrics`. `Candidate.scores` resolves each raw score key against
+  the catalog *for that candidate*, so `boltz2.protein_iptm` comes back as HER2 binding confidence,
+  heavy-light pairing confidence, or no interface at all, depending on which chains that candidate
+  folded — the ipTM problem above, answered by the API. `Mutation.annotateCandidate` is the one
+  write. Two fields in `docs/graphql-schema.md` are deliberately not built: `Metric.transformOf`
+  and `Recipe.modules`.
 
 **Not built yet — and the README will say so until it is**
 
-- **GraphQL** (`/graphql`). Live, and partial. `Query` answers `experiments`, `experiment(id)`,
-  `candidates` and `candidate(id)`, over `Experiment`, `Candidate`, `Chain`, `Project`, `Recipe`
-  and `Target`. Still to come, and declared in `docs/graphql-schema.md` rather than implemented:
-  `ScoreEntry`, `Metric`, `Module`, `Concept`, `Query.metrics`, `Query.modules`, and `Mutation`
-  entirely. The schema was designed first (`docs/graphql-schema-handoff.md`) and the catalog was
-  built to feed it.
 - **REST ingestion** (`POST /experiments/…/import`). Still placeheld. CSVs are loaded by script:
   `experiment_results/load_experiment_results.py` rebuilds this corpus, and
   `scripts/load_experiment.py` is the general single-CSV tool it wraps.
 
-The live HTTP surface is exactly: `GET /health`, `GET /demo`, `GET /demo/pdb/{candidate_id}`, and
-`/static`. Nothing else responds.
+The live HTTP surface is exactly: `GET /health`, `GET /demo`, `GET /demo/pdb/{candidate_id}`,
+`/graphql` (GET serves the in-browser IDE, POST runs a query), and `/static`. Nothing else responds.
 
 ---
 
@@ -164,7 +165,7 @@ This is what makes the ipTM problem solvable: chain composition is queryable, so
 each row.
 
 It also enables an antibody **fingerprint** — an md5 of the heavy+light sequences, target excluded —
-so the *same molecule* is recognisable across experiments even when it was folded with a target in
+so the *same molecule* is recognizable across experiments even when it was folded with a target in
 one and without in another. That is how the demo traces one antibody through a design→humanization
 fork that spans two separate CSV exports.
 
@@ -229,7 +230,7 @@ Then open **http://localhost:8000/demo**.
 ### What the demo shows
 
 Three panels, top to bottom. **A 3D viewer** of every predicted structure in the corpus, grouped by
-what was actually folded — antibody heavy chain in blue, light chain in green, HER2 target in grey,
+what was actually folded — antibody heavy chain in blue, light chain in green, HER2 target in gray,
 and the residues the model predicts are in contact painted red. **A table of every candidate**, where
 the empty cells are the interesting part: they show which metrics a given recipe did and did not
 emit. **A provenance panel** that follows one antibody across two separate experiments, using a

@@ -10,7 +10,7 @@ got a 500 on /demo because nothing created `candidate_summary`.
 
 **Two-sources-of-truth note.** The SQL below is a *snapshot*, deliberately duplicated from
 ``sql/candidate_summary.sql``. It is not read from that file at runtime: migrations must be
-immutable, and sourcing the file would make this migration's behaviour change retroactively
+immutable, and sourcing the file would make this migration's behavior change retroactively
 every time someone edited it. The `.sql` file remains the annotated, iterate-in-TablePlus copy;
 this is the version that actually gets applied. `scripts/check_view_migration.py` (run in CI)
 fails the build if the file changes without a new migration, which is what keeps them honest.
@@ -52,7 +52,7 @@ SELECT
     -- What does this row's ipTM actually MEASURE? It depends entirely on which chains went into
     -- the fold, so classify the group rather than trusting the column name. The count() guard is
     -- first because this is a LEFT JOIN: bool_or over zero rows returns NULL, not false, so a
-    -- chainless candidate would otherwise fall through to the ELSE and be mislabelled.
+    -- chainless candidate would otherwise fall through to the ELSE and be mislabeled.
     CASE
         WHEN count(cc.id) = 0                    THEN 'no chains recorded'
         WHEN bool_or(cc.chain::text = 'TARGET')  THEN 'antibody-target complex'

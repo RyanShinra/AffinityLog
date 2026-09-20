@@ -9,7 +9,7 @@ routers. A typo in any of those is an ImportError or a startup crash that every 
 this suite would sail straight past, since they all exercise modules in isolation.
 
 These are smoke tests, deliberately shallow. They answer "is it plugged in", not "does it work"
-— resolver behaviour is exercised elsewhere.
+— resolver behavior is exercised elsewhere.
 
 WHY NO DATABASE
 ---------------
