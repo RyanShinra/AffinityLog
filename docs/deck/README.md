@@ -1,6 +1,6 @@
 # The project overview deck
 
-Seventeen slides explaining AffinityLog end to end: what it ingests, the finding that drove the
+Nineteen slides explaining AffinityLog end to end: what it ingests, the finding that drove the
 schema, and how the API came to serve it. Built 2026-09-20, after the ScoreEntry chapter merged.
 
 The deck is published as a private Artifact:
@@ -46,8 +46,9 @@ is the one thing the shared layout exists to prevent.
 Slide order, which `deck.json` also states:
 
 ```
-cover  no-api  terms  corpus  finding  layers  discriminator  lookup
-query  measured  stack  checks  witness  locks  snapshot  open  close
+cover  no-api  terms  corpus  anatomy  humanization  finding  layers
+discriminator  lookup  query  measured  stack  checks  witness  locks
+snapshot  open  close
 ```
 
 Four sections: **premise** (cover), **finding** (finding), **engineering** (stack), **close** (open).

@@ -8,6 +8,8 @@
     "no-api",
     "terms",
     "corpus",
+    "anatomy",
+    "humanization",
     "finding",
     "layers",
     "discriminator",
@@ -24,7 +26,7 @@
   ],
   "sections": {
     "premise": {
-      "description": "What AffinityLog ingests, and the no-API constraint that shapes every design decision below.",
+      "description": "What AffinityLog ingests, the no-API constraint behind it, and what the eleven experiments produced.",
       "start": "cover"
     },
     "finding": {
