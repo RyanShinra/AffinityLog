@@ -68,6 +68,10 @@ raising, so a stray property simply does nothing.
 - `position:absolute` pins a child to the slide; everything else flows.
 - A footer sits at `bottom:64px` and its slide takes `padding:128px 128px 160px`.
 - Nothing below 24px, anywhere, including table cells and footers.
+- **`gap` takes ONE value.** The two-value row/column shorthand is outside the subset, so
+  `gap:18px 40px` is dropped whole and the element lands with no gap on either axis. That is
+  how the *terms* slide shipped with its two columns touching. To widen the gutter without
+  widening the rows, put `padding:0 24px 0 0` on the cells and keep the single `gap`.
 
 **Design.** IBM Plex Sans with JetBrains Mono for keys, SQL and GraphQL. Slate `#12212E`, off-white
 `#F7F6F3`, warm accent `#B24A22`, teal `#1F6459`. Type scale 140 / 64 / 34 / 30 / 26 / 24. Content
