@@ -1,4 +1,4 @@
-<section id="discriminator" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:32px; justify-content:space-between">
+<section id="discriminator" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Tahoma, Arial, sans-serif; padding:96px 96px 160px; display:flex; flex-direction:column; gap:32px; justify-content:space-between">
   <div style="display:flex; flex-direction:column; gap:24px">
     <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">Derived, not stored</p>
     <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Telling the three apart</h2>
@@ -14,5 +14,5 @@
     <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#8FB6D6">END AS interface_kind</p>
   </div>
   <p style="font-size:28px; line-height:1.45; color:#4E5B66">I wrote this one by hand, and the leading <b>count()</b> branch is why. It's a LEFT JOIN, so a candidate with no chain rows still produces a group, and <b>bool_or</b> over zero rows returns NULL rather than false. NULL isn't true, so that row would fall through to the ELSE and get mislabeled silently.</p>
-  <p style="position:absolute; left:128px; bottom:64px; width:1664px; font-size:24px; line-height:1.4; color:#6C7A85">A view is a stored query rather than a stored table, so this is computed fresh on every read and can never drift from the chain rows it depends on. It reaches the API as Candidate.interfaceKind, two slides on.</p>
+  <p style="position:absolute; left:96px; bottom:64px; width:1728px; font-size:24px; line-height:1.4; color:#6C7A85">A view is a stored query rather than a stored table, so this is computed fresh on every read and can never drift from the chain rows it depends on. It reaches the API as Candidate.interfaceKind, two slides on.</p>
 </section>
