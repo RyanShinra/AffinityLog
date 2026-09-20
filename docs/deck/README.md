@@ -62,18 +62,27 @@ a closed subset. No classes, no `<style>` block, no `var()`, no `em`, no `margin
 Lengths in px, colors in hex. Anything outside the subset is dropped silently on read rather than
 raising, so a stray property simply does nothing.
 
-- `padding:128px` is the slide margin, leaving 1664×824 for content. Nothing shrinks to fit: content
+- `padding:96px` is the slide margin, leaving 1728×888 for content. Nothing shrinks to fit: content
   that does not fit overflows, so tall slides need the arithmetic done rather than guessed.
 - A `<div>` is invisible until it has a `background`, `border` or `box-shadow`.
 - `position:absolute` pins a child to the slide; everything else flows.
-- A footer sits at `bottom:64px` and its slide takes `padding:128px 128px 160px`.
+- A footer sits at `bottom:64px` and its slide takes `padding:96px 96px 160px`, leaving 1728×824.
+  **A pinned footer's own `left` and `width` do not follow the padding**, so they are set to
+  `left:96px; width:1728px` by hand. Move the margin and those have to move with it.
 - Nothing below 24px, anywhere, including table cells and footers.
 - **`gap` takes ONE value.** The two-value row/column shorthand is outside the subset, so
   `gap:18px 40px` is dropped whole and the element lands with no gap on either axis. That is
   how the *terms* slide shipped with its two columns touching. To widen the gutter without
   widening the rows, put `padding:0 24px 0 0` on the cells and keep the single `gap`.
 
-**Design.** IBM Plex Sans with JetBrains Mono for keys, SQL and GraphQL. Slate `#12212E`, off-white
+**How wide text actually runs.** The slide format's reference says to budget about 0.6 × font-size
+per character. That figure is for sizing a box to its longest *word*, where the worst case is what
+matters. Running prose averages nearer **0.45 × font-size**, measured off a rendered slide: the HER2
+entry on *terms* sets 74 characters of 24px Archivo in a 796px column. Budget a paragraph at 0.45 and
+a box that must not break a word at 0.6. Using 0.6 for prose costs about 40% of the line, which is
+how the *terms* definitions got trimmed harder than they needed to be.
+
+**Design.** Archivo with JetBrains Mono for keys, SQL and GraphQL. Slate `#12212E`, off-white
 `#F7F6F3`, warm accent `#B24A22`, teal `#1F6459`. Type scale 140 / 64 / 34 / 30 / 26 / 24. Content
 slides share one layout — eyebrow and heading in a header block at the top margin — so the heading
 lands at the same height on every one.
