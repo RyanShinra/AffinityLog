@@ -88,8 +88,8 @@ count decide property-versus-member**, rather than guessing at it now.
 ## The counter-argument, recorded
 
 `HeadingAudit.problems()` is called exactly once per instance, which makes the class close to a
-named wrapper around a pure function rather than an object with a life. The defence is the argument
-bundle, not behaviour: a free `problems(module, column_key, variant_kinds, variants, bare_rows)` is
+named wrapper around a pure function rather than an object with a life. The defense is the argument
+bundle, not behavior: a free `problems(module, column_key, variant_kinds, variants, bare_rows)` is
 five positional arguments of which two are same-shaped tuples of different element types —
 transposable, and only partly caught by mypy. `tests/test_catalog_invariants.py` constructs these by
 hand with no database precisely because the classification is pure. A named class beats a free

@@ -167,13 +167,13 @@ def declared_variants_for(module: ModuleName, column_key: ColumnKey, variant_kin
     """Every variant this heading's key strings may carry ALONG THIS AXIS, or empty if none do.
 
     The companion to `decomposable_kinds_for`: that one says which axis the key encodes, this says
-    which VALUES of it exist. `app/catalog/invariants.py` uses it to refuse a heading catalogued
+    which VALUES of it exist. `app/catalog/invariants.py` uses it to refuse a heading cataloged
     along a declared axis without a row for every value — seed `esm` but not `amplify` and every
     `evoprotgrad.amplify_pseudolikelihood_ratio` key resolves to nothing.
 
     THE AXIS IS A REQUIRED ARGUMENT, not a convenience. This took only (module, column_key) at
     first, and returned the rule's variants whatever axis the caller was asking about — so
-    `evoprotgrad.pseudolikelihood_ratio` catalogued along TRANSFORM was measured against
+    `evoprotgrad.pseudolikelihood_ratio` cataloged along TRANSFORM was measured against
     {esm, amplify} and refused for "having no row for" variants belonging to a different axis
     entirely, while `fastdpe.SFvCSP` with the identical shape passed. Whether a heading happens to
     carry a rule for some OTHER axis cannot be what decides it.

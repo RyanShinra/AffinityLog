@@ -308,7 +308,7 @@ class TestAnAxisWithMissingValues:
     """The fourth way a heading breaks the lookup: qualified along an axis it does not cover.
 
     The first three ask whether an axis can be RESOLVED at all. This asks whether every value of a
-    resolvable axis is actually catalogued — because tier two builds
+    resolvable axis is actually cataloged — because tier two builds
     (module, column_key, 'INTERFACE', <the candidate's interface kind>) from the candidate, and if
     no row was seeded for that particular kind the key resolves to nothing. Silently, for exactly
     the candidates carrying that kind, while every other candidate resolves fine. That partial

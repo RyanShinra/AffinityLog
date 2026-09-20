@@ -223,7 +223,7 @@ class TestTheFilters:
         assert keys("boltz") == ["boltz2.protein_iptm"]
         assert keys("heavy") == ["temstapro.clash.H"]
         assert keys("confidence") == ["boltz2.protein_iptm"], "the complex candidate's ipTM carries the concept"
-        assert keys("mystery") == ["mystery.column"], "module matches the key's prefix, so an uncatalogued key is found"
+        assert keys("mystery") == ["mystery.column"], "module matches the key's prefix, so an uncataloged key is found"
 
     async def test_concept_drops_the_lone_candidates_iptm(self, seeded_catalog: AsyncSession) -> None:
         """The 'Not an interface' row has no concept, so the lone candidate's ipTM does not match."""
@@ -242,7 +242,7 @@ class TestTheFilters:
         assert _passes_filters(decompose("mystery.column"), None, module=None, chain=None, concept=None)
 
     def test_module_matches_the_key_not_the_catalog(self) -> None:
-        """An uncatalogued key (db_metric None) still matches on its own prefix."""
+        """An uncataloged key (db_metric None) still matches on its own prefix."""
         assert _passes_filters(decompose("mystery.column"), None, module="mystery", chain=None, concept=None)
         assert not _passes_filters(decompose("mystery.column"), None, module="boltz2", chain=None, concept=None)
 

@@ -62,6 +62,6 @@ already scored against.
 
 ## Before ingesting anything
 
-**Check the licence and terms of each source first.** This project already treats terms-of-use as a gate
+**Check the license and terms of each source first.** This project already treats terms-of-use as a gate
 rather than an afterthought, and public availability is not the same as permission to redistribute.
 Record what each source permits, in this file, before loading it.

@@ -276,7 +276,7 @@ than a formality:
   `scripts/` is deliberately not installed — `[tool.setuptools.packages.find]` is `include =
   ["app*"]`. Left as it is, with the cast made explicit.
 
-The two behavioural changes were both proved rather than assumed: the xlsx crash above, and
+The two behavioral changes were both proved rather than assumed: the xlsx crash above, and
 `migrations/env.py`'s revision hook, whose annotations must not disturb the sequential numbering
 `docs`/CLAUDE.md both depend on. `alembic revision -m "probe"` still produced
 `009_probe_delete_me.py` — zero-padded, sequential, correct. Probe deleted.
@@ -673,7 +673,7 @@ the fifth field            -> ScoreKey=int, MetricKey=str, UNCHECKED
 
 `MetricIdentity` defines the arity, so it decides now. The guard-the-guard test also got stronger
 rather than merely adapted: it asserts `ScoreKey.identity` actually RETURNS that many values, tying
-the arity to behaviour instead of to a second annotation that could drift from the first.
+the arity to behavior instead of to a second annotation that could drift from the first.
 
 **Three times is a pattern, not an accident.** `_LEAVES`, `_ENTRY_POINTS`, `_MIRRORED` — each one a
 literal list standing in for something the code already knew, each failing by silence rather than by
@@ -729,7 +729,7 @@ tested — it is one that has never run.
 ### The self-refuting docstring
 
 The second finding was smaller and sharper: a docstring arguing "mypy cannot catch this", with a
-worked example labelled `# Success: no issues found` that had become an error. It was accurate about
+worked example labeled `# Success: no issues found` that had become an error. It was accurate about
 the bare-`str` `MetricKey` it described, and stopped being the moment stage 5 fixed that —
 `NamedTuple.__init__` IS typed. The claim survives; the demonstration did not. Replaced in all three
 places it had been copied, with the file now saying why the old one was wrong rather than quietly
@@ -758,7 +758,7 @@ typechecking:
 
 ```python
 metric_by_identity[(column_key, module, None, None)]        # transposed
-decomposable_kinds_for(module, column_key) == {"PARMETER"}  # misspelt
+decomposable_kinds_for(module, column_key) == {"PARMETER"}  # misspelled
 ```
 
 The first is what `NewType` buys. The second is what only the real enum buys, and is why Act I went

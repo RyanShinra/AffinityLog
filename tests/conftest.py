@@ -150,7 +150,7 @@ def _running_in_ci() -> bool:
     "yes, this is CI" and turned a stopped Docker into a hard failure for someone explicitly saying
     the opposite.
 
-    Deliberately asymmetric, and the asymmetry is the design. An unrecognised value counts as CI:
+    Deliberately asymmetric, and the asymmetry is the design. An unrecognized value counts as CI:
     treating a real CI run as local means every database test SKIPS, `build` still only
     `needs: [lint, test]`, and a green build ships with no database coverage at all — including
     `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM finding
@@ -238,7 +238,7 @@ def database_url() -> Iterator[str]:
     `test_the_same_key_means_different_things_per_candidate`, the one test guarding the ipTM
     finding this whole schema exists for. A skip is the right ergonomic on a laptop and a blind
     spot in a pipeline; `CI` is set by GitHub Actions and by every other runner worth naming.
-    `_running_in_ci()` decides, and errs towards failing — see its docstring for why an unrecognised
+    `_running_in_ci()` decides, and errs towards failing — see its docstring for why an unrecognized
     value counts as CI, and how to opt out.
     """
     if not _docker_is_running():

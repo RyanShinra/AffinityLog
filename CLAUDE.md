@@ -81,7 +81,7 @@ view, and stored in the catalog as `VariantKind.INTERFACE`. Full write-up in
 (2026-06 to 2026-07) and 9 exported successfully, but **7 CSVs are what load** — they produce
 9 experiment rows, because `load_csv` creates one Experiment per distinct `experimentId` and
 experiments 1 and 5 each span two sub-experiments. The loaded corpus is 9 experiments,
-14 candidates, 26 chains, 200 distinct score keys, 11 predicted structures, 144 catalogued
+14 candidates, 26 chains, 200 distinct score keys, 11 predicted structures, 144 cataloged
 metrics. Raw CSVs and structures live in `experiment_results/`, archived HTML in
 `HTML Extracts/`.
 
@@ -131,7 +131,7 @@ Docker only. Do not add a deploy step to CI until the next sprint.
 
 The owner is a senior backend engineer — TypeScript/Node primary, Python developing. This project is
 partly a vehicle for learning Python data-layer design, so *how* work happens matters as much as what
-ships. These were learned the hard way; they are not preferences to optimise away.
+ships. These were learned the hard way; they are not preferences to optimize away.
 
 - **Discuss the approach before building it.** For anything past a trivial edit, propose the plan,
   name the decision points, and wait. Building first pre-empts the owner's input and wastes his time.

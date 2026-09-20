@@ -209,7 +209,7 @@ antibody's own light chain, or against nothing. The fourth member is different i
 `'no chains recorded'` is the first branch of the view's `CASE`, and it is a guard rather than a
 classification: the view LEFT JOINs `candidate_chains`, so a candidate with no chain rows still
 produces a group, and `bool_or` over zero rows returns NULL rather than false. Without that branch
-such a row falls through to `ELSE` and is silently mislabelled as a single chain.
+such a row falls through to `ELSE` and is silently mislabeled as a single chain.
 
 All 14 candidates currently have chains, so the branch is **reachable but unreached**. It is in the
 enum anyway, because the row that would hit it is a row whose chain import failed — exactly the case

@@ -2,7 +2,7 @@
 
 The dry run's status is a PREDICTION of what the real run would do — 0 if it would succeed,
 non-zero if it would not — refined into two failures that need different things done about them.
-`Exit` in that script carries the reasoning; this file pins the behaviour.
+`Exit` in that script carries the reasoning; this file pins the behavior.
 
 WHY SUBPROCESSES. Calling `seed()` in-process would meet the conftest quarantine on
 `AsyncSessionLocal`, raise UnboundExecutionError inside the dry run's broad `except`, and report

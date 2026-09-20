@@ -24,7 +24,7 @@ missing:   nothing this chapter set out to build
 ```
 
 **The corpus this has to serve** (measured 2026-08-25): 14 candidates, 200 distinct score keys, 144
-catalogued metrics, 9 of them INTERFACE, 14 `candidate_summary` rows.
+cataloged metrics, 9 of them INTERFACE, 14 `candidate_summary` rows.
 
 ---
 
@@ -59,7 +59,7 @@ by candidate id.
 
 `ScoreEntry` is backed by no table. Each one is built from one entry in a candidate's `scores` JSONB
 bag plus the catalog row explaining it. This is where the finding the whole schema turns on finally
-becomes API behaviour: `boltz2.protein_iptm` resolves to *HER2 binding confidence*, *heavy-light
+becomes API behavior: `boltz2.protein_iptm` resolves to *HER2 binding confidence*, *heavy-light
 pairing*, or *not an interface*, depending on which chains that candidate folded.
 
 **The two-tier lookup had to MOVE, not be copied — done in `f786597`/`b3b6c64`.** It lived in
@@ -74,7 +74,7 @@ than before, because it would look like coverage.
 
 ### Decisions this forces
 
-* **`ScoreEntry.metric` is nullable, and the resolver has to mean it.** 200 keys, 144 catalogued —
+* **`ScoreEntry.metric` is nullable, and the resolver has to mean it.** 200 keys, 144 cataloged —
   so keys legitimately resolve to no metric, and `docs/graphql-schema.md` already decided they
   surface with `metric: null` rather than erroring. Worth measuring on the way in: how many of the
   200 actually miss, and are they all `_export` rows?
@@ -144,7 +144,7 @@ Recorded here because the commits carry the reasoning but the plan is what a col
 ### Stage 1b — the lookup's vocabulary
 
 * `Heading`, `MetricIdentity` (promoted from a bare tuple alias) and `VariantAxes` exist to make
-  `metric_for` readable, not to add behaviour. `Mapping[tuple[ModuleName, ColumnKey],
+  `metric_for` readable, not to add behavior. `Mapping[tuple[ModuleName, ColumnKey],
   frozenset[VariantKind]]` costs a reader ten seconds; `if axes.interface_qualified` says what is
   being asked where `if VariantKind.INTERFACE in kinds` did not.
 * **Promoting `MetricIdentity` to a class turned three of four defects into compile errors.** The
@@ -182,7 +182,7 @@ Recorded here because the commits carry the reasoning but the plan is what a col
 ### Stage 2 — `ScoreEntry` and `Candidate.scores`
 
 Built copy-paste style: every line shown in chat and interrogated before it went in, tests included.
-The four judgement calls, and where each landed:
+The four judgment calls, and where each landed:
 
 * **`numericValue`** (`_numeric_value` in `app/graphql/types.py`): FLOAT and INT only, so a BOOL
   stored as `"1"` is never served as a measurement. Catches `ValueError` only — `value` is `str`
@@ -193,9 +193,9 @@ The four judgement calls, and where each landed:
   through. No log line — on the real corpus every key resolves, and the seeder's `--dry-run` is
   the tool for "what is new in this CSV", not a resolver firing 1132 times a request.
 * **`module` filters on the KEY's prefix**, `score_key.module`, not on `metric.module.name`. The
-  two agree for every catalogued key and differ only for an uncatalogued one, which has no metric
+  two agree for every cataloged key and differ only for an uncataloged one, which has no metric
   to match: matching the key keeps it, so `module: "mystery"` finds `mystery.column` whether or
-  not the catalog knows it. `concept` has no such choice and drops uncatalogued keys.
+  not the catalog knows it. `concept` has no such choice and drops uncataloged keys.
 * **`chain: null` means no filter**, two-valued. The three-valued version (`strawberry.UNSET` so
   that `null` could mean "unsuffixed entries only") was considered and rejected: nothing asks for
   it, and a client can read `chain == null` off the response.
@@ -291,7 +291,7 @@ finished function to review.
 
 1. ~~**The two-tier branch in the ScoreEntry resolver.**~~ **DONE in stage 1b**, and it landed as
    `MetricCatalog.metric_for` rather than inside the resolver — see "Stage 1b" above for why the
-   catalog owns it. Both judgements survived the move: a missing `interface_kind` on an
+   catalog owns it. Both judgments survived the move: a missing `interface_kind` on an
    INTERFACE-qualified heading RAISES rather than building an identity that resolves to nothing, and
    it raises rather than `assert`s, because `python -O` strips asserts and the silent failure is the
    exact thing the design exists to prevent. What remains for the resolver is the FILTER semantics —

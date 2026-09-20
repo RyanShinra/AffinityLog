@@ -135,7 +135,7 @@ Which raised the owner's sharpest question of the branch:
 Correct, and it moved the fix twice:
 
 - **Not in the resolver.** The resolver only reads, and raising there takes down every GraphQL
-  request for all 144 metrics because one row is miscatalogued.
+  request for all 144 metrics because one row is miscataloged.
 - **At write time**, in both seeders, before `commit()`, so a bad catalog rolls back rather than
   landing.
 - **And structurally, eventually** — Postgres cannot express a functional dependency with `UNIQUE`
@@ -176,7 +176,7 @@ résumé ought to mean, and it never came up on Bloomberg's proprietary MySQL la
 SQL-standard and MySQL/InnoDB has it too — what varies is whether your tooling ever surfaces it.
 
 The fixture data was hand-written rather than seeded from `seed/catalog.json`, and the owner's
-argument for that is the best one-line defence of brittle tests I have heard:
+argument for that is the best one-line defense of brittle tests I have heard:
 
 > "Hand written, brittle test data failing when code is updated, even when the new code is fully
 > correct, is a sign that you need to examine and update the test. It forces you to properly
@@ -223,7 +223,7 @@ session, not on `catalog()`, because fixing only the memo would have left a know
 
 **Method note:** the first attempt to reproduce this *failed* — the fixture's session was already
 warm, which is precisely the state where it does not reproduce. Getting a false negative and
-recognising it as one was the step that found the real trigger.
+recognizing it as one was the step that found the real trigger.
 
 ### Three tests that passed for the wrong reason
 

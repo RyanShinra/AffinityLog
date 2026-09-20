@@ -44,7 +44,7 @@ RowTuple = TypeVar("RowTuple", bound=tuple[Any, ...])
 
 
 class TaskSafeSession:
-    """One `AsyncSession`, serialised so a tree of concurrent tasks can safely share it.
+    """One `AsyncSession`, serialized so a tree of concurrent tasks can safely share it.
 
     WHY THIS EXISTS
     ---------------
@@ -61,7 +61,7 @@ class TaskSafeSession:
     Note which one is worse. The cold failure is loud; the warm one is silent, because SQLAlchemy's
     protection sits a layer BELOW the session — `_execute_mutex` on the asyncpg connection adapter
     guards the wire protocol, not the identity map, the autoflush, or the transaction state machine.
-    A warm session gets its statements serialised on the wire and its ORM state trampled anyway.
+    A warm session gets its statements serialized on the wire and its ORM state trampled anyway.
 
     WHY THE LOCK LIVES IN HERE AND NOT IN THE CALLER
     -----------------------------------------------
@@ -100,7 +100,7 @@ class TaskSafeSession:
         self._lock = asyncio.Lock()
 
     async def execute(self, statement: Select[RowTuple]) -> Result[RowTuple]:
-        """Run one statement, serialised against every other statement on this session.
+        """Run one statement, serialized against every other statement on this session.
 
         Named `execute` to mirror `AsyncSession.execute` exactly — same verb, same signature, same
         meaning, minus the concurrency hazard — so the substitution is obvious to a reader.
@@ -113,7 +113,7 @@ class TaskSafeSession:
             return result
 
     async def commit(self) -> None:
-        """Commit the session's transaction, serialised like every statement on it.
+        """Commit the session's transaction, serialized like every statement on it.
 
         The second method this class was always going to grow (see NOT A PROXY above). The flush a
         commit triggers walks the identity map and writes pending state, which is precisely the

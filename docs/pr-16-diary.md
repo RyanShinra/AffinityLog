@@ -57,7 +57,7 @@ had given it a design constraint before a line of it was written.
 Its shape came from `catalog()`: one query for all candidates rather than one per candidate,
 memoized per request, double-checked inside the lock, handed out behind a `MappingProxyType`. The
 one genuinely new decision was the lock — a **third** one, not a reuse of `_catalog_lock`. The two
-builds never nest, so sharing would not have deadlocked today. But it would have serialised two
+builds never nest, so sharing would not have deadlocked today. But it would have serialized two
 unrelated memos, and it would have put one object back in charge of two invariants, which is the
 exact shape that deadlocked in PR #14. One lock per invariant is the rule; this was the third
 invariant.
@@ -111,7 +111,7 @@ its first line and an instruction not to push it alone.
 
 ### Promoting a tuple to a class turned three of four defects into compile errors
 
-The types add no behaviour the tuples lacked. What they buy is reading speed:
+The types add no behavior the tuples lacked. What they buy is reading speed:
 
 ```python
 Mapping[tuple[ModuleName, ColumnKey], frozenset[VariantKind]]   # ten seconds
@@ -228,7 +228,7 @@ Three things it decided:
 This is the chapter's point, and it is where the collaboration changed shape.
 
 CLAUDE.md's standing rule is that decision-carrying code is the owner's, with tests and mechanical
-fallout as the two exceptions. Stage 2 opened the usual way — a plan, the four judgement calls named,
+fallout as the two exceptions. Stage 2 opened the usual way — a plan, the four judgment calls named,
 a scaffold with `YOUR TURN` raising `NotImplementedError` at each spot. Then:
 
 > Let's set it up with everything shown in the chat, so that it's Mavis Beacon Teaches Typing, (or at
@@ -254,8 +254,8 @@ and the resolver was reaching the decision spots.
 * **The `metric: null` fallback** passes straight through, unlogged. On the real corpus every key
   resolves, so a miss means a new export column, and the seeder's `--dry-run` is the tool for that —
   not a resolver firing 1132 times a request.
-* **`module` filters on the key's prefix**, not the catalog's module. They agree for every catalogued
-  key and differ only for an uncatalogued one, which has no metric to match: matching the key keeps
+* **`module` filters on the key's prefix**, not the catalog's module. They agree for every cataloged
+  key and differ only for an uncataloged one, which has no metric to match: matching the key keeps
   it findable. The client typed a string it can see in `key`.
 * **`chain: null` means no filter**, two-valued. `strawberry.UNSET` would allow an explicit `null` to
   mean "unsuffixed entries only"; nothing asks for it, and a client can read `chain == null` off the
@@ -368,7 +368,7 @@ Each finding was reproduced before it was reported, with a toy schema where no d
 | `numericValue` returns NaN or infinity, which GraphQL's Float cannot serialize, so the entry comes back as a masked "Internal server error." | **fixed** — `math.isfinite`, logged at DEBUG like any other value that will not serve as a number |
 | `Query.metrics` and `Module.metrics` come back in heap order, which the idempotent seeder reshuffles on every re-run | **fixed** — the catalog query orders on the metric's full identity |
 | The `Artifact` docstring cited an ORM comment the correction commit had already changed | **fixed** |
-| One candidate missing from the view nulls the entire `candidates` response, not "the whole Candidate" as three documents say | **prose corrected**, in the code, the spec, the plan and this diary; the behaviour is deferred to issue #17 |
+| One candidate missing from the view nulls the entire `candidates` response, not "the whole Candidate" as three documents say | **prose corrected**, in the code, the spec, the plan and this diary; the behavior is deferred to issue #17 |
 | A NUL character in an annotation is rejected by Postgres at commit and surfaces as a masked internal error | **fixed** — confirmed read-only against the dev database (`CharacterNotInRepertoireError`), then refused as `BAD_USER_INPUT` before the session is touched |
 
 The blast-radius finding led somewhere larger. Asked what could make the trigger reachable, the

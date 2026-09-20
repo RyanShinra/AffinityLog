@@ -81,7 +81,7 @@ def _identity_sort_key(item: tuple[MetricIdentity, object]) -> tuple[str, str, s
     both `evoprotgrad.pseudolikelihood_ratio` and `evoprotgrad.esm_pseudolikelihood_ratio` puts a
     bare identity and a PARAMETER one under the same heading.
 
-    Neither `Enum` nor `None` defines `__lt__`, so every field is normalised to a string here. Sorting
+    Neither `Enum` nor `None` defines `__lt__`, so every field is normalized to a string here. Sorting
     the kind by `.name` also keeps the output order the same as it was when this was a `str`.
     """
     module, column_key, variant_kind, variant = item[0]
@@ -104,7 +104,7 @@ async def collect() -> list[MetricKey]:
         score_key = decompose(key)
         chains, originals = buckets[score_key.identity]
         if (chain := score_key.chain) is not None:
-            # `.value` because `chains` is informational output — printed, and serialised to JSON
+            # `.value` because `chains` is informational output — printed, and serialized to JSON
             # by `--json`. The enum is the internal spelling; the letter is the reported one.
             chains.add(chain.value)
         originals.append(key)

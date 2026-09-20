@@ -36,12 +36,12 @@ that existed only to compensate for the design**.
 
 The original `Context` held one `asyncio.Lock` and used it for two jobs:
 
-1. serialise access to the session — one statement at a time, in `execute()`
-2. serialise construction of the catalog memo — check, load, store, atomically, in `catalog()`
+1. serialize access to the session — one statement at a time, in `execute()`
+2. serialize construction of the catalog memo — check, load, store, atomically, in `catalog()`
 
 Job 2 holds the lock across a call to `_load_catalog()`, seventy lines of it. Anything that method
 does, it does with the lock held — so the statement it issues had to bypass the wrapper and call
-`session.execute` directly, under a comment explaining why. That comment was the entire defence,
+`session.execute` directly, under a comment explaining why. That comment was the entire defense,
 and `interface_kinds()` was about to have the same shape.
 
 The proposed fixes, in the order they were proposed and rejected:
@@ -78,7 +78,7 @@ Two things measured along the way, both of which ended up in the shipped docstri
   measurement from PR #13 — 3 of 4 concurrent executes raise — happens *above* the layer that mutex
   protects, because there is no connection yet for it to guard.
 - **The warm case is the dangerous one.** Warm session, 4 concurrent executes, 0 raise. That is not
-  safety; it is the connection mutex serialising the wire while session-level state is trampled
+  safety; it is the connection mutex serializing the wire while session-level state is trampled
   quietly.
 
 The framing that finally landed was C. `asyncio.Lock` is `PTHREAD_MUTEX_NORMAL` — no owner field,

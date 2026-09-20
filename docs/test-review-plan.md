@@ -25,7 +25,7 @@ The failure mode is specific and this project has hit it twice, both recorded in
 it passes *against the bug it was written to catch*. A dependency injected as a parameter cannot
 fail that way, because there is no second place for the value to come from.
 
-Not a licence to rewrite every test. `monkeypatch` is sometimes genuinely the only way — process
+Not a license to rewrite every test. `monkeypatch` is sometimes genuinely the only way — process
 start-up state, environment read at import, third-party singletons — and the goal is to be able to
 say which of those applies, per site, rather than to reach for it first.
 

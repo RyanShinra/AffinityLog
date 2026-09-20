@@ -32,7 +32,7 @@ USAGE
 
 The ``--chains`` list is POSITIONAL: it maps to the ``/``-split parts in order, so
 it must match how that particular export lays its chains out. Chains you name are
-kept and labelled; parts beyond the list are ignored. Naming fewer chains than the
+kept and labeled; parts beyond the list are ignored. Naming fewer chains than the
 row has is how you drop the target (default ``H`` keeps only the first part).
 """
 

@@ -31,7 +31,7 @@ collide:
 
 It is tempting to read a two-axis heading as "the resolver needs a smarter branch". It is not.
 A metric row carries **one** `(variant_kind, variant)` pair, so there is no row for *"esm **and**
-complex"* — the cross product has nowhere to live. A heading catalogued along two axes is already
+complex"* — the cross product has nowhere to live. A heading cataloged along two axes is already
 incoherent at rest; the resolver is just where you'd notice.
 
 Concretely, with the branch as designed: `decompose()` recovers `PARAMETER='esm'` from the key
