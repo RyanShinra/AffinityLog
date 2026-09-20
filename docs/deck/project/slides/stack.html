@@ -1,0 +1,25 @@
+<section id="stack" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">How it runs</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">The stack, briefly</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:28px">
+    <div style="display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:30px; font-weight:600; color:#12212E">API</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">FastAPI · Strawberry GraphQL, code-first · one AsyncSession per request, shared by the whole resolver tree</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:30px; font-weight:600; color:#12212E">Data</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">SQLAlchemy 2.0 async · asyncpg · PostgreSQL 16 · Alembic, migrations 001 through 008</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:30px; font-weight:600; color:#12212E">Tests</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">pytest · pytest-asyncio · testcontainers running the same postgres:16-alpine image as compose · 236 passing</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:30px; font-weight:600; color:#12212E">Gates</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">ruff · black · mypy strict over the whole tree, not just the app · GitHub Actions: lint, test, build</p>
+    </div>
+  </div>
+  <p style="width:1560px; font-size:28px; line-height:1.45; color:#4E5B66">Two heads on one app, on purpose. REST takes the CSV upload, because Strawberry has no multipart upload without tooling we chose not to add for a single endpoint. GraphQL takes everything else.</p>
+</section>

@@ -1,0 +1,31 @@
+<section id="query" data-transition="fade" style="background:#12212E; color:#F0EFEA; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#E08A5F">The payoff</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#F0EFEA">The query this was built for</h2>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:0; background:#0C1822; border:1px solid #27394A; border-radius:14px; padding:36px">
+    <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:30px; line-height:1.5; color:#DDE6EA">{ candidates { sequenceId interfaceKind</p>
+    <p style="padding:0 0 0 48px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:30px; line-height:1.5; color:#DDE6EA">scores(module: "boltz2") { key value metric { displayName } } } }</p>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:16px">
+    <div style="display:flex; gap:28px; align-items:center; background:#16302C; border-radius:12px; padding:22px 28px">
+      <p style="width:400px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; color:#93C6BB">boltz2.protein_iptm</p>
+      <p style="width:40px; font-size:26px; color:#93C6BB">→</p>
+      <p style="flex:1; font-size:30px; font-weight:600; color:#6FC9B8">HER2 binding confidence</p>
+      <p style="width:400px; font-size:24px; color:#93C6BB">antibody-target complex</p>
+    </div>
+    <div style="display:flex; gap:28px; align-items:center; background:#33211A; border-radius:12px; padding:22px 28px">
+      <p style="width:400px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; color:#E0AE95">boltz2.protein_iptm</p>
+      <p style="width:40px; font-size:26px; color:#E0AE95">→</p>
+      <p style="flex:1; font-size:30px; font-weight:600; color:#F0A277">Heavy-light pairing confidence</p>
+      <p style="width:400px; font-size:24px; color:#E0AE95">antibody only (H/L pairing)</p>
+    </div>
+    <div style="display:flex; gap:28px; align-items:center; background:#1C2E3D; border-radius:12px; padding:22px 28px">
+      <p style="width:400px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; color:#A8BCC4">boltz2.protein_iptm</p>
+      <p style="width:40px; font-size:26px; color:#A8BCC4">→</p>
+      <p style="flex:1; font-size:30px; font-weight:600; color:#DDE6EA">ipTM (no interface)</p>
+      <p style="width:400px; font-size:24px; color:#A8BCC4">single chain (no interface)</p>
+    </div>
+  </div>
+  <p style="font-size:34px; line-height:1.4; color:#F0EFEA">Three display names. One key. Chosen by what each candidate folded.</p>
+</section>

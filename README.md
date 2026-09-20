@@ -272,6 +272,7 @@ There is deliberately no `TEST_DATABASE_URL` escape hatch — see CLAUDE.md for 
 | `scripts/` | loaders, the score-key extractor, and the HTML provenance scrapers |
 | `docs/schema-stress-log.md` | **the most interesting file in the repo** — a running log of what each experiment revealed about the schema, including the ipTM finding |
 | `docs/demo-biology.md` | the biology, written for a software engineer |
+| `docs/deck/` | the project overview deck — sixteen slides covering the whole project, and the source of record for the published copy |
 
 ---
 

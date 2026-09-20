@@ -1,0 +1,16 @@
+<section id="discriminator" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The derivation</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Where the discriminator lives</h2>
+  </div>
+  <p style="font-size:30px; line-height:1.5; color:#4E5B66">It is in neither the key nor the value. The view derives it per row, from the sibling table.</p>
+  <div style="display:flex; flex-direction:column; gap:0; background:#12212E; border-radius:14px; padding:40px">
+    <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#8FB6D6">CASE</p>
+    <p style="padding:0 0 0 40px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#DDE6EA">WHEN count(cc.id) = 0 THEN 'no chains recorded'</p>
+    <p style="padding:0 0 0 40px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#DDE6EA">WHEN bool_or(cc.role::text = 'TARGET') THEN 'antibody-target complex'</p>
+    <p style="padding:0 0 0 40px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#DDE6EA">WHEN bool_or(cc.role::text = 'LIGHT') THEN 'antibody only (H/L pairing)'</p>
+    <p style="padding:0 0 0 40px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#DDE6EA">ELSE 'single chain (no interface)'</p>
+    <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#8FB6D6">END AS interface_kind</p>
+  </div>
+  <p style="font-size:28px; line-height:1.45; color:#4E5B66">The leading <b>count()</b> branch is not padding. This is a LEFT JOIN, so a candidate with no chain rows still produces a group — and <b>bool_or</b> over zero rows returns NULL, not false. NULL is not true, so that row would fall through to the ELSE and be mislabeled silently.</p>
+</section>

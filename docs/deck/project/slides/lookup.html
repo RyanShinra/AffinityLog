@@ -1,0 +1,22 @@
+<section id="lookup" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">Resolving a key</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">The two-tier lookup</h2>
+  </div>
+  <div style="display:flex; gap:32px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#1F6459">Tier one</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.25; color:#12212E">Does the key identify a metric by itself?</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">True for 197 of the 200 keys. One lookup, no candidate context required.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#B24A22">Tier two</p>
+      <h3 style="font-size:34px; font-weight:600; line-height:1.25; color:#12212E">Supply the candidate's interface kind.</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">For the three INTERFACE-qualified headings, chain composition completes the identity.</p>
+    </div>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:16px">
+    <p style="font-size:30px; line-height:1.5; color:#4E5B66">Asked in that order, rather than looked up and retried on a miss. Retry-on-miss happens to work today only because of how the seeder skips rows.</p>
+    <p style="font-size:30px; line-height:1.5; color:#4E5B66">Metric identity is <b>(module, column_key, variant_kind, variant)</b>. Three columns — iptm, protein_iptm, complex_ipde — times three interface kinds gives nine catalog rows for what looks like three columns.</p>
+  </div>
+</section>

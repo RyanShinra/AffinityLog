@@ -1,0 +1,21 @@
+<section id="no-api" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:48px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The constraint</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">The source has no API</h2>
+  </div>
+  <p style="width:1440px; font-size:32px; line-height:1.5; color:#4E5B66">Amazon Bio Discovery — AWS's computational antibody-engineering platform, demoed at the June 2026 AWS Summit — is UI-only. No REST, no SDK, no boto3. Every row in this database entered it as a CSV file a person exported by hand.</p>
+  <div style="display:flex; gap:32px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">Ingestion is a script, not an endpoint</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Every loader is idempotent and converges on a re-run, because reloading the same export is the normal case rather than an error.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">The columns are not knowable in advance</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Each pipeline emits its own, so a fixed schema is wrong on arrival. Seven CSV files produced 200 distinct keys.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">Nothing upstream will explain a column</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">There is no service to ask what a header means. The meaning has to be stored beside the data, by hand, once.</p>
+    </div>
+  </div>
+</section>
