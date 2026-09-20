@@ -1,10 +1,11 @@
-<section id="discriminator" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+<section id="discriminator" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:32px; justify-content:space-between">
   <div style="display:flex; flex-direction:column; gap:24px">
-    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The derivation</p>
-    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Where the discriminator lives</h2>
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">Derived, not stored</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Telling the three apart</h2>
   </div>
-  <p style="font-size:30px; line-height:1.5; color:#4E5B66">It isn't in the key, and it isn't in the value. The view works it out per row, from the sibling table.</p>
-  <div style="display:flex; flex-direction:column; gap:0; background:#12212E; border-radius:14px; padding:40px">
+  <p style="font-size:30px; line-height:1.5; color:#4E5B66">Nothing in a candidate's row says which of the three meanings its ipTM has. A view named <b>candidate_summary</b> works it out at read time, from that candidate's chain rows.</p>
+  <div style="display:flex; flex-direction:column; gap:0; background:#12212E; border-radius:14px; padding:36px 40px">
+    <p style="padding:0 0 10px 0; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:24px; color:#5E7A90">-- sql/candidate_summary.sql</p>
     <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#8FB6D6">CASE</p>
     <p style="padding:0 0 0 40px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#DDE6EA">WHEN count(cc.id) = 0 THEN 'no chains recorded'</p>
     <p style="padding:0 0 0 40px; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#DDE6EA">WHEN bool_or(cc.role::text = 'TARGET') THEN 'antibody-target complex'</p>
@@ -13,4 +14,5 @@
     <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#8FB6D6">END AS interface_kind</p>
   </div>
   <p style="font-size:28px; line-height:1.45; color:#4E5B66">I wrote this one by hand, and the leading <b>count()</b> branch is why. It's a LEFT JOIN, so a candidate with no chain rows still produces a group, and <b>bool_or</b> over zero rows returns NULL rather than false. NULL isn't true, so that row would fall through to the ELSE and get mislabeled silently.</p>
+  <p style="position:absolute; left:128px; bottom:64px; width:1664px; font-size:24px; line-height:1.4; color:#6C7A85">A view is a stored query rather than a stored table, so this is computed fresh on every read and can never drift from the chain rows it depends on. It reaches the API as Candidate.interfaceKind, two slides on.</p>
 </section>
