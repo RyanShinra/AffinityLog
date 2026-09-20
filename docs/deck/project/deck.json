@@ -6,6 +6,7 @@
   "order": [
     "cover",
     "no-api",
+    "terms",
     "corpus",
     "finding",
     "layers",
