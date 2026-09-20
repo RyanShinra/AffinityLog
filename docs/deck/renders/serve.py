@@ -8,12 +8,13 @@ writes the bytes straight to a file.
 import base64
 import os
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 class Handler(SimpleHTTPRequestHandler):
-    def do_POST(self):  # noqa: N802 - name fixed by the base class
+    def do_POST(self) -> None:  # noqa: N802 - name fixed by the base class
         if not self.path.startswith("/save/"):
             self.send_error(404)
             return
@@ -35,7 +36,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(f"wrote {name} ({len(raw)} bytes)".encode())
 
-    def log_message(self, fmt, *args):
+    def log_message(self, fmt: str, *args: Any) -> None:
         pass
 
 
