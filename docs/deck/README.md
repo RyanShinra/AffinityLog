@@ -88,3 +88,44 @@ The *measured* slide reports 0 unresolved keys and 0 parse failures, and then sa
 the reassurance they look like — the catalog was derived from this corpus, so both zeroes are
 artifacts of how it was built. Keep that caveat if the slide is ever rewritten; without it the slide
 overclaims.
+
+---
+
+## Regenerating the structure renders
+
+The finding slide shows three real predicted structures rather than a drawing. `renders/` holds
+the PNGs, the page that produced them, and the little server that saves them.
+
+No database and no Docker are involved. The page loads a PDB straight off disk with the viewer
+already vendored at `app/static/vendor/3Dmol-min.js`, and uses the same scheme `/demo` uses,
+read from `app/templates/demo.html`: heavy `#58a6ff`, light `#3fb950`, target `#8b949e`,
+predicted epitope `#f85149`. Running `/demo` itself would not work here anyway, because
+`experiment_results/` is not bind-mounted in compose, so `/demo/pdb/{id}` 404s in Docker.
+
+```bash
+cp app/static/vendor/3Dmol-min.js docs/deck/renders/
+cp experiment_results/*/9d9d1d35be0340a6b9b4d79bccf3db7a_boltz2.pdb docs/deck/renders/single.pdb
+cp experiment_results/*/a6d1540b89d047f9a65f73cff490a2f8_boltz2.pdb docs/deck/renders/pair.pdb
+cp experiment_results/*/8981aae116524c7683f6e3e310f32e43_boltz2.pdb docs/deck/renders/complex.pdb
+python docs/deck/renders/serve.py     # serves render.html as index on 127.0.0.1:8138
+```
+
+Then open each of these and call `save('<file>.png')` from the console once `window.ready` is true:
+
+| slide panel | url | candidate |
+|---|---|---|
+| single chain | `?s=single&zoom=0.52` | `9d9d1d35…`, chains H |
+| heavy-light pair | `?s=pair&roty=62&zoom=0.60` | `a6d1540b…`, chains H/L |
+| antibody and target | `?s=complex&surface=1&roty=30&zoom=0.92` | `8981aae1…`, chains H/L/T, run 8 |
+
+Two things about those numbers. The zoom factors are deliberately **not** "fit each one to the
+frame": they hold the heavy chain at the same apparent size across all three, so the panels
+compare honestly instead of making a lone chain look as big as a whole complex. And the target
+gets a molecular surface rather than a cartoon, because its cartoon is mostly coil and reads as
+thin wire at slide size; the epitope residues are painted onto that surface.
+
+The epitope list in `render.html` comes from `structure_analysis_boltz2.epitope_residues` in the
+run 8 export, not from the database.
+
+The PNGs here are the source of record. The deck references uploaded copies of them, so
+replacing a render means re-uploading it and updating that slide's image reference.
