@@ -1,26 +1,25 @@
-<section id="corpus" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px 128px 160px; display:flex; flex-direction:column; gap:48px; justify-content:space-between">
+<section id="corpus" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:'IBM Plex Sans', Verdana, sans-serif; padding:128px; display:flex; flex-direction:column; gap:32px; justify-content:space-between">
   <div id="cf79b6ea" style="display:flex; flex-direction:column; gap:24px">
-    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The data</p>
-    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Eleven experiments against HER2</h2>
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The experiments · target HER2 / PDB 1N8Z</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">What I actually ran</h2>
   </div>
-  <div id="23c72e49" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:24px">
-    <div style="display:flex; flex-direction:column; gap:8px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <p style="font-size:110px; font-weight:600; line-height:1; color:#12212E">9</p>
-      <p style="font-size:26px; line-height:1.4; color:#4E5B66">experiments loaded</p>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:8px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <p style="font-size:110px; font-weight:600; line-height:1; color:#12212E">14</p>
-      <p style="font-size:26px; line-height:1.4; color:#4E5B66">candidates, over 26 chains</p>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:8px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <p style="font-size:110px; font-weight:600; line-height:1; color:#12212E">200</p>
-      <p style="font-size:26px; line-height:1.4; color:#4E5B66">distinct score keys</p>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:8px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <p style="font-size:110px; font-weight:600; line-height:1; color:#12212E">144</p>
-      <p style="font-size:26px; line-height:1.4; color:#4E5B66">cataloged metrics, across 16 modules</p>
-    </div>
-  </div>
-  <p id="883e1714" style="width:1560px; font-size:30px; line-height:1.5; color:#4E5B66">I ran these during the free trial in June and July 2026. Nine exported, and seven of the CSV files load, two of which span two sub-experiments each. I left two ESM2 runs out on purpose, because that recipe folds nothing, so there's no predicted structure to pair them with.</p>
-  <p id="e1-1x9jvy9" style="position:absolute; left:128px; bottom:64px; width:1664px; font-size:24px; color:#6C7A85">HER2 is the receptor trastuzumab (Herceptin) binds. Reference structure: PDB 1N8Z.</p>
+  <table style="font-family:'IBM Plex Sans', Verdana, sans-serif; font-size:24px; color:#1B2A36; border:1px solid #DFDDD6">
+    <tr>
+      <th style="width:5%; text-align:left; color:#4E5B66">#</th>
+      <th style="width:26%; text-align:left; color:#4E5B66">Run</th>
+      <th style="width:21%; text-align:left; color:#4E5B66">Recipe</th>
+      <th style="width:48%; text-align:left; color:#4E5B66">What came out</th>
+    </tr>
+    <tr><td>1</td><td>Testing De Novo Design</td><td>De Novo Design</td><td>Two sub-experiments, one candidate each</td></tr>
+    <tr><td>2</td><td>HER 2 Round 9</td><td>HER2 Round 2 copy</td><td>Design plus humanized heavy chain; three new modules</td></tr>
+    <tr><td>3</td><td>Experiment 3</td><td>HER2 Round 3 take 1</td><td>Design plus humanized; Humatch enters</td></tr>
+    <tr><td>4</td><td>Round 4, add IntelliFold</td><td>HER2 Round 4</td><td style="color:#B24A22">Failed. IntelliFold gutted below the viable floor</td></tr>
+    <tr><td>5</td><td>Light and Heavy</td><td>HER2 Round 3 take 1</td><td>First light chain. Four rows from two sub-experiments</td></tr>
+    <tr><td>6</td><td>Match H and L to target</td><td>HER2 Round 3 take 1</td><td>EvoProtGrad stripped the target back out</td></tr>
+    <tr><td>7</td><td>Dual evolution</td><td>HER2 Round 7</td><td style="color:#B24A22">Failed. Disconnected topology, severed disulfide</td></tr>
+    <tr><td>8</td><td>Her2 Round 8</td><td>Boltz2 Solo</td><td>Three-chain fold. Humanized binding 0.702</td></tr>
+    <tr><td>9, 10</td><td>ESM2, before and after</td><td>ESM2 Only</td><td>Five properties each, decodable only via a mapping file</td></tr>
+    <tr><td>11</td><td>Her2 Boltz2 Evolved</td><td>Boltz2 Solo</td><td>Three-chain fold. Evolved binding 0.793</td></tr>
+  </table>
+  <p id="883e1714" style="font-size:28px; line-height:1.4; color:#12212E; background:#F0E6DF; border-radius:12px; padding:16px 24px">Humanizing the evolved antibody cost about 0.09 of binding confidence, 0.793 down to 0.702.</p>
 </section>
