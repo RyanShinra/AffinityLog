@@ -1,0 +1,25 @@
+<section id="layers" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:Archivo, Tahoma, Arial, sans-serif; padding:96px 96px 160px; display:flex; flex-direction:column; gap:48px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">The schema</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Three layers</h2>
+  </div>
+  <div style="display:flex; gap:32px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">1 · The bag</h3>
+      <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:24px; color:#B24A22">candidates.scores</p>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">JSONB, GIN indexed, keyed by the full export header. I store the values as text without coercing them, so a new recipe needs no migration.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">2 · The chains</h3>
+      <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:24px; color:#B24A22">candidate_chains</p>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">An antibody is built from two protein chains, heavy and light. The target, HER2, is a third. This table records which ones went into each fold, and that composition is what tells the bag apart.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
+      <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">3 · The catalog</h3>
+      <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:24px; color:#B24A22">modules / metrics / concepts</p>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">What a score means. Display name, unit, direction, value type, and the caveat that has to travel with the number.</p>
+    </div>
+  </div>
+  <p style="width:1560px; font-size:30px; line-height:1.5; color:#4E5B66">Each layer answers something the one before it can't. The bag takes whatever a pipeline emits, but it can't say what a column is. The chains say what was folded, but not what to call it.</p>
+  <p style="position:absolute; left:96px; bottom:64px; width:1728px; font-size:24px; line-height:1.4; color:#6C7A85">JSONB is Postgres storing a whole JSON document in one column, parsed into a binary form rather than kept as text. GIN is an inverted index: it maps each key back to the rows that contain it, the way the index at the back of a book maps a word to its pages.</p>
+</section>

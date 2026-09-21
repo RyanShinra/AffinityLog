@@ -1,0 +1,20 @@
+<section id="measured" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:Archivo, Tahoma, Arial, sans-serif; padding:96px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">Verification · 19 September 2026</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">Measured against the corpus</h2>
+  </div>
+  <table style="font-family:Archivo, Tahoma, Arial, sans-serif; font-size:26px; color:#1B2A36; border:1px solid #DFDDD6">
+    <tr>
+      <th style="width:68%; text-align:left; color:#4E5B66">What I ran in process against the nine loaded experiments</th>
+      <th style="width:32%; text-align:left; color:#4E5B66">Value</th>
+    </tr>
+    <tr><td>ScoreEntry objects for one full candidates query</td><td>1,132</td></tr>
+    <tr><td>Distinct score keys</td><td>200</td></tr>
+    <tr><td>Keys resolving to no metric</td><td style="color:#1F6459">0</td></tr>
+    <tr><td>Entries whose metric says FLOAT or INT</td><td>995</td></tr>
+    <tr><td>Of those, values that fail to parse</td><td style="color:#1F6459">0</td></tr>
+    <tr><td>Candidates by interface kind</td><td>4 complex / 6 pairing / 4 single-chain</td></tr>
+    <tr><td>Candidates whose target hoists to HER2 / 1N8Z</td><td>14 of 14</td></tr>
+  </table>
+  <p style="font-size:28px; line-height:1.45; color:#4E5B66">Those two zeroes aren't the reassurance they look like. I derived the catalog from this corpus, and each metric's value type was inferred from these very strings. That's why the metric field is nullable and the numeric parse is defensive.</p>
+</section>

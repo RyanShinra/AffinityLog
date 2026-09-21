@@ -1,0 +1,56 @@
+{
+  "v": 4,
+  "createdOnFiles": { "v": 1, "at": "2026-09-20T16:00:00Z" },
+  "title": "AffinityLog",
+  "cover": "cover",
+  "order": [
+    "cover",
+    "no-api",
+    "terms",
+    "corpus",
+    "anatomy",
+    "humanization",
+    "finding",
+    "layers",
+    "discriminator",
+    "lookup",
+    "query",
+    "measured",
+    "stack",
+    "checks",
+    "witness",
+    "locks",
+    "snapshot",
+    "open",
+    "close"
+  ],
+  "sections": {
+    "premise": {
+      "description": "What AffinityLog ingests, the no-API constraint behind it, and what the eleven experiments produced.",
+      "start": "cover"
+    },
+    "finding": {
+      "description": "One score column measures three different things, and the three layers of schema that answer which.",
+      "start": "finding"
+    },
+    "engineering": {
+      "description": "How it was built: the stack, the checks that lied, the lock design, and the schema contract.",
+      "start": "stack"
+    },
+    "close": {
+      "description": "What is still open, and what the project set out to demonstrate.",
+      "start": "open"
+    }
+  },
+  "faces": {
+    "archivo": {
+      "family": "Archivo",
+      "href": "https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap"
+    },
+    "jetbrains-mono": {
+      "family": "JetBrains Mono",
+      "href": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+    }
+  },
+  "designSystems": []
+}

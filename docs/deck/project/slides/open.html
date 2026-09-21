@@ -1,0 +1,24 @@
+<section id="open" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:Archivo, Tahoma, Arial, sans-serif; padding:96px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">Known edges</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">What is open, and why it's written down</h2>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #C9A38E; border-radius:14px; padding:36px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#B24A22">Issue 17 · request isolation</p>
+    <p style="font-size:28px; line-height:1.45; color:#4E5B66">Requests run at READ COMMITTED. I checked with SHOW transaction_isolation rather than assuming, so one request is not one snapshot. A delete committed between the candidate select and the summary read would null the entire candidates response, because the list is non-null all the way up. Nothing deletes today, so it can't happen yet. I found it by asking what would make it happen.</p>
+  </div>
+  <div style="display:flex; gap:28px">
+    <div style="flex:1; display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:28px; font-weight:600; line-height:1.25; color:#12212E">Two spec fields not built</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Both on purpose, both written down, and one has a test asserting its own absence.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:28px; font-weight:600; line-height:1.25; color:#12212E">N+1 queries measured, not fixed</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Selection-set driven loading is real machinery. I'd rather add it deliberately than smuggle it in.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:32px">
+      <h3 style="font-size:28px; font-weight:600; line-height:1.25; color:#12212E">Everything here is predicted</h3>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">I ran no wet-lab assay. ipTM, pLDDT and humanness are model outputs, not measurements.</p>
+    </div>
+  </div>
+</section>

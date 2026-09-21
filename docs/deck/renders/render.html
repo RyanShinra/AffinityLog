@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>structure render</title>
+  <script src="3Dmol-min.js"></script>
+  <style>
+    html, body { margin:0; padding:0; background:#12212E; }
+    #stage { position:relative; width:900px; height:700px; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <script>
+    // Same scheme the /demo page uses, read from app/templates/demo.html.
+    const CHAIN_COLORS = { H: "#58a6ff", L: "#3fb950", T: "#8b949e" };
+    const EPITOPE_COLOR = "#f85149";
+    // From structure_analysis_boltz2.epitope_residues in the run 8 export.
+    const EPITOPE = { complex: [83,85,90,91,92,93,94,108,109,110,111,112,124] };
+
+    const q = new URLSearchParams(location.search);
+    const name = q.get("s") || "complex";
+    const surface = q.get("surface") === "1";
+    const zoomF = parseFloat(q.get("zoom") || "1");
+    const rotY = parseFloat(q.get("roty") || "0");
+    const rotX = parseFloat(q.get("rotx") || "0");
+
+    // backgroundAlpha 0 gives a transparent PNG, so a render drops onto any card colour.
+    const viewer = $3Dmol.createViewer(document.getElementById("stage"),
+                                       { backgroundColor: "#000000", backgroundAlpha: 0 });
+    window.viewer = viewer;
+    window.ready = false;
+
+    (async function () {
+      const text = await (await fetch(name + ".pdb")).text();
+      viewer.addModel(text, "pdb");
+      for (const [chain, color] of Object.entries(CHAIN_COLORS)) {
+        viewer.setStyle({ chain }, { cartoon: { color } });
+      }
+      const ep = EPITOPE[name];
+      if (ep) {
+        viewer.setStyle({ chain: "T", resi: ep },
+                        { cartoon: { color: EPITOPE_COLOR }, stick: { color: EPITOPE_COLOR, radius: 0.18 } });
+      }
+      // The target is mostly coil, so its cartoon reads as thin wire at slide size. A surface
+      // makes it a solid body the antibody is visibly holding, with the epitope painted onto it.
+      if (surface && ep) {
+        const hot = new Set(ep);
+        viewer.addSurface($3Dmol.SurfaceType.VDW,
+          { opacity: 0.92, colorfunc: (a) => (hot.has(a.resi) ? EPITOPE_COLOR : CHAIN_COLORS.T) },
+          { chain: "T" });
+      }
+      // Rotate FIRST, then fit, so the camera recentres on what the rotation actually shows.
+      if (rotY) viewer.rotate(rotY, "y");
+      if (rotX) viewer.rotate(rotX, "x");
+      viewer.zoomTo();
+      if (zoomF !== 1) viewer.zoom(zoomF);
+      viewer.render();
+      window.ready = true;
+    })();
+
+    window.save = async function (file) {
+      const r = await fetch("/save/" + file, { method: "POST", body: viewer.pngURI() });
+      return await r.text();
+    };
+  </script>
+</body>
+</html>
