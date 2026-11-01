@@ -1,22 +1,23 @@
-<section id="lookup" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:Archivo, Tahoma, Arial, sans-serif; padding:96px; display:flex; flex-direction:column; gap:40px; justify-content:space-between">
+<section id="lookup" data-transition="fade" style="background:#F7F6F3; color:#1B2A36; font-family:Archivo, Tahoma, Arial, sans-serif; padding:96px; display:flex; flex-direction:column; gap:36px">
   <div style="display:flex; flex-direction:column; gap:24px">
     <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#B24A22">Resolving a key</p>
-    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">The two-tier lookup</h2>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212E">When the header isn't enough</h2>
   </div>
+  <p style="font-size:30px; line-height:1.4; color:#4E5B66">A metric is identified by <b>(module, column_key, variant_kind, variant)</b>. The only question a key ever raises is whether the header spells out all four.</p>
   <div style="display:flex; gap:32px">
     <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#1F6459">Tier one</p>
-      <h3 style="font-size:34px; font-weight:600; line-height:1.25; color:#12212E">Does the key identify a metric by itself?</h3>
-      <p style="font-size:26px; line-height:1.45; color:#4E5B66">True for 197 of the 200 keys. One lookup, and it needs nothing about the candidate.</p>
+      <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#1F6459">Usually it does · 197 of 200 keys</p>
+      <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#12212E">evoprotgrad.<b>esm</b>_pseudolikelihood_ratio<br>evoprotgrad.<b>amplify</b>_pseudolikelihood_ratio</p>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Two language models, two columns. Which one ran is written into the name, so the key decomposes on its own and one lookup finishes it.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FDFCF9; border:1px solid #DFDDD6; border-radius:14px; padding:36px">
-      <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#B24A22">Tier two</p>
-      <h3 style="font-size:34px; font-weight:600; line-height:1.25; color:#12212E">Supply the candidate's interface kind.</h3>
-      <p style="font-size:26px; line-height:1.45; color:#4E5B66">For the three INTERFACE qualified headings, chain composition finishes the identity.</p>
+      <p style="font-size:24px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:#B24A22">Three keys it doesn't</p>
+      <p style="font-family:'JetBrains Mono', 'Courier New', monospace; font-size:26px; line-height:1.5; color:#12212E">boltz2.<b>protein_iptm</b><br>boltz2.iptm &nbsp; boltz2.complex_ipde</p>
+      <p style="font-size:26px; line-height:1.45; color:#4E5B66">Which chains were folded belongs to the candidate, never to the header. Three keys times three interface kinds is nine catalog rows, and the resolver has to ask the view which one it has.</p>
     </div>
   </div>
-  <div style="display:flex; flex-direction:column; gap:16px">
-    <p style="font-size:30px; line-height:1.5; color:#4E5B66">I ask them in that order rather than looking up and retrying on a miss. Retry on miss only works today because of how the seeder happens to skip rows.</p>
-    <p style="font-size:30px; line-height:1.5; color:#4E5B66">Metric identity is <b>(module, column_key, variant_kind, variant)</b>. Three columns, iptm, protein_iptm and complex_ipde, times three interface kinds, gives nine catalog rows for what looks like three columns.</p>
+  <div style="display:flex; flex-direction:column; gap:12px; background:#FDFCF9; border:1px solid #C9A38E; border-radius:14px; padding:32px 36px">
+    <h3 style="font-size:30px; font-weight:600; line-height:1.25; color:#12212E">A fourth key I have not built</h3>
+    <p style="font-size:26px; line-height:1.45; color:#4E5B66">Runs 9 and 10 put five properties through one column, <b>esm2propertypredictor.predicted_property</b>: thermal stability, degradation, solubility, immunogenicity, hydrophobicity. Which one a row holds is decided by its sub-experiment, and that mapping is in no table. I keep it in a spreadsheet. Loading those two runs would force a second kind of tier two.</p>
   </div>
 </section>

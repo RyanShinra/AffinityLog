@@ -23,7 +23,9 @@
     "locks",
     "snapshot",
     "open",
-    "close"
+    "close",
+    "alt-axes",
+    "alt-esm2"
   ],
   "sections": {
     "premise": {
@@ -41,6 +43,10 @@
     "close": {
       "description": "What is still open, and what the project set out to demonstrate.",
       "start": "open"
+    },
+    "appendix": {
+      "description": "An alternate take on slide 11, split across two slides instead of one. Not part of the talk.",
+      "start": "alt-axes"
     }
   },
   "faces": {
