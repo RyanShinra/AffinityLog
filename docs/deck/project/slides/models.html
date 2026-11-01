@@ -1,0 +1,65 @@
+<section id="models" data-transition="fade" style="background:#f7f6f3; color:#4e5b66; font-family:Archivo, Tahoma, sans-serif; padding:96px 96px 160px; display:flex; flex-direction:column; gap:32px">
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <p style="font-size:24px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:#b24a22">For the specialists</p>
+    <h2 style="font-size:64px; font-weight:600; line-height:1.1; color:#12212e">The models in the recipes</h2>
+  </div>
+  <div style="display:grid; gap:24px; grid-template-columns:1fr 1fr">
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">RFantibody</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#b24a22; color:#f7f6f3">Writes a sequence</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">RFdiffusion retrained on antibodies, from the Baker lab. Given HER2 hotspots and a nanobody framework, it designed binders from nothing. Run 1.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">EvoProtGrad</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#b24a22; color:#f7f6f3">Writes a sequence</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">Directed evolution in software. It proposes point mutations where a protein language model's gradients say the score should rise. Runs 2, 3, 5 and 6.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">BioPhi</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#7a5e18; color:#f7f6f3">Humanization step</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">Sapiens rewrites framework residues toward human antibodies; OASis scores the result against the Observed Antibody Space.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">Humatch</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#7a5e18; color:#f7f6f3">Humanization step</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">A CNN classifier, run as a second opinion. On the same humanized sequence it answered 0.99999 where BioPhi's OASis put it in the 16th percentile.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">Boltz2</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#1f6459; color:#f7f6f3">Predicts the structure</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">Open source, out of MIT, in the AlphaFold family. It folds whatever chains it is handed into one 3D structure and rates its own confidence. The source of ipTM.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">ESM2</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#3d4f7a; color:#f7f6f3">Scores a sequence</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">Used two ways: predicting five properties straight from sequence, and rating how ordinary a sequence looks. Its column says esm2 even when AMPLIFY was the model.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">TemStaPro</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#3d4f7a; color:#f7f6f3">Scores a sequence</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">Thermostability from language model embeddings, and the most verbose module here: a raw and a binary call at eight thresholds from 40 to 80 degrees.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding:16px 24px 0 0; border-top:1px solid #dfddd6">
+      <div style="display:flex; gap:16px; align-items:center">
+        <h3 style="font-size:30px; font-weight:600; line-height:1.2; color:#12212e">FastDPE</h3>
+        <p style="font-size:24px; font-weight:600; line-height:1.3; padding:2px 14px; border-radius:18px; background:#3d4f7a; color:#f7f6f3">Scores a sequence</p>
+      </div>
+      <p style="font-size:24px; line-height:1.4">Paratope charge, CDR hydrophobicity and loop geometry. Run 2 also carried the Nanobody Polyreactivity Scorer, which looks for loops likely to stick to everything.</p>
+    </div>
+  </div>
+  <p style="position:absolute; left:96px; bottom:64px; width:1728px; font-size:24px; color:#6a7179">A ninth, IntelliFold, was added in run 4 and cut the construct below the viable floor; that run produced nothing. Clustering, alignment and liability columns come from built-ins rather than from a module anyone chose.</p>
+</section>
