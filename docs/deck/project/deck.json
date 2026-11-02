@@ -15,6 +15,7 @@
     "layers",
     "discriminator",
     "lookup",
+    "predicted-property",
     "query",
     "measured",
     "stack",
@@ -23,9 +24,7 @@
     "locks",
     "snapshot",
     "open",
-    "close",
-    "alt-axes",
-    "alt-esm2"
+    "close"
   ],
   "sections": {
     "premise": {
@@ -43,10 +42,6 @@
     "close": {
       "description": "What is still open, and what the project set out to demonstrate.",
       "start": "open"
-    },
-    "appendix": {
-      "description": "An alternate take on slide 11, split across two slides instead of one. Not part of the talk.",
-      "start": "alt-axes"
     }
   },
   "faces": {
