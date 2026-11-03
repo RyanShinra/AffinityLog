@@ -62,9 +62,11 @@ schema. The controlled vocabularies live in `app/catalog/` rather than beside th
 3. **The catalog** (`modules` → `metrics` → `concepts`) — what a score MEANS. Metric identity is
    `(module, column_key, variant_kind, variant)`, because column names collide.
 
-**The finding that drove the design (2026-07-31):** `boltz2.protein_iptm` measures three different
-physical quantities depending on which chains were folded — real HER2 binding (0.196–0.793), the
-antibody's own heavy–light pairing (~0.95), or nothing at all (0.000 for a lone chain). The
+**The finding that drove the design (2026-07-31):** `boltz2.protein_iptm` is one quantity —
+confidence that separate chains sit correctly against each other — but it is aggregated over all
+the interfaces the fold contained, so its meaning changes with chain composition: real HER2 binding
+(0.196–0.793), the antibody's own heavy–light pairing (~0.95), or no reading at all (0.000 for a
+lone chain). The
 meaningless values score HIGHEST, so a naive sort inverts the ranking. The discriminator is not in
 the key or the value; it is derived from `candidate_chains` by a CASE in the `candidate_summary`
 view, and stored in the catalog as `VariantKind.INTERFACE`. Full write-up in
