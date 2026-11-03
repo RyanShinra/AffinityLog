@@ -305,6 +305,16 @@ ships. These were learned the hard way; they are not preferences to optimize awa
   typechecks while `m.column_key = "literal"` does not. Also note that **converting a string to an
   enum is never a local change**: every `sorted`, f-string and dict key downstream is a site the
   type checker will not flag.
+- **A domain word that also has an everyday meaning misleads the SPECIALISTS worst.** Twice on the
+  deck, both caught by the owner reading it cold. In antibody work a *variant* is a mutated
+  sequence — which is exactly what EvoProtGrad produces three slides earlier — so `variant_kind`
+  and `variant` read to anyone in the field as a sequence variant rather than an axis of metric
+  identity. A *fold* is the 3D shape a chain adopts, so "2 folds" on a slide counting Boltz2 runs
+  read as a property of the molecule. Both times the wrong reading was perfectly coherent, which is
+  the danger: a reader who has never met a word asks what it means, while a reader who already owns
+  a different definition for it never notices they have mis-parsed. The schema keeps these names;
+  the prose says "the three kinds of fold" and "candidates" instead. The tell is a word the audience
+  already has a definition for, where ours differs — harder to spot than jargon, and worse.
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image
