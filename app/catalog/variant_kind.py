@@ -71,7 +71,7 @@ class VariantKind(enum.Enum):
     # the shape of the candidate the value was computed on, i.e. which chains went into the fold.
     # `boltz2.protein_iptm` measures HER2 binding (0.196-0.793) on an antibody-target complex, the
     # antibody's own heavy-light pairing (~0.95) with no antigen present, and nothing at all (0.000)
-    # on a lone chain — one column, three quantities. The variant carries the meaning; the CASE in
+    # on a lone chain — one column, three meanings. The variant carries the meaning; the CASE in
     # the candidate_summary view decides which one a given row has.
     # Only metrics whose value COLLAPSES TO 0.000 without an interface use this (iptm,
     # protein_iptm, complex_ipde); complex_iplddt/complex_plddt/ptm stay meaningful for a single

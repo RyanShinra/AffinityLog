@@ -62,9 +62,11 @@ schema. The controlled vocabularies live in `app/catalog/` rather than beside th
 3. **The catalog** (`modules` → `metrics` → `concepts`) — what a score MEANS. Metric identity is
    `(module, column_key, variant_kind, variant)`, because column names collide.
 
-**The finding that drove the design (2026-07-31):** `boltz2.protein_iptm` measures three different
-physical quantities depending on which chains were folded — real HER2 binding (0.196–0.793), the
-antibody's own heavy–light pairing (~0.95), or nothing at all (0.000 for a lone chain). The
+**The finding that drove the design (2026-07-31):** `boltz2.protein_iptm` is one quantity —
+confidence that separate chains sit correctly against each other — but it is aggregated over all
+the interfaces the fold contained, so its meaning changes with chain composition: real HER2 binding
+(0.196–0.793), the antibody's own heavy–light pairing (~0.95), or no reading at all (0.000 for a
+lone chain). The
 meaningless values score HIGHEST, so a naive sort inverts the ranking. The discriminator is not in
 the key or the value; it is derived from `candidate_chains` by a CASE in the `candidate_summary`
 view, and stored in the catalog as `VariantKind.INTERFACE`. Full write-up in
@@ -303,6 +305,16 @@ ships. These were learned the hard way; they are not preferences to optimize awa
   typechecks while `m.column_key = "literal"` does not. Also note that **converting a string to an
   enum is never a local change**: every `sorted`, f-string and dict key downstream is a site the
   type checker will not flag.
+- **A domain word that also has an everyday meaning misleads the SPECIALISTS worst.** Twice on the
+  deck, both caught by the owner reading it cold. In antibody work a *variant* is a mutated
+  sequence — which is exactly what EvoProtGrad produces three slides earlier — so `variant_kind`
+  and `variant` read to anyone in the field as a sequence variant rather than an axis of metric
+  identity. A *fold* is the 3D shape a chain adopts, so "2 folds" on a slide counting Boltz2 runs
+  read as a property of the molecule. Both times the wrong reading was perfectly coherent, which is
+  the danger: a reader who has never met a word asks what it means, while a reader who already owns
+  a different definition for it never notices they have mis-parsed. The schema keeps these names;
+  the prose says "the three kinds of fold" and "candidates" instead. The tell is a word the audience
+  already has a definition for, where ours differs — harder to spot than jargon, and worse.
 - asyncpg quirks that cost time: array params need a real Python list (not `'{A,B}'`), and one named
   parameter cannot be reused across an INSERT target column and a comparison.
 - **Tests provision their own Postgres via testcontainers** — `postgres:16-alpine`, the same image

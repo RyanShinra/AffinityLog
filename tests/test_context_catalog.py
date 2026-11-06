@@ -2,7 +2,7 @@
 
 The test that matters here is `test_the_same_key_means_different_things_per_candidate`. Everything
 else checks plumbing; that one checks the finding the whole schema exists for — that
-`boltz2.protein_iptm` is three different physical quantities depending on which chains were folded,
+`boltz2.protein_iptm` is one quantity whose meaning changes with which chains were folded,
 and that the API resolves each to the right one. Break it and the API starts reporting an
 antibody's heavy-light pairing confidence as if it were HER2 binding, silently, with the
 meaningless values ranking highest.

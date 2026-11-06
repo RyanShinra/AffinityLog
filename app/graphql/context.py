@@ -406,7 +406,7 @@ class Context(BaseContext):
         TIER TWO of the two-tier lookup. `catalog().variant_axes_per_heading` answers "is this
         heading INTERFACE-qualified?"; this answers "and what did THIS candidate fold?". Neither is
         sufficient alone, which is the whole shape of the 2026-07-31 finding: `boltz2.protein_iptm`
-        is one key meaning three different physical quantities, and the discriminator lives on the
+        is one quantity whose meaning changes with chain composition, and that discriminator lives on the
         candidate rather than in the key or the value.
 
         ONE QUERY FOR EVERY CANDIDATE, not one per candidate. `{ candidates { scores } }` gathers
