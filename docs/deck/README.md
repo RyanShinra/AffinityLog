@@ -119,9 +119,14 @@ Not defects — judgment calls the deck has not made yet. Raised during the 2026
 - **Every content slide ends on a qualifying sentence.** Each caveat is individually correct; it is
   the metronome of fifteen slides sharing one rhythm that reads as generated. Hardest of the three
   to fix, because the fix is structural rather than lexical.
-- **Open from the slide-by-slide pass:** "Gates" as a card label on *stack*, and whether *measured*
-  ("Measured against the corpus") reads as a continuation of the slide before it rather than a new
-  thought.
+- **Open from the slide-by-slide pass:** whether *measured* ("Measured against the corpus") reads
+  as a continuation of the slide before it rather than a new thought.
+- **Closed 2026-11-06:** the fourth card on *stack* was labelled "Gates" beside API, Data and Tests
+  — three flat nouns and then a metaphor, which is variety in the one place a label row should not
+  vary. It is "CI" now. Noted as unfinished: "CI" slightly under-describes ruff and black, which
+  also run in the pre-commit hook, and no single short word covers linting and CI together
+  ("quality gates" is the term of art, which is where "Gates" came from). "Checks" was rejected
+  because the next slide but one is titled "Checks that covered less than they claimed".
 
 ## Regenerating the structure renders
 
