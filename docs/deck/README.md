@@ -105,6 +105,24 @@ overclaims.
 
 ---
 
+## Open editorial items
+
+Not defects — judgment calls the deck has not made yet. Raised during the 2026-11 review pass.
+
+- **Slide titles should carry the take-away, not announce the contents.** "Three layers" names
+  what is on the slide and conjures a cake before the reader gets to the cards; a title that said
+  what the three layers *buy you* would do more work. This applies across the deck, not to one
+  slide, so it is a pass of its own rather than a fix. The same pass should take the heading
+  grammar: six headings open "What …" or "Where …", which reads as a template being filled in.
+  The card titles on *layers* were already changed this way — "The catalog" became "The
+  definitions catalog" so the body refines a claim instead of explaining a bare noun.
+- **Every content slide ends on a qualifying sentence.** Each caveat is individually correct; it is
+  the metronome of fifteen slides sharing one rhythm that reads as generated. Hardest of the three
+  to fix, because the fix is structural rather than lexical.
+- **Open from the slide-by-slide pass:** "Gates" as a card label on *stack*, and whether *measured*
+  ("Measured against the corpus") reads as a continuation of the slide before it rather than a new
+  thought.
+
 ## Regenerating the structure renders
 
 The finding slide shows three real predicted structures rather than a drawing. `renders/` holds
