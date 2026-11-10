@@ -109,18 +109,79 @@ overclaims.
 
 Not defects — judgment calls the deck has not made yet. Raised during the 2026-11 review pass.
 
-- **Slide titles should carry the take-away, not announce the contents.** "Three layers" names
-  what is on the slide and conjures a cake before the reader gets to the cards; a title that said
-  what the three layers *buy you* would do more work. This applies across the deck, not to one
-  slide, so it is a pass of its own rather than a fix. The same pass should take the heading
-  grammar: six headings open "What …" or "Where …", which reads as a template being filled in.
-  The card titles on *layers* were already changed this way — "The catalog" became "The
-  definitions catalog" so the body refines a claim instead of explaining a bare noun.
+### The title pass — agreed, not yet applied (2026-11-10)
+
+Every content slide's title was reviewed together as a table of contents, which is the only way the
+pattern shows. The old set announced what was on the slide ("What the words mean", "What one run
+gives you", "The stack, briefly"); six opened "What ..." or "Where ...". Below is the agreed
+replacement set, merged from two passes — Claude's, which reached for claims and rhythm, and the
+owner's, which reached for flat documentation labels. **Recorded, not landed.** Three slides are
+held deliberately; see the vocabulary gap below.
+
+| # | slide | current | agreed |
+|---|---|---|---|
+| 1 | cover | AffinityLog | unchanged |
+| 2 | no-api | The source has no API | Bio Discovery gives you a CSV and nothing else |
+| 3 | terms | What the words mean | Key terminology |
+| 4 | models | The models in the recipes | Each module outputs its own columns |
+| 5 | corpus | What I actually ran | Eleven runs, nine that produced data |
+| 6 | anatomy | What one run gives you | Sample output from run 8 |
+| 7 | humanization | What humanization changed | Humanization traded binding for safety |
+| 8 | finding | One column, multiple meanings | ipTM means three different things |
+| 9 | layers | Three layers | Three layers to pin down one meaning |
+| 10 | discriminator | Telling the three apart | Chain composition decides the meaning |
+| 11 | lookup | When the header isn't enough | Resolving ambiguous header names |
+| 12 | predicted-property | The same disease, a different cure | One key, five properties, decoded elsewhere |
+| 13 | query | The query this was built for | One key, three display names |
+| 14 | measured | Measured against the corpus | Of course they're zero — I made them that way |
+| 15 | stack | The stack, briefly | Two heads on one app, on purpose |
+| 16 | checks | Checks that covered less than they claimed | HELD — whole slide needs rework |
+| 17 | witness | I planned stage four on the belief ... | HELD — "stage four" arrives cold |
+| 18 | locks | One lock per invariant | HELD — "invariant" arrives cold |
+| 19 | snapshot | A code-first schema needs a snapshot | The snapshot that catches contract drift |
+| 20 | open | What is open, and why it's written down | Every number here is predicted |
+| 21 | close | Where it ended up | Flexibility breeds complexity |
+
+Knock-on edit when this lands: *stack*'s closing paragraph currently opens "Two heads on one app, on
+purpose", which would restate its own new title six inches below itself. Trim it to start at "REST
+takes the CSV upload, because ...".
+
+**The register rule this produced.** The two passes disagreed about voice, and the disagreement is
+the useful part. Flat documentation labels suit the inventory slides (3, 6, 11, 15); a voiced,
+first-person title suits the slides that carry a finding (14, 21). What does not work is
+alternating without a rule. Decide per slide which kind it is, then write the title to match.
+
+**Do not lead with the limit.** Claude's pass turned four empty titles into claims and, in doing so,
+doubled the number of titles built on an absence (four to eight), because in this deck the
+take-aways mostly *are* limits. The owner's pass fixed it instinctively on slides 2 and 5 by
+leading with purpose and letting the limit land in the body. That is the general repair, and it
+applies to the closing-caveat item below as well — the two are one habit, not two.
+
+**Two corrections made during the pass, worth not reintroducing.** "Predicted binding probability"
+was proposed as a plain-English name for ipTM on slide 8; it is the exact overclaim removed from
+`README.md`, `CLAUDE.md` and three code comments on 2026-11-05 — ipTM is confidence that chains were
+*placed* correctly, not a probability of binding. And "Building schema snapshots after every build"
+describes the opposite of what `scripts/dump_schema.py` plus `tests/test_schema_snapshot.py` do:
+the snapshot is regenerated deliberately when the contract changes, and CI fails when it drifted.
+
+- **The vocabulary gap on 16, 17 and 18 (2026-11-10).** `stage` appears on slide 17 and nowhere
+  else in the deck; `invariant` appears on slide 18 and nowhere else. Both arrive with no
+  introduction, which is the same failure that made *lookup* unreadable before it was reframed —
+  a reader meets "stage four" and asks what happened to one through three. Slide 16's wording needs
+  work beyond its title. These three slides are held out of the title pass because the title
+  problem is downstream of the body problem.
+- **"Flexibility breeds complexity" may be the thesis, not the conclusion.** It is currently the
+  last line of the last slide, where it reads as a lesson learned. The JSONB bag is flexible — any
+  recipe, no migration — and the catalog exists because that flexibility removed any way to know
+  what a column means. Slides 8 through 14 are that sentence being paid for. Worth deciding whether
+  it belongs on the cover as a thesis the deck then proves. Open.
 - **Every content slide ends on a qualifying sentence.** Each caveat is individually correct; it is
-  the metronome of fifteen slides sharing one rhythm that reads as generated. Hardest of the three
-  to fix, because the fix is structural rather than lexical.
-- **Open from the slide-by-slide pass:** whether *measured* ("Measured against the corpus") reads
-  as a continuation of the slide before it rather than a new thought.
+  the metronome of nine slides sharing one rhythm (4, 7, 8, 11, 12, 14, 16, 17, 20; plus 2 and 10
+  ending on a "so therefore" conclusion, a cousin of the same shape) that reads as generated.
+  Hardest of these to fix, because the fix is structural rather than lexical. Related to the
+  "do not lead with the limit" note above: both are the same habit in different places.
+- **Resolved by the table above:** *measured* ("Measured against the corpus") read as a
+  continuation of the slide before it. The agreed replacement makes it a claim of its own.
 - **Closed 2026-11-06:** the fourth card on *stack* was labelled "Gates" beside API, Data and Tests
   — three flat nouns and then a metaphor, which is variety in the one place a label row should not
   vary. It is "CI" now. Noted as unfinished: "CI" slightly under-describes ruff and black, which
