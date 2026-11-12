@@ -11,6 +11,7 @@ against the running database before it was written.
 
 | doc | what it is |
 |---|---|
+| [`handoff.md`](handoff.md) | **What is in flight and what is next.** A living doc, updated at the end of each session: the active work with each item's state and next move, plus pointers to open threads elsewhere. Finished items get deleted, not ticked, and decisions move to their home doc, so it should stay short. Start here to pick the work back up. |
 | [`schema-stress-log.md`](schema-stress-log.md) | **Start here after the README.** A running log of what each of the 11 experiments revealed about the schema, newest findings at the bottom of each section. The 2026-07-31 entry is the ipTM discovery the whole design turns on. A lab notebook, not a tutorial — dense, but nothing else in the repo explains *why* the schema looks like this. |
 | [`demo-biology.md`](demo-biology.md) | The biology behind the `/demo` page, written for a software engineer with no biology background. Includes the humanization trade-off the featured structures illustrate, a glossary of the score names, and explicit caveats about what these numbers are not. |
 | [`recipe-topology-note.md`](recipe-topology-note.md) | Why recipe DAG *edges* are not stored yet, and what storing them would require. Still an open decision. |
@@ -50,5 +51,5 @@ state. Each carries a status banner at the top.
 ## If you are an AI assistant starting a session here
 
 Read `../CLAUDE.md` (conventions, and how the owner prefers to work), then `../README.md`, then the
-stress log. Be aware that everything under **Historical** will contradict the README — the README wins.
+stress log. To pick up work in progress, read [`handoff.md`](handoff.md). Be aware that everything under **Historical** will contradict the README — the README wins.
 Verify claims against the running database rather than against any document, including this one.
