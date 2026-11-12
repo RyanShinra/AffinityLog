@@ -170,11 +170,20 @@ the snapshot is regenerated deliberately when the contract changes, and CI fails
   a reader meets "stage four" and asks what happened to one through three. Slide 16's wording needs
   work beyond its title. These three slides are held out of the title pass because the title
   problem is downstream of the body problem.
-- **"Flexibility breeds complexity" may be the thesis, not the conclusion.** It is currently the
-  last line of the last slide, where it reads as a lesson learned. The JSONB bag is flexible — any
-  recipe, no migration — and the catalog exists because that flexibility removed any way to know
-  what a column means. Slides 8 through 14 are that sentence being paid for. Worth deciding whether
-  it belongs on the cover as a thesis the deck then proves. Open.
+- **Decided 2026-11-12: "Flexibility breeds complexity" is the thesis, and it is on the cover.**
+  It sits under the title at 48px in the accent, so the deck opens by stating what it will prove
+  rather than closing on a lesson learned. The JSONB bag is flexible — any recipe, no migration —
+  and the catalog exists because that flexibility removed any way to know what a column means, so
+  slides 8 through 14 are that sentence being paid for. Moving it forward changes what the middle
+  of the deck is *for*: those slides stop reading as a problem that was hit and start reading as
+  evidence being presented. **The conclusion slide answers it** — the agreed shape is "the
+  complexity was worth it", wording still open, replacing "Flexibility breeds complexity" in the
+  title table above as slide 21's title.
+- **Still to tune on the cover.** The 34px paragraph beneath the new subtitle ends on "one score
+  column means something different depending on what went into the run" — true, and it is the
+  complexity, but it never names the flexibility that caused it, so the thesis above it is not yet
+  paid off in the paragraph below it. Left alone for now; it is a sentence-level edit, not a
+  layout one.
 - **Every content slide ends on a qualifying sentence.** Each caveat is individually correct; it is
   the metronome of nine slides sharing one rhythm (4, 7, 8, 11, 12, 14, 16, 17, 20; plus 2 and 10
   ending on a "so therefore" conclusion, a cousin of the same shape) that reads as generated.
