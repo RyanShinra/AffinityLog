@@ -1,6 +1,6 @@
 # The project overview deck
 
-Nineteen slides explaining AffinityLog end to end: what it ingests, the finding that drove the
+Twenty-one slides explaining AffinityLog end to end: what it ingests, the finding that drove the
 schema, and how the API came to serve it. Built 2026-09-20, after the ScoreEntry chapter merged.
 
 The deck is published as a private Artifact:
@@ -109,14 +109,16 @@ overclaims.
 
 Not defects — judgment calls the deck has not made yet. Raised during the 2026-11 review pass.
 
-### The title pass — agreed, not yet applied (2026-11-10)
+### The title pass — agreed 2026-11-10, applied 2026-11-12
 
 Every content slide's title was reviewed together as a table of contents, which is the only way the
 pattern shows. The old set announced what was on the slide ("What the words mean", "What one run
 gives you", "The stack, briefly"); six opened "What ..." or "Where ...". Below is the agreed
 replacement set, merged from two passes — Claude's, which reached for claims and rhythm, and the
-owner's, which reached for flat documentation labels. **Recorded, not landed.** Three slides are
-held deliberately; see the vocabulary gap below.
+owner's, which reached for flat documentation labels. **Applied 2026-11-12**: the sixteen agreed
+titles are on the slides, and the "current" column is now history. Three slides are still held
+deliberately (see the vocabulary gap below), and slide 21's title is still open (see the thesis
+item below).
 
 | # | slide | current | agreed |
 |---|---|---|---|
@@ -142,9 +144,9 @@ held deliberately; see the vocabulary gap below.
 | 20 | open | What is open, and why it's written down | Every number here is predicted |
 | 21 | close | Where it ended up | Flexibility breeds complexity |
 
-Knock-on edit when this lands: *stack*'s closing paragraph currently opens "Two heads on one app, on
-purpose", which would restate its own new title six inches below itself. Trim it to start at "REST
-takes the CSV upload, because ...".
+Knock-on edit, applied with the titles: *stack*'s closing paragraph opened "Two heads on one app, on
+purpose", which would have restated its own new title six inches below itself. It now starts at
+"REST takes the CSV upload, because ...".
 
 **The register rule this produced.** The two passes disagreed about voice, and the disagreement is
 the useful part. Flat documentation labels suit the inventory slides (3, 6, 11, 15); a voiced,
