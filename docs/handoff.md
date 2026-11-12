@@ -19,6 +19,12 @@ cloud) doesn't have to rebuild that from chat scrollback. Last updated **2026-11
 
 ## Now: the deck's editorial pass
 
+**Gate: the arc review comes first** (`docs/deck/arc.md`). The audience and the read-alone format
+are decided. Two questions are with the owner: one thesis or thesis plus method, and whether a cold
+open is fair game. Rows 3, 5 and 6 wait on the arc, because they may move or merge. Row 4 (the
+cover) starts the language review once the arc is set. The slide 7 title fix is the one item
+that doesn't wait: the primary reader is biopharma, and that reader catches the overclaim first.
+
 Branch `portfolio-deck`. Deck: <https://claude.ai/artifact/71smZjwSgUvCMujvT6anDc>.
 Git is the source of record; see `docs/deck/README.md` for the page-edit → folder → republish loop.
 On 2026-11-12 the published copy and `docs/deck/project/` matched exactly.
