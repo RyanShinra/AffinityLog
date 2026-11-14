@@ -53,7 +53,8 @@ The title pass itself is done (commit `57a8487`). It turned up these follow-ups,
   H/L/T complexes (0.793, 0.702) and both H/T (0.402, 0.196), but the two lone H chains are 0.000
   and rank *last*. The slide 8 footer says five. The looser "the meaningless ones score highest" is
   half true, and it also appears in `CLAUDE.md`, `app/catalog/interface_kind.py:11`,
-  `app/routers/demo.py:47` and `tests/test_metric_lookup.py:112`. The precise claim, that a pairing
+  `app/routers/demo.py:47` and `tests/test_metric_lookup.py:112`, and `docs/schema-stress-log.md:388`, which says
+  "every target-less fold". The precise claim, that a pairing
   score outranks every real binding score, is still the hook and is still striking. The code
   comments are the owner's call; the slide 8 footer waits on the arc, since it may become the cold open.
 - **Slide 20, *open*: "Every number here is predicted"** nearly repeats the heading of its own fourth
