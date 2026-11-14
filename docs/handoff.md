@@ -20,9 +20,8 @@ cloud) doesn't have to rebuild that from chat scrollback. Last updated **2026-11
 ## Now: the deck's editorial pass
 
 **Gate: the arc review comes first** (`docs/deck/arc.md`). The audience and the read-alone format
-are decided. Decided: thesis plus method, with the method named up front. Still with the owner:
-whether a cold open is fair game. Rows 3, 5 and 6 wait on the arc, because they may move or merge. Row 4 (the
-cover) starts the language review once the arc is set.
+are decided. Decided: thesis plus method, with the method named up front, and a teaser on the cover
+rather than a cold open. Next: where the method goes and how it's worded. Rows 3, 5 and 6 wait on the arc, because they may move or merge.
 
 Branch `portfolio-deck`. Deck: <https://claude.ai/artifact/71smZjwSgUvCMujvT6anDc>.
 Git is the source of record; see `docs/deck/README.md` for the page-edit → folder → republish loop.
@@ -31,7 +30,6 @@ On 2026-11-12 the published copy and `docs/deck/project/` matched exactly.
 | # | item | recorded at | state | next move |
 |---|---|---|---|---|
 | 3 | Conclusion slide (*close*) title | deck README, thesis item: "the complexity was worth it", wording open | Draft: **"The complexity paid for itself"**. Catch: none of the slide's three points says *why*, so the body may need a fourth point, or point 02 reworded, to back up the title. | Owner picks wording |
-| 4 | Cover paragraph | deck README, "Still to tune on the cover" | Draft (adds a fourth line at 34px; the cover has room): *"I ran eleven antibody design experiments on Amazon Bio Discovery, then built a backend to store and interpret what came out. Storing it flexibly was easy: any pipeline's columns, no migrations. Interpreting it was the hard part, because the same score column means something different depending on what went into the run."* | Owner picks wording |
 | 5 | Vocabulary gap on 16, 17, 18 | deck README, "The vocabulary gap on 16, 17 and 18" | Not started. *checks* needs body work; "stage four" (17) and "invariant" (18) come up with no introduction. Titles for all three are held until the bodies are fixed. | Discuss before drafting |
 | 6 | Every slide ends on a caveat | deck README, "Every content slide ends on a qualifying sentence" | Not started. A structural fix, not a word swap; the same habit as "do not lead with the limit". | Discuss before drafting |
 | 7 | Boltz-2 reruns | `docs/boltz2-rerun-plan.md` | Not started. **Needs the PC's GPU.** Its result could replace the headline 0.09 on *corpus* and *humanization*, so do it before the deck is called finished. | Owner, on the PC |

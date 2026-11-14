@@ -185,7 +185,8 @@ the snapshot is regenerated deliberately when the contract changes, and CI fails
   evidence being presented. **The conclusion slide answers it** — the agreed shape is "the
   complexity was worth it", wording still open, replacing "Flexibility breeds complexity" in the
   title table above as slide 21's title.
-- **Still to tune on the cover.** The 34px paragraph beneath the new subtitle ends on "one score
+- **Resolved 2026-11-14, see `arc.md`: the paragraph now names the flexibility and plants the
+  inverted sort as a teaser.** What it said before: The 34px paragraph beneath the new subtitle ends on "one score
   column means something different depending on what went into the run" — true, and it is the
   complexity, but it never names the flexibility that caused it, so the thesis above it is not yet
   paid off in the paragraph below it. Left alone for now; it is a sentence-level edit, not a

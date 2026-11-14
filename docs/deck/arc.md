@@ -39,10 +39,14 @@ Where it goes and how it's worded are still open. The cover's "How the work spli
 natural home, and it would serve the secondary audience too: building with AI is only impressive
 if the verification shows. The thesis stays the headline.
 
+**Teaser, not a cold open (option C, 2026-11-14).** The deck keeps its order, with the turn at
+slide 8. The cover paragraph now plants the surprise in plain English, with no jargon, so slide 8
+pays off a promise. The same rewrite settles row 4: the paragraph now names the flexibility as well
+as what it costs. Rollback point: `622cbab`, the commit before the change.
+
 ## Open, owner to answer
 
-1. **Is a cold open fair game?** For example, the inverted sort ("sorting by this column puts those
-   five above every real complex", now a footer on slide 8) as slide 2, with the setup after it.
+Nothing open right now.
 
 ## Observations from the first read (2026-11-12), not yet acted on
 
