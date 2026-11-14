@@ -50,6 +50,14 @@ The title pass itself is done (commit `57a8487`). It turned up these follow-ups,
   dropped, and now slide 7 says "placement" while 13 says "binding". Renaming it is a catalog data
   change: a decision for the owner, not a deck edit. The seeder is idempotent, but check whether it
   updates `display_name` on an existing row or only inserts.
+- **"Puts those five above every real complex" is wrong: it is three** (checked against the exports
+  2026-11-14). Sorted by `boltz2.protein_iptm`: the three H/L pairs (0.948–0.962) rank above both
+  H/L/T complexes (0.793, 0.702) and both H/T (0.402, 0.196), but the two lone H chains are 0.000
+  and rank *last*. The slide 8 footer says five. The looser "the meaningless ones score highest" is
+  half true, and it also appears in `CLAUDE.md`, `app/catalog/interface_kind.py:11`,
+  `app/routers/demo.py:47` and `tests/test_metric_lookup.py:112`. The precise claim, that a pairing
+  score outranks every real binding score, is still the hook and is still striking. The code
+  comments are the owner's call; the slide 8 footer waits on the arc, since it may become the cold open.
 - **Slide 20, *open*: "Every number here is predicted"** nearly repeats the heading of its own fourth
   card ("Everything here is predicted"), the same knock-on *stack* had. It also names a four-card
   slide after one card, and it opens on a limit. Either the card or the title has to change.
