@@ -32,12 +32,16 @@ helping.
 - **For the secondary audience, the AI split is part of the story.** Right now it appears once, on
   the cover ("How the work split"). Whether it needs to appear again is not decided.
 
+**Thesis plus method, with the method named up front (2026-11-14).** The deck has a second
+thread, *measure, don't assert* (slides 8, 14, 16, 17, 20 and *close*'s point 03). It gets
+introduced early, as the deck's "how", so later slides pay off a promise instead of arriving cold.
+Where it goes and how it's worded are still open. The cover's "How the work split" paragraph is the
+natural home, and it would serve the secondary audience too: building with AI is only impressive
+if the verification shows. The thesis stays the headline.
+
 ## Open, owner to answer
 
-1. **One thesis, or a thesis plus a method?** The deck has an unnamed second thread: *measure,
-   don't assert* (slides 8, 14, 16, 17, and *close*'s point 03). Either name it, or fold 16–17 into
-   the flexibility story.
-2. **Is a cold open fair game?** For example, the inverted sort ("sorting by this column puts those
+1. **Is a cold open fair game?** For example, the inverted sort ("sorting by this column puts those
    five above every real complex", now a footer on slide 8) as slide 2, with the setup after it.
 
 ## Observations from the first read (2026-11-12), not yet acted on

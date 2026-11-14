@@ -20,8 +20,8 @@ cloud) doesn't have to rebuild that from chat scrollback. Last updated **2026-11
 ## Now: the deck's editorial pass
 
 **Gate: the arc review comes first** (`docs/deck/arc.md`). The audience and the read-alone format
-are decided. Two questions are with the owner: one thesis or thesis plus method, and whether a cold
-open is fair game. Rows 3, 5 and 6 wait on the arc, because they may move or merge. Row 4 (the
+are decided. Decided: thesis plus method, with the method named up front. Still with the owner:
+whether a cold open is fair game. Rows 3, 5 and 6 wait on the arc, because they may move or merge. Row 4 (the
 cover) starts the language review once the arc is set.
 
 Branch `portfolio-deck`. Deck: <https://claude.ai/artifact/71smZjwSgUvCMujvT6anDc>.
