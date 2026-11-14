@@ -169,7 +169,11 @@ class Module(ModelBase):
 
 
 class Metric(ModelBase):
-    """One named output a Module can emit (a column). The catalog's core — all our refinements live here."""
+    """One named output a Module can emit. The catalog's core — all our refinements live here.
+
+    A metric is a MEANING, not a column: the same column name can carry several, which is what the
+    `(module_id, column_key, variant_kind, variant)` key below exists to separate.
+    """
 
     __tablename__ = "metrics"
     __table_args__ = (

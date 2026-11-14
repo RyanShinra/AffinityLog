@@ -19,18 +19,38 @@ Bio Discovery pipelines ("recipes") chain together modules — a design model, a
 humanness scorer — and every module emits its own columns. Different recipes emit different columns,
 so a fixed schema is wrong on arrival. That much is a normal JSONB-bag problem.
 
-Here is the part that is not normal. This corpus contains one column, `boltz2.protein_iptm`, that
-measures **three different physical quantities**:
+So, here's the unexpected thing: the results contain one column, `boltz2.protein_iptm`, whose
+**meaning changes row by row**.
 
-| what was folded | n | what ipTM actually measures | observed |
+ipTM is a single quantity: the model's confidence that it positioned separate chains correctly
+against each other, aggregated over every interface in the fold. So what the number describes
+depends on which chains went in:
+
+| what was folded | folds | what the number describes | observed |
 |---|---|---|---|
-| antibody + HER2 | 4 | genuine binding to the target | 0.196 – 0.793 |
+| nanobody + HER2 | 2 | binding to the target | 0.196 – 0.402 |
+| antibody + HER2 (heavy + light + target) | 2 | binding, averaged with the heavy–light pairing | 0.702 – 0.793 |
 | antibody alone (heavy + light) | 3 | the antibody's own two chains pairing | 0.948 – 0.962 |
 | a single chain | 2 | nothing — there is no interface | 0.000 |
 
-Same module, same column, same run. The three bands **do not overlap**, and the meaningless ones
-score *highest* — so sorting candidates by "binding score" puts every structure that contains no
-target above every structure that does.
+Nine folds, four bands, and **no two of them overlap**. While this gets described as a "binding
+score" across various runs, naively sorting candidates by it creates the illusion that the antibody
+binds to itself best, which is not the same thing as an antibody binding to a target. Your left hand
+will always grab your right hand better than both of them grab a basketball.
+
+Two things make the number less portable than it looks. It is aggregated over all interfaces, so a
+three-chain fold averages the more trivial heavy–light interface in with the binding one — that is
+the second row above, and it is why that row is split out. And the scoring tolerance widens as the
+assembly gets bigger: that is deliberate, since a large structure shouldn't be punished for having
+more absolute error, but it is computed over the whole fold, so adding a third chain makes the
+scoring more forgiving for the two that were already there. Two ipTM values compare cleanly only
+when the folds share a chain composition.
+
+Boltz-2 agrees about the single-chain case: its own `confidence_score` drops ipTM in favour of pTM
+when there is only one chain. It also computes a score for every pair of chains,
+`pair_chains_iptm`, that the Bio Discovery export does not carry — so the information that would
+resolve this exists upstream and is flattened on the way out. Recovering it is
+[`docs/boltz2-rerun-plan.md`](docs/boltz2-rerun-plan.md).
 
 Nothing in the column name, the value, or the module says which case you are looking at. The
 discriminator lives in a **different table**: which chains the candidate has. That single fact shapes
@@ -272,6 +292,7 @@ There is deliberately no `TEST_DATABASE_URL` escape hatch — see CLAUDE.md for 
 | `scripts/` | loaders, the score-key extractor, and the HTML provenance scrapers |
 | `docs/schema-stress-log.md` | **the most interesting file in the repo** — a running log of what each experiment revealed about the schema, including the ipTM finding |
 | `docs/demo-biology.md` | the biology, written for a software engineer |
+| `docs/deck/` | the project overview deck — sixteen slides covering the whole project, and the source of record for the published copy |
 
 ---
 
