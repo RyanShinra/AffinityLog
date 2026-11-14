@@ -1,7 +1,7 @@
 # Handoff — where the work is, and what is next
 
 **A living doc.** It says what is in flight and what is next, so the next session (Mac, PC or
-cloud) doesn't have to rebuild that from chat scrollback. Last updated **2026-11-12**.
+cloud) doesn't have to rebuild that from chat scrollback. Last updated **2026-11-14**.
 
 ## How to keep this file honest
 
@@ -22,8 +22,7 @@ cloud) doesn't have to rebuild that from chat scrollback. Last updated **2026-11
 **Gate: the arc review comes first** (`docs/deck/arc.md`). The audience and the read-alone format
 are decided. Two questions are with the owner: one thesis or thesis plus method, and whether a cold
 open is fair game. Rows 3, 5 and 6 wait on the arc, because they may move or merge. Row 4 (the
-cover) starts the language review once the arc is set. The slide 7 title fix is the one item
-that doesn't wait: the primary reader is biopharma, and that reader catches the overclaim first.
+cover) starts the language review once the arc is set.
 
 Branch `portfolio-deck`. Deck: <https://claude.ai/artifact/71smZjwSgUvCMujvT6anDc>.
 Git is the source of record; see `docs/deck/README.md` for the page-edit → folder → republish loop.
@@ -39,15 +38,18 @@ On 2026-11-12 the published copy and `docs/deck/project/` matched exactly.
 
 ### Raised during the title pass, not yet decided
 
-The title pass itself is done (commit `57a8487`). It turned up three follow-ups:
+The title pass itself is done (commit `57a8487`). It turned up these follow-ups, still open:
 
 - **Twelve or sixteen?** The 2026-11-12 to-do said "the twelve titles"; the deck README marks sixteen
   as agreed, and all sixteen were applied. If four were meant to wait, they need reverting.
-- **Slide 7, *humanization*: "Humanization traded binding for safety"** claims two things the body
-  denies. Neither run measures humanness, so "safety" isn't shown. There is no antibody binding
-  number, so "binding" is standing in for ipTM. That's the same overclaim as "predicted binding
-  probability", which the deck README records as corrected. Suggested replacement: **"What
-  humanization cost in placement confidence"**.
+- **"HER2 binding confidence" is the product's own wording, not just the deck's** (found 2026-11-14).
+  It is the catalog `display_name` for `boltz2.protein_iptm` on a complex (`seed/catalog.json:122`),
+  so the API serves it, and *query* (13) shows it because that is the real output. It is also in
+  `README.md`, migration 005's docstring, `docs/scoreentry-plan.md` and six test files. *corpus*
+  (5) says "0.09 of binding confidence" in its own words. That is the same overclaim slide 7 just
+  dropped, and now slide 7 says "placement" while 13 says "binding". Renaming it is a catalog data
+  change: a decision for the owner, not a deck edit. The seeder is idempotent, but check whether it
+  updates `display_name` on an existing row or only inserts.
 - **Slide 20, *open*: "Every number here is predicted"** nearly repeats the heading of its own fourth
   card ("Everything here is predicted"), the same knock-on *stack* had. It also names a four-card
   slide after one card, and it opens on a limit. Either the card or the title has to change.

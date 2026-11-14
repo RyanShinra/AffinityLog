@@ -128,7 +128,7 @@ item below).
 | 4 | models | The models in the recipes | Each module outputs its own columns |
 | 5 | corpus | What I actually ran | Eleven runs, nine that produced data |
 | 6 | anatomy | What one run gives you | Sample output from run 8 |
-| 7 | humanization | What humanization changed | Humanization traded binding for safety |
+| 7 | humanization | What humanization changed | What humanization cost in placement confidence ¹ |
 | 8 | finding | One column, multiple meanings | ipTM means three different things |
 | 9 | layers | Three layers | Three layers to pin down one meaning |
 | 10 | discriminator | Telling the three apart | Chain composition decides the meaning |
@@ -143,6 +143,10 @@ item below).
 | 19 | snapshot | A code-first schema needs a snapshot | The snapshot that catches contract drift |
 | 20 | open | What is open, and why it's written down | Every number here is predicted |
 | 21 | close | Where it ended up | Flexibility breeds complexity |
+
+¹ Revised 2026-11-14 from the agreed "Humanization traded binding for safety", which claimed two
+things the slide denies: neither run scores humanness, so "safety" is not shown, and an antibody
+has no binding number, so "binding" was standing in for ipTM.
 
 Knock-on edit, applied with the titles: *stack*'s closing paragraph opened "Two heads on one app, on
 purpose", which would have restated its own new title six inches below itself. It now starts at

@@ -17,8 +17,7 @@ helping.
 
 - **Overclaims cost the most with the primary reader.** A biopharma reader spots "binding" standing
   in for ipTM at once. The precision of the caveats is the selling point to that reader, so a wrong
-  one undoes the whole pitch. That moves the slide 7 title (see `../handoff.md`) to the front of
-  the queue.
+  one undoes the whole pitch. The slide 7 title was fixed first for that reason (2026-11-14).
 - **The caveats are a feature, but only if they are gathered.** Precision about what a number is
   *not* is what that reader is hiring for. Nine slides ending on a hedge reads as nervousness.
   The same hedges collected in one place reads as rigor. (Row 6 in the handoff.)
